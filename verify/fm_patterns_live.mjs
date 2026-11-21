@@ -136,11 +136,17 @@ let replayOk = await tryReplay(page);
 // 결과 화면의 '계속' — 리플레이가 재생 중이면 잠시 가려질 수 있어 다시 나타날 때까지 기다립니다
 async function continueFromResult(p) {
   const btn = p.locator('#ov-continue');
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 20; i++) {
     if (await btn.isVisible().catch(() => false)) { await btn.click().catch(() => {}); return true; }
     await sleep(300);
   }
-  return false;
+  // 리플레이가 물려 화면이 잠시 가려진 경우 — 버튼 핸들러를 직접 부릅니다
+  return p.evaluate(() => {
+    const b = document.getElementById('ov-continue');
+    if (!b) return false;
+    b.click();
+    return true;
+  }).catch(() => false);
 }
 
 // 하프타임
