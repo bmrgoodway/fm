@@ -516,7 +516,9 @@ export class Match {
     this.t = this.half1Ticks;
     this.phase = 'half';
     this.sp = null;
+    this.clearDives();          // 하프타임에는 키퍼가 뻗은 자세로 남지 않습니다
     this.ball.owner = null;
+    this.ball.shot = null;
     this.ball.mode = 'loose';
     this.ball.vx = 0; this.ball.vy = 0;
     this.ball.x = W / 2; this.ball.y = CY;
