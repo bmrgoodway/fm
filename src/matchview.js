@@ -352,7 +352,8 @@ export function mountMatch(app, m, meta) {
     lastTickerId = c.id;
     $('tk-min').textContent = c.label || `${c.minute}'`;
     const el = $('tk-text');
-    el.textContent = c.text;
+    // 골 멘트는 이미 분을 달고 있어 티커에서 한 번만 보이게 정리합니다
+    el.textContent = c.text.replace(/^⚽\s*\d+(?:\+\d+)?'\s*/, '⚽ ');
     el.classList.remove('tk-in');
     void el.offsetWidth;
     el.classList.add('tk-in');
