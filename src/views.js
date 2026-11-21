@@ -445,7 +445,7 @@ export function renderSeason(app) {
     <h1>${s.myRank === 1 ? '🏆 리그 우승!' : `${s.myRank}위로 시즌 마감`}</h1>
     <p class="hero-desc">${esc(w.teams[w.myTeamId].name)} · 승점 ${my?.pts ?? 0} · ${my?.win ?? 0}승 ${my?.draw ?? 0}무 ${my?.loss ?? 0}패 (${my?.gf ?? 0}-${my?.ga ?? 0})</p>
     <div class="season-grid">
-      <article class="card"><h3>최종 순위</h3>
+      <article class="card"><div class="card-head"><h3>최종 순위</h3><span class="pill">리그 우승 ${s.champion ? esc(w.teams[s.champion].short) : '—'}</span></div>
         <ol class="final-table">${s.table.map((x) => `<li class="${x.id === w.myTeamId ? 'on' : ''}"><span>${x.rank}</span>${teamLine(w, x.id)}<b>${x.pts}</b><small>${x.gf}:${x.ga}</small></li>`).join('')}</ol>
       </article>
       <article class="card"><h3>컵대회</h3>
@@ -484,6 +484,16 @@ export function renderModal(app) {
       <h3 id="m-title">${esc(p?.name)} 선수를 방출할까요?</h3>
       <p>${esc(p?.pos)} · 종합 ${p?.ovr} · 예상 이적료 ${won(Math.round((p?.value || 0) * 0.9 * 10) / 10)}. 선수단에서 빠지고 이적 자금이 늘어납니다.</p>
       <div class="actions"><button class="btn danger" data-act="sell-confirm" data-pid="${m.pid}" type="button">방출하기</button><button class="btn" data-act="modal-close" type="button">취소</button></div>
+    </div></div>`;
+  }
+  if (m.kind === 'overwrite') {
+    const t = app.defs[m.team];
+    const old = app.savedGame?.teams?.[app.savedGame.myTeamId] || (app.world ? app.world.teams[app.world.myTeamId] : null);
+    return `<div class="modal-back" data-act="modal-close"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <h3 id="m-title">기존 커리어를 지우고 새로 시작할까요?</h3>
+      <p>${old ? `${esc(old.name)} · ${(app.savedGame || app.world).season}시즌 커리어` : '저장된 커리어'}가 이 브라우저에서 사라집니다. 되돌릴 수 없습니다.</p>
+      <p class="sm"><b>${esc(t.name)}</b> 감독으로 새로 시작합니다.</p>
+      <div class="actions"><button class="btn danger" data-act="overwrite-confirm" data-team="${t.id}" type="button">지우고 새로 시작</button><button class="btn" data-act="modal-close" type="button">취소</button></div>
     </div></div>`;
   }
   if (m.kind === 'team') {

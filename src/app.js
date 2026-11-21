@@ -106,11 +106,18 @@ function onClick(e) {
 
   switch (act) {
     case 'team': state.modal = { kind: 'team', team: el.dataset.team }; render(); break;
-    case 'team-sign': newGame(el.dataset.team); break;
+    case 'team-sign':
+      if (state.world || state.savedGame) { state.modal = { kind: 'overwrite', team: el.dataset.team }; render(); }
+      else newGame(el.dataset.team);
+      break;
+    case 'overwrite-confirm': state.modal = null; newGame(el.dataset.team); break;
     case 'continue':
       if (state.savedGame) { state.world = state.savedGame; state.view = 'hub'; state.tab = 'schedule'; state.selSlot = 0; render(); }
       break;
-    case 'new-game': if (w) state.modal = { kind: 'new-game' }; else { state.view = 'select'; state.modal = null; render(); } break;
+    case 'new-game':
+      if (w) state.modal = { kind: 'new-game' };
+      else { state.view = 'select'; state.modal = null; }
+      render(); break;
     case 'new-game-confirm': W.wipeWorld(); state.world = null; state.savedGame = null; state.modal = null; state.view = 'select'; render(); break;
     case 'modal-close': if (el.classList.contains('modal-back') && e.target !== el) break; state.modal = null; render(); break;
     case 'tab': state.tab = el.dataset.tab; state.selPid = null; state.selSlot = 0; state.modal = null; render(); break;
