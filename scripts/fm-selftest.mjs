@@ -8,7 +8,7 @@
 //   6) 다경기 밸런스(득점·xG·코너·프리킥·골킥·파울·카드·부상)
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld } from '../src/world.js';
-import { Match, lineupFor } from '../src/match.js';
+import { Match, lineupFor, applyResult } from '../src/match.js';
 
 const N = Number(process.argv[2] || 24);
 let fails = 0;
@@ -166,6 +166,28 @@ console.log('\n[4] 경고 · 퇴장 · 부상');
   m.injure(q, side, 'test');
   ok(q.injured && q.factor < before && side.stats.injuries === 1, '부상 — 능력치 저하와 부상 집계', `factor ${before.toFixed(2)} → ${q.factor.toFixed(2)}`);
   ok(m.events.some((e) => e.type === 'injury') && m.events.some((e) => e.type === 'card'), '중계 기록에 부상·카드 이벤트');
+}
+
+/* ── 4-2. 다음 경기 출전 정지 · 부상 결장 연결 ── */
+console.log('\n[4-2] 다음 경기 출전 정지 · 부상');
+{
+  const m = newMatch('gs', 'dj', 'susp');
+  for (let i = 0; i < 6; i++) m.tick();
+  const side = m.sides[m.userSide];
+  const victim = side.players.find((e) => e.onPitch && e.pos === 'DF');
+  const hurt = side.players.find((e) => e.onPitch && e !== victim && e.pos === 'MF');
+  m.giveCard(victim, 'red');
+  m.injure(hurt, side, 'test');
+  let g = 0;
+  while (!m.done && g < 4000) { m.tick(); g++; }
+  if (!m.done) m.finish();
+  applyResult(world, m);
+  const pv = world.players[victim.id], ph = world.players[hurt.id];
+  ok(pv.bans === 1, '퇴장 → 다음 경기 출전 정지 1경기', `${pv.name} bans=${pv.bans}`);
+  ok(ph.inj >= 1, '부상 → 결장 경기 수 기록', `${ph.name} inj=${ph.inj}`);
+  const l = lineupFor(world, world.myTeamId);
+  ok(!l.starters.includes(pv.id), '정지 선수는 다음 경기 선발에서 빠짐', `${pv.name}`);
+  ok(!l.starters.includes(ph.id), '부상 선수도 선발에서 빠짐', `${ph.name}`);
 }
 
 /* ── 5. 보간용 이전 좌표 ── */
