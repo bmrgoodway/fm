@@ -250,5 +250,94 @@ console.log(`\n[6] 다경기 시뮬레이션 밸런스 (${N}경기)`);
   console.log(`  · 득점 분포: ${gd.join(', ')}`);
 }
 
+/* ── 7. 오픈 플레이 공간 분포 (중앙 과밀 해소) ── */
+console.log('\n[7] 오픈 플레이 공간 분포');
+{
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const acc = { frames: 0, nn: 0, nnN: 0, close: 0, pairN: 0, swarm: 0, cluster: 0 };
+  for (let i = 0; i < 6; i++) {
+    const m = newMatch('gs', 'dj', `space-${i}`);
+    m.holdHalf = false;      // 전·후반 전체를 재야 공간 분포가 대표성을 가집니다
+    let g = 0;
+    while (!m.done && g < 4000) {
+      m.tick(); g++;
+      if (m.phase !== 'play' || !m.ball.owner) continue;
+      for (const s of ['home', 'away']) {
+        const ps = m.sides[s].players.filter((e) => e.onPitch);
+        const out = ps.filter((e) => e.pos !== 'GK');
+        for (const e of ps) {
+          let nn = 1e9;
+          for (const o of ps) if (o !== e) nn = Math.min(nn, dist(o, e));
+          acc.nn += nn; acc.nnN += 1;
+        }
+        for (let a = 0; a < out.length; a++) for (let b = a + 1; b < out.length; b++) {
+          acc.pairN += 1;
+          if (dist(out[a], out[b]) < 4) acc.close += 1;
+        }
+        acc.swarm += ps.filter((e) => dist(e, m.ball) < 6).length;
+        let worst = 0;
+        for (const e of out) worst = Math.max(worst, out.filter((o) => o !== e && dist(o, e) < 5).length);
+        acc.cluster += worst;
+      }
+      acc.frames += 1;
+    }
+  }
+  const nn = acc.nn / Math.max(acc.nnN, 1);
+  const closePct = (acc.close / Math.max(acc.pairN, 1)) * 100;
+  const swarm = acc.swarm / Math.max(acc.frames, 1);
+  const cluster = acc.cluster / Math.max(acc.frames, 1);
+  ok(closePct < 2.5, '같은 팀 선수가 4u 안에 겹치는 비율 낮음', `${closePct.toFixed(1)}% (개선 전 5%대)`);
+  ok(nn > 8, '최근접 동료와의 간격 충분', `평균 ${nn.toFixed(2)}u`);
+  ok(swarm < 3.2, '공 주변에 몰리는 선수가 적당', `평균 ${swarm.toFixed(2)}명`);
+  ok(cluster < 3.2, '한 선수 주변 5u 안에 동료가 몰리지 않음', `최대 ${cluster.toFixed(2)}명`);
+}
+
+/* ── 8. 전술별 전개 패턴·공간 분포 차이 ── */
+console.log('\n[8] 전술별 패스 패턴·공간');
+{
+  const mix = (preset, n = 12) => {
+    const a = { len: 0, sw: 0, th: 0, gg: 0, cb: 0, cr: 0, width: 0, depth: 0, wide: 0, pass: 0, goals: 0 };
+    for (let i = 0; i < n; i++) {
+      const m = newMatch('gs', 'dj', `mix-${JSON.stringify(preset)}-${i}`);
+      if (preset) m.sides.home.tactic = { line: 0, pass: 0, press: 0, route: 0, ...preset };
+      m.holdHalf = false;
+      let g = 0;
+      while (!m.done && g < 4000) { m.tick(); g++; }
+      if (!m.done) m.finish();
+      const s = m.stats();
+      const nAtt = s.passAtt.home || 1;
+      a.len += s.passLen.home / n;
+      a.sw += (s.patterns.switch.home / nAtt) * 100 / n;
+      a.th += (s.patterns.through.home / nAtt) * 100 / n;
+      a.gg += (s.patterns.givego.home / nAtt) * 100 / n;
+      a.cb += (s.patterns.cutback.home / nAtt) * 100 / n;
+      a.cr += (s.patterns.cross.home / nAtt) * 100 / n;
+      a.width += s.width.home / n;
+      a.depth += s.depth.home / n;
+      a.wide += s.wideShare.home / n;
+      a.pass += nAtt / n;
+      a.goals += (m.score.home + m.score.away) / n;
+    }
+    return a;
+  };
+  const bal = mix(null);
+  const shortC = mix({ pass: -1, route: -1 });
+  const longW = mix({ pass: 1, route: 1 });
+  const highP = mix({ line: 1, press: 1 });
+  const lowP = mix({ line: -1, press: -1 });
+  const f = (v) => v.toFixed(1);
+  ok(longW.len - shortC.len > 8, '롱볼 vs 짧은 패스 — 평균 패스 거리가 뚜렷이 다름', `${f(shortC.len)}u → ${f(longW.len)}u`);
+  ok(longW.sw - shortC.sw > 8, '롱볼·측면은 사이드 전환이 훨씬 많음', `전환 ${f(shortC.sw)}% → ${f(longW.sw)}%`);
+  ok(shortC.gg >= bal.gg * 0.6, '짧은 패스 축은 원투(원-투) 연계를 유지', `원투 ${f(shortC.gg)}% (기준 ${f(bal.gg)}%)`);
+  ok(longW.cb + longW.cr > shortC.cb + shortC.cr, '측면 루트는 크로스·컷백이 더 많음', `크로스+컷백 ${f(shortC.cb + shortC.cr)}% → ${f(longW.cb + longW.cr)}%`);
+  ok(longW.width - shortC.width > 1.2, '측면 루트는 선수 평균 폭이 넓음', `폭 ${f(shortC.width)}u → ${f(longW.width)}u`);
+  ok(longW.wide - shortC.wide > 8, '측면 루트는 공이 측면에 머무는 시간이 길다', `측면 점유 ${f(shortC.wide)}% → ${f(longW.wide)}%`);
+  ok(highP.depth - lowP.depth > 3, '높은 라인은 평균 깊이(진행도)가 높음', `깊이 ${f(lowP.depth)}u → ${f(highP.depth)}u`);
+  ok(bal.th > 2, '기본 전개에도 스루패스가 나옴', `스루 ${f(bal.th)}%`);
+  // 네 축을 바꿨을 때 득점이 한쪽으로 무너지지 않는지
+  const gl = [bal, shortC, longW, highP, lowP].map((x) => x.goals);
+  ok(Math.max(...gl) - Math.min(...gl) < 2.2, '전술별 득점 편차가 과하지 않음', gl.map(f).join(' / '));
+}
+
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);
 process.exit(fails ? 1 : 0);
