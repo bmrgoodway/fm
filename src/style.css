@@ -267,6 +267,9 @@ html[data-theme="night"] .tc-words { color: #03210f; }
 .results li i { width: 19px; height: 19px; display: inline-grid; place-content: center; font-style: normal; font-size: 10px; font-weight: 900; border: 1.5px solid var(--line); }
 .results .tl { flex: 1; }
 
+.mini-row { align-items: center; }
+.mini-pitch { width: 92px; height: 59px; border: 1.5px solid var(--line); flex: none; background: #2f9e4f; }
+
 /* ── 표 ─────────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 420px; }

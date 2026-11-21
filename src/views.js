@@ -23,6 +23,26 @@ export function applyTeamColors(root, world) {
 export const badge = (t, cls = '') => `<span class="badge ${cls}" data-team="${t.id}" aria-hidden="true">${esc(t.short.slice(0, 2))}</span>`;
 const formChips = (rec) => (rec && rec.length ? `<span class="form">${rec.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>` : '<span class="muted sm">경기 없음</span>');
 const won = (v) => `${W.fmt(v)}억`;
+
+/* 작은 포메이션 미리보기 (SVG) */
+function miniPitch(formation, team, flip) {
+  const slots = FORMATIONS[formation]?.slots || [];
+  const dots = slots.map((s) => {
+    const x = (flip ? 1 - s.x : s.x) * 100;
+    const y = s.y * 64;
+    const big = s.pos === 'GK';
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${big ? 3.4 : 3}" fill="${team.primary}" stroke="#101014" stroke-width="1.2"/>`;
+  }).join('');
+  return `<svg class="mini-pitch" viewBox="0 0 100 64" role="img" aria-label="${esc(team.short)} ${esc(formation)} 예상 배치">
+    <rect x="1" y="1" width="98" height="62" fill="#2f9e4f" stroke="#101014" stroke-width="1.5"/>
+    <path d="M50 1v62" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <circle cx="50" cy="32" r="8" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <rect x="1" y="19" width="12" height="26" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <rect x="87" y="19" width="12" height="26" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    ${dots}
+  </svg>`;
+}
+
 const rankLabel = (n) => `${n}위`;
 
 function teamLine(w, id) {
@@ -141,7 +161,7 @@ function nextMatchCard(app, w) {
     <dl class="cmp">
       <div><dt>전력</dt><dd>${bar(myP, oppP)}<span>${myP} : ${oppP}</span></dd></div>
       <div><dt>최근 5경기</dt><dd>${formChips(myForm.slice(-5))}<span class="vs-sep">vs</span>${formChips(opp.recent?.slice(-5) || [])}</dd></div>
-      <div><dt>예상 포메이션</dt><dd><span>${esc(me.formation)}</span><span class="vs-sep">vs</span><span>${esc(opp.formation)}</span></dd></div>
+      <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(me.formation, me, false)}<span class="vs-sep">vs</span>${miniPitch(opp.formation, opp, true)}</dd></div>
       <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(me.tactic))}</span><span class="vs-sep">vs</span><span>${esc(tacticWords(opp.tactic))}</span></dd></div>
     </dl>
     <div class="actions">
