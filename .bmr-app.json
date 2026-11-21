@@ -1,0 +1,12 @@
+{
+  "slug": "fm",
+  "name": "Football Manager",
+  "schema": "fm",
+  "db_role": "fm_dev",
+  "bucket": "fm",
+  "function": "fm-fn",
+  "secret_prefix": "FM_",
+  "supabase_ref": "wjvqavianqceeyyxonfg",
+  "url": "https://bmrgoodway.github.io/fm/",
+  "template": "bmr-app-templates v2"
+}
