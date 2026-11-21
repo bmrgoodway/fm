@@ -9,8 +9,21 @@ import { posFactor, autoLineup } from './world.js';
 
 export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
 const TPM = 4;            // 1분 = 4틱 (한 틱 = 경기 15초)
-const SUBSTEPS = 3;
-const SETUP_TICKS = { corner: 5, freekick: 4, goalkick: 3 };
+// 한 틱(경기 15초)을 몇 단계로 쪼개 판단·이동하는지.
+// 공이 여러 틱에 걸쳐 날아가게 되면서 그 사이 '결정할 기회'가 줄어드는데,
+// 단계 수를 늘려 경기 흐름(패스·슛 빈도)을 예전과 같게 유지합니다.
+const SUBSTEPS = 5;
+const STEP_K = 3 / SUBSTEPS;   // 3단계 기준이던 이동량·확률을 틱 기준으로 같게
+const SETUP_TICKS = { corner: 3, freekick: 3, goalkick: 2 };
+const WARP_TICKS = 2;     // 세트피스·재개 때 제자리로 모이는 데 쓰는 틱 수(한 프레임 순간이동 대신)
+const DIVE_LAND_TICKS = 2; // 다이빙을 마친 키퍼가 일어나는 데 쓰는 틱 수
+
+/* 골키퍼 다이빙 진행도 — 0(서 있음) → 1(완전히 뻗음). 마무리(landAt) 뒤에는 2틱에 걸쳐 돌아옵니다. */
+export function diveProgress(dive, t, a = 0) {
+  if (!dive) return 0;
+  if (dive.landAt != null) return Math.max(0, 1 - (t - dive.landAt + a) / DIVE_LAND_TICKS);
+  return Math.max(0, Math.min(1.12, (t - dive.at + a) / Math.max(dive.dur || 1, 1)));
+}
 
 /* 유니폼 색이 비슷하면 원정팀은 다른 키트를 입는다 */
 function rgb(hex) {
@@ -214,6 +227,9 @@ export class Match {
     this.commentary = [];
     this.fx = [];
     this.lastEventId = 0;
+    this.speed = 1;             // 화면 배속 — 득점 연출 길이(pause)를 벽시계에 맞춥니다
+    this.wt = 0;                // 일시정지 중에도 흐르는 틱 수(워프·연출 진행용)
+    this.lastKickoffT = -99;    // 마지막 킥오프(순간이동) 시각 — 리플레이 클립이 이 앞을 담지 않게
     this.pens = null;
     this.aet = false;
     this.holdHalf = false;      // 화면이 하프타임 카드를 보여 주는 동안 엔진을 멈춥니다
@@ -326,35 +342,91 @@ export class Match {
   }
 
   /* ───────────── 위치·재개 ───────────── */
-  resetPositions() {
+  setSpeed(v) { this.speed = clamp(Number(v) || 1, 1, 4); }
+
+  /* 다이빙 정리 — 킥오프·세트피스·새 공 전개에서는 골키퍼가 바로 일어납니다 */
+  clearDives() {
     for (const s of ['home', 'away']) {
-      const side = this.sides[s];
-      for (const e of side.players) {
-        if (!e.onPitch) continue;
-        e.x = side.dir > 0 ? e.slot.x * W : W - e.slot.x * W;
-        e.y = e.slot.y * H;
-        e.px = e.x; e.py = e.y;
+      for (const e of this.sides[s].players) if (e.pos === 'GK') e.dive = null;
+      for (const e of this.sides[s].bench) if (e.pos === 'GK') e.dive = null;
+    }
+  }
+  /* 슛이 끝난 뒤 — 뻗은 자세에서 2틱에 걸쳐 일어납니다 */
+  landDives() {
+    for (const s of ['home', 'away']) {
+      for (const e of this.sides[s].players) if (e.dive && e.dive.landAt == null) e.dive.landAt = this.t;
+    }
+  }
+  expireDives() {
+    for (const s of ['home', 'away']) {
+      for (const e of this.sides[s].players) {
+        if (e.dive && e.dive.landAt != null && this.t - e.dive.landAt >= DIVE_LAND_TICKS) e.dive = null;
       }
     }
   }
 
-  startPossession(sideName, reason = '') {
+  /* 자리로 모이기 — y=목표. 한 프레임에 85u 튀지 않고 n틱에 걸쳐 미끄러지듯 이동합니다. */
+  warpTo(e, x, y, ticks = WARP_TICKS) {
+    if (!e) return false;
+    const d = Math.hypot(x - e.x, y - e.y);
+    if (d < 2.0) { e.warp = null; return false; }
+    e.warp = { x0: e.x, y0: e.y, x1: x, y1: y, t0: this.wt, n: Math.max(1, ticks) };
+    return true;
+  }
+  stepWarps() {
+    for (const s of ['home', 'away']) {
+      for (const e of this.sides[s].players) {
+        const w = e.warp;
+        if (!w) continue;
+        const p = clamp((this.wt - w.t0) / w.n, 0, 1);
+        const k = p * p * (3 - 2 * p);      // 부드럽게 출발하고 부드럽게 도착
+        const nx = w.x0 + (w.x1 - w.x0) * k;
+        const ny = w.y0 + (w.y1 - w.y0) * k;
+        e.moved = Math.hypot(nx - e.x, ny - e.y);
+        e.x = nx; e.y = ny;
+        if (p >= 1) e.warp = null;
+      }
+    }
+  }
+
+  resetPositions(warpTicks = 0) {
+    for (const s of ['home', 'away']) {
+      const side = this.sides[s];
+      for (const e of side.players) {
+        if (!e.onPitch) continue;
+        const tx = side.dir > 0 ? e.slot.x * W : W - e.slot.x * W;
+        const ty = e.slot.y * H;
+        if (warpTicks > 0) this.warpTo(e, tx, ty, warpTicks);
+        else { e.warp = null; e.x = tx; e.y = ty; e.px = e.x; e.py = e.y; }
+      }
+    }
+  }
+
+  startPossession(sideName, reason = '', opts = {}) {
     const side = this.sides[sideName];
     if (!side) return;
     const mids = side.players.filter((e) => e.onPitch && e.pos === 'MF');
-    const carrier = mids.length ? mids[Math.floor(this.rng() * mids.length)] : side.players.find((e) => e.onPitch && e.pos !== 'GK') || side.players[0];
+    const carrier = (opts.carrier && opts.carrier.onPitch) ? opts.carrier
+      : mids.length ? mids[Math.floor(this.rng() * mids.length)]
+        : side.players.find((e) => e.onPitch && e.pos !== 'GK') || side.players[0];
     if (!carrier) return;
     if (reason === 'kickoff' || reason === 'goal') {
-      this.resetPositions();
+      // opts.placed = 득점 연출(일시정지) 동안 이미 대형으로 워프해 둔 상태
+      if (!opts.placed) this.resetPositions();
       carrier.x = 48; carrier.y = CY;
       carrier.px = carrier.x; carrier.py = carrier.y;
+      carrier.warp = null;
+      this.lastKickoffT = this.t;
     }
+    this.clearDives();
     this.ball.owner = carrier;
     this.ball.mode = 'carry';
     this.ball.x = carrier.x; this.ball.y = carrier.y;
     this.ball.px = this.ball.x; this.ball.py = this.ball.y;
     this.ball.trail = [];
     this.ball.shot = null;
+    this.ball.passer = null;
+    this.ball.receiver = null;
     this.possessionStart = this.t;
     this.sp = null;
     this.phase = 'play';
@@ -363,6 +435,7 @@ export class Match {
   /* ───────────── 틱 ───────────── */
   tick() {
     if (this.done) return;
+    this.wt += 1;
     if (this.phase === 'half') {
       if (!this.holdHalf) this.startSecondHalf();
       return;
@@ -370,10 +443,14 @@ export class Match {
     if (this.pause > 0) {
       this.pause -= 1;
       this.updateStamina(true);
+      this.snapshot();
+      this.stepWarps();                                  // 득점 연출 중에도 대형으로 흩어지는 워프는 진행
       if (this.ball.mode === 'net') this.moveBall();
       if (this.pause === 0 && this.phase === 'goal' && this.pendingRestart) {
-        this.startPossession(this.pendingRestart, 'goal');
+        this.startPossession(this.pendingRestart, 'goal', { placed: this.formationReady, carrier: this.restartCarrier });
         this.pendingRestart = null;
+        this.formationReady = false;
+        this.restartCarrier = null;
       }
       return;
     }
@@ -382,11 +459,12 @@ export class Match {
     if (this.done) return;
     if (this.phase === 'setpiece') {
       this.stepSetPiece();
+      this.expireDives();
       this.checkClock();
       return;
     }
-    if (this.phase !== 'play') { this.checkClock(); return; }
-    // 한 틱(=경기 15초) 안에서 세 번의 플레이 단계를 돌린다 — 패스·슛이 더 자주 나온다
+    if (this.phase !== 'play') { this.expireDives(); this.checkClock(); return; }
+    // 한 틱(=경기 15초) 안에서 SUBSTEPS 번의 플레이 단계를 돌린다 — 패스·슛이 더 자주 나온다
     for (let i = 0; i < SUBSTEPS; i++) {
       this.updateStamina(false);
       this.updateDrift();
@@ -398,6 +476,7 @@ export class Match {
       this.countPossession();
       if (this.done) return;
     }
+    this.expireDives();
     if (this.t % 30 === 1) this.aiManage();
     this.aiAdjust();
     this.checkClock();
@@ -538,9 +617,9 @@ export class Match {
   updateDrift() {
     for (const s of ['home', 'away']) {
       for (const e of this.sides[s].players) {
-        e.rt -= 1;
+        e.rt -= STEP_K;
         if (e.rt <= 0) {
-          e.rt = rint(this.rng, 14, 34);
+          e.rt = rint(this.rng, 14, 34) / STEP_K;
           e.rx = (this.rng() - 0.5) * 5;
           e.ry = (this.rng() - 0.5) * 5;
         }
@@ -595,6 +674,7 @@ export class Match {
 
   /* ───────────── 이동 ───────────── */
   movePlayers() {
+    this.stepWarps();       // 자리로 모이는 중인 선수는 워프가 위치를 정합니다
     const owningSide = this.ball.owner ? this.ball.owner.side : null;
     for (const s of ['home', 'away']) {
       const side = this.sides[s];
@@ -611,12 +691,13 @@ export class Match {
       const hasBall = owningSide === s;
       for (const e of side.players) {
         if (!e.onPitch) continue;
+        if (e.warp) continue;
         e.press = false;
         const tgt = this.phase === 'setpiece' ? this.setPieceTargetFor(e) : this.targetFor(e, side, hasBall);
         e.lastTarget = tgt;
         const dx = tgt.x - e.x, dy = tgt.y - e.y;
         const d = Math.hypot(dx, dy);
-        let sp = (0.42 + this.eff(e, 'spd') / 100 * 0.62);
+        let sp = (0.42 + this.eff(e, 'spd') / 100 * 0.62) * STEP_K;
         if (e === this.ball.owner) sp *= 1.06;
         else if (e.press) sp *= 1.12;
         if (e.injured) sp *= 0.72;
@@ -723,6 +804,8 @@ export class Match {
     const ball = this.ball;
     if (ball.mode !== 'carry' || !ball.owner) return;
     const c = ball.owner;
+    // 골키퍼가 공을 잡았으면 몸에 붙여 두지 않고 곧바로 배급합니다 (패스·골킥 전개)
+    if (c.pos === 'GK' && c.holdT != null) { c.holdT = null; this.distributeFromGK(c); return; }
     c.decCd -= 1;
     if (c.decCd > 0) return;
     const gx = c.dir > 0 ? W : 0;
@@ -732,7 +815,7 @@ export class Match {
 
     if (c.pos !== 'GK' && dGoal < 27) {
       const angle = 1 - Math.abs(c.y - CY) / H;
-      let urge = clamp((25 - dGoal) / 24, 0, 1) * 0.8 * (this.eff(c, 'sho') / 70) * angle;
+      let urge = clamp((25 - dGoal) / 24, 0, 1) * 1.10 * (this.eff(c, 'sho') / 70) * angle;
       if (side.tactic.route < -0.4) urge *= 1.2;
       urge *= 1 - Math.min(pressure, 3) * 0.14;
       if (this.rng() < clamp(urge, 0.01, 0.72)) return this.shoot(c, dGoal, pressure);
@@ -745,6 +828,25 @@ export class Match {
       if (this.rng() < passP) return this.passTo(c, best.mate, best.cross);
     }
     c.decCd = rint(this.rng, 1, 2);
+  }
+
+  /* 골키퍼 배급 — 잡은 공을 오래 끌지 않고 동료에게 넘깁니다 */
+  distributeFromGK(gk) {
+    const side = this.sides[gk.side];
+    const mates = side.players.filter((e) => e.onPitch && e !== gk && e.pos !== 'GK');
+    if (!mates.length) return false;
+    const style = side.tactic.pass || 0;
+    const long = this.rng() < (style > 0.1 ? 0.8 : 0.35);
+    let rec = null;
+    if (long) {
+      rec = mates.filter((e) => e.pos === 'FW' || e.pos === 'MF')
+        .sort((a, b) => prog(b.x, side.dir) - prog(a.x, side.dir))[0];
+    }
+    if (!rec) rec = mates.slice().sort((a, b) => dist(a, gk) - dist(b, gk))[0];
+    if (!rec) return false;
+    gk.decCd = 1;
+    this.passTo(gk, rec, false);
+    return true;
   }
 
   bestPass(c, pressure) {
@@ -793,12 +895,13 @@ export class Match {
   passTo(c, m, cross) {
     const d = dist(c, m);
     const ball = this.ball;
+    this.clearDives();
     ball.mode = 'pass';
     ball.from = { x: c.x, y: c.y };
     ball.to = { x: m.x, y: m.y };
     ball.t = 0;
-    // dur = 날아가는 틱 수 (멀수록 오래). 1x 화면에서 짧은 패스는 0.13~0.4초
-    ball.dur = clamp(0.12 + d / 220, 0.15, 0.34);
+    // dur = 날아가는 틱 수(정수). 짧은 패스 1틱, 긴 패스 2틱 — 화면이 매 틱 궤적을 이어 그립니다
+    ball.dur = clamp(Math.round(1 + d / 45), 1, 2);
     ball.passer = c;
     ball.receiver = m;
     ball.cross = !!cross;
@@ -816,7 +919,7 @@ export class Match {
   /* ───────────── 슈팅 ───────────── */
   xgFor(c, dGoal, pressure) {
     const angle = 1 - Math.abs(c.y - CY) / 42;
-    const base = 0.86 * Math.exp(-dGoal / 8.8) * clamp(angle, 0.12, 1);
+    const base = 1.22 * Math.exp(-dGoal / 8.4) * clamp(angle, 0.12, 1);
     const skill = 0.72 + this.eff(c, 'sho') / 210;
     const press = 1 - Math.min(pressure, 3) * 0.11;
     return clamp(base * skill * press, 0.02, 0.6);
@@ -826,7 +929,6 @@ export class Match {
     const side = this.sides[c.side];
     const gx = c.dir > 0 ? W : 0;
     const xg = this.xgFor(c, dGoal, pressure) * (header ? 0.5 : 1);
-    const aimY = CY + (this.rng() - 0.5) * 9;
     const ball = this.ball;
     const gk = this.sides[this.opposing[c.side]].players.find((e) => e.pos === 'GK' && e.onPitch);
     // 결과는 슛을 때리는 순간 정해 두되(애니메이션을 미리 맞추기 위해),
@@ -837,14 +939,23 @@ export class Match {
     if (r < xg) outcome = 'goal';
     else if (r < xg + 0.05) outcome = 'woodwork';
     else if (r < xg + 0.05 + onTargetP * 0.55) outcome = 'save';
+    // 조준점은 결과에 맞춰 따로 — 골은 골문 안, 빗나감은 골문 밖, 골대는 정확히 포스트
+    const sgn = this.rng() < 0.5 ? -1 : 1;
+    let aimY;
+    if (outcome === 'woodwork') aimY = CY + sgn * GOAL_HALF;
+    else if (outcome === 'miss') aimY = CY + sgn * (GOAL_HALF + 0.5 + this.rng() * 2.8);   // 4.2~7.0u 바깥
+    else aimY = CY + sgn * (0.45 + this.rng() * (GOAL_HALF - 0.75));                      // 골·선방은 ±3.4u 안쪽
     const big = this.rng() < 0.3;
-    const dur = clamp(0.25 + dGoal / 45, 0.3, 0.9);
+    // 슛은 2~3틱에 걸쳐 날아갑니다 — 1x 에서 28~41프레임, 4x 에서도 7~10프레임 보입니다
+    const dur = clamp(Math.round(1 + dGoal / 16), 2, 3);
+    this.clearDives();
     ball.mode = 'shot';
     ball.from = { x: c.x, y: c.y };
     ball.to = { x: gx, y: aimY };
     ball.t = 0;
     ball.dur = dur;
     ball.owner = null;
+    ball.receiver = null;
     ball.trail = [{ x: c.x, y: c.y }];
     ball.shot = { shooter: c, xg, pressure, header, aimY, outcome, big, onTargetP, gk };
     ball.passer = null;
@@ -855,8 +966,8 @@ export class Match {
     c.decCd = 2;
     // 골키퍼 다이빙도 슛과 '동시에' 시작합니다 — 공이 도착할 즈음 손끝이 간신히 닿도록
     if (gk) {
-      const off = outcome === 'goal' ? (this.rng() < 0.5 ? -1 : 1) * (2.4 + this.rng() * 3.2) : 0;
-      gk.dive = { at: this.t, dur, to: clamp(aimY - gk.y + off, -7, 7), save: outcome === 'save' };
+      const wide = outcome === 'goal' ? sgn * (1.0 + this.rng() * 2.2) : 0;
+      gk.dive = { at: this.t, dur, to: clamp(aimY - gk.y + wide, -8, 8), save: outcome === 'save', landAt: null };
     }
     if (this.lastPass && this.t - this.lastPass.t <= 6 && this.lastPass.from.side === c.side && this.lastPass.from !== c) {
       this.assistCand = this.lastPass.from;
@@ -868,6 +979,12 @@ export class Match {
   }
 
   resolveShot() {
+    this.resolveShotInner();
+    // 슛이 끝나면 키퍼는 2틱에 걸쳐 일어납니다 (뻗은 자세로 남지 않게)
+    this.landDives();
+  }
+
+  resolveShotInner() {
     const ball = this.ball;
     const s = ball.shot;
     if (!s) { ball.mode = 'loose'; ball.owner = null; return; }
@@ -880,7 +997,7 @@ export class Match {
       side.stats.onTarget += 1;
       c.st.onTarget += 1;
       this.say('woodwork', c.side, { p: c.name }, 'woodwork');
-      this.fx.push({ kind: 'woodwork', at: this.t, x: c.dir > 0 ? W : 0, y: s.aimY });
+      this.fx.push({ kind: 'woodwork', at: this.t, x: c.dir > 0 ? W : 0, y: s.aimY, dir: c.dir });
       // 골대 맞고 나온 공 — 세컨드볼 또는 골킥
       if (this.rng() < 0.55) {
         const atk = side.players.filter((e) => e.onPitch && e.pos !== 'GK' && Math.hypot((c.dir > 0 ? W : 0) - e.x, CY - e.y) < 20);
@@ -910,8 +1027,16 @@ export class Match {
         if (gk.dive) gk.dive.save = true;
       }
       this.say(big ? 'supersave' : 'save', this.opposing[c.side], { p: gk ? gk.name : '골키퍼' }, 'save');
+      // 공은 골라인까지 가지 않고 키퍼 손끝에서 멈춰 잡힙니다 (골라인→키퍼 순간이동 없음)
+      if (gk) {
+        const handX = gk.x + c.dir * 1.1;
+        const handY = gk.y + clamp(s.aimY - gk.y, -3.2, 3.2) * 0.85;
+        this.fx.push({ kind: 'save', at: this.t, x: handX, y: handY, side: this.opposing[c.side], big });
+        ball.px = ball.x; ball.py = ball.y;
+        ball.x = handX; ball.y = handY;
+      }
       // 선방 후: 골문을 벗어나면 코너킥
-      if (this.rng() < 0.72) {
+      if (this.rng() < 0.78) {
         const spot = this.cornerSpot(c.side);
         ball.shot = null;
         this.setPiece('corner', c.side, spot.x, spot.y);
@@ -927,22 +1052,28 @@ export class Match {
         ball.shot = null;
         return;
       }
-      ball.owner = gk || oppSide.players.find((e) => e.onPitch && e.pos !== 'GK') || oppSide.players[0];
-      if (ball.owner) { ball.owner.decCd = 2; ball.mode = 'carry'; ball.x = ball.owner.x; ball.y = ball.owner.y; }
-      else ball.mode = 'loose';
+      // 키퍼가 잡았습니다 — 앞쪽 핸들링 자리에서 곧바로 배급합니다
+      const owner = gk || oppSide.players.find((e) => e.onPitch && e.pos !== 'GK') || oppSide.players[0];
+      ball.owner = owner;
+      if (owner) {
+        owner.decCd = 0;
+        ball.mode = 'carry';
+        ball.x = owner.x + owner.dir * 1.1; ball.y = owner.y;
+        if (owner.pos === 'GK') owner.holdT = this.t;    // 다음 틱에 바로 배급(공이 몸에 붙어 있지 않게)
+      } else ball.mode = 'loose';
       ball.shot = null;
       return;
     }
     // 빗나간 슛 → 수비 맞고 나가면 코너킥, 아니면 골킥
     this.say('miss', c.side, { p: c.name }, 'miss');
     ball.shot = null;
-    if (this.rng() < 0.2) {
+    if (this.rng() < 0.3) {
       const spot = this.cornerSpot(c.side);
       this.setPiece('corner', c.side, spot.x, spot.y);
       return;
     }
     const gks = this.goalKickSpot(this.opposing[c.side]);
-      this.setPiece('goalkick', this.opposing[c.side], gks.x, gks.y);
+    this.setPiece('goalkick', this.opposing[c.side], gks.x, gks.y);
   }
 
   goal(c, s) {
@@ -969,15 +1100,40 @@ export class Match {
     this.ball.x = gx; this.ball.y = s.aimY;
     this.ball.px = gx; this.ball.py = s.aimY;
     this.ball.t = 0;
-    this.ball.dur = 0.55;
+    this.ball.dur = 1;
     this.ball.owner = null;
+    this.ball.receiver = null;
     this.ball.shot = null;
     this.ball.trail = [];
+    this.clearDives();           // 실점한 키퍼가 뻗은 채로 남지 않게
     this.fx.push({ kind: 'goal', side: c.side, pid: c.id, name: c.name, at: this.t, x: gx, y: s.aimY, assist: c.assistName });
-    this.pause = 10;
+    // 득점 연출은 배속과 무관하게 벽시계 2.3초 — 4x 에서도 재개 장면이 배너에 가리지 않습니다
+    this.pause = Math.max(4, Math.round(10 * (this.speed || 1)));
     this.phase = 'goal';
     this.goalFlash = { side: c.side, name: c.name, assist: c.assistName, at: this.t };
     this.pendingRestart = this.opposing[c.side];
+    this.prepareRestart();
+  }
+
+  /* 득점 뒤 재개 준비 — 연출(일시정지) 동안 대형으로 워프하고, 재개 순간에 킥오프 순간이동이 없게 합니다 */
+  prepareRestart() {
+    const side = this.sides[this.pendingRestart];
+    if (!side) return;
+    const mids = side.players.filter((e) => e.onPitch && e.pos === 'MF');
+    const carrier = mids.length ? mids[Math.floor(this.rng() * mids.length)]
+      : (side.players.find((e) => e.onPitch && e.pos !== 'GK') || side.players[0] || null);
+    this.restartCarrier = carrier;
+    const ticks = Math.max(2, Math.min(8, Math.round(this.pause * 0.6)));
+    for (const s of ['home', 'away']) {
+      const sd = this.sides[s];
+      for (const e of sd.players) {
+        if (!e.onPitch) continue;
+        const tx = e === carrier ? 48 : (sd.dir > 0 ? e.slot.x * W : W - e.slot.x * W);
+        const ty = e === carrier ? CY : e.slot.y * H;
+        this.warpTo(e, tx, ty, ticks);
+      }
+    }
+    this.formationReady = true;
   }
 
   /* ────── 볼 이동 ──────
@@ -1009,7 +1165,8 @@ export class Match {
         for (const o of opps) {
           const d = Math.hypot(o.x - b.x, o.y - b.y);
           // 공이 지나가는 길목의 수비수가 끊을 수 있습니다
-          if (d < 1.9 && this.rng() < (0.07 + this.eff(o, 'def') / 1000)) {
+          // (비행이 여러 틱으로 늘었으니 틱당 확률을 dur 로 나눠 전체 차단 확률은 그대로)
+          if (d < 1.9 && this.rng() < (0.07 + this.eff(o, 'def') / 1000) * STEP_K / Math.max(1, b.dur)) {
             this.intercept(o, b.passer);
             return;
           }
@@ -1030,7 +1187,10 @@ export class Match {
       const all = [...this.sides.home.players, ...this.sides.away.players].filter((e) => e.onPitch && e !== b.owner);
       let best = null, bd = 1e9;
       for (const e of all) { const d = dist(e, b); if (d < bd) { bd = d; best = e; } }
-      if (best && bd < 1.6) { b.owner = best; b.mode = 'carry'; best.decCd = 1; }
+      if (best && bd < 1.6) {
+        b.owner = best; b.mode = 'carry'; best.decCd = 1;
+        if (best.pos === 'GK') best.holdT = this.t;
+      }
     }
   }
 
@@ -1076,12 +1236,13 @@ export class Match {
     }
     b.owner = rec; b.mode = 'carry';
     b.x = rec.x + rec.dir * 0.9; b.y = rec.y;
+    if (rec.pos === 'GK') rec.holdT = this.t;   // 키퍼가 받으면 바로 배급
     if (passer) { passer.st.passOk += 1; this.sides[passer.side].stats.passOk += 1; }
     rec.decCd = 0;
     if (rec.pos !== 'GK' && prog(rec.x, rec.dir) > 81 && Math.abs(rec.y - CY) < 13) {
       const pr = this.pressureOn(rec);
       const dG = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
-      if (pr < 2.6 && this.rng() < (b.cross ? 0.26 : 0.52)) { this.shoot(rec, dG, pr); return; }
+      if (pr < 2.6 && this.rng() < (b.cross ? 0.33 : 0.66)) { this.shoot(rec, dG, pr); return; }
     }
     if (b.cross && Math.abs(rec.y - CY) < 13 && prog(rec.x, rec.dir) > 70 && rec.pos === 'FW') {
       const dGoal = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
@@ -1114,7 +1275,7 @@ export class Match {
       if (dist(d, c) > 2.6) continue;
       d.tackleCd -= 1;
       if (d.tackleCd > 0) continue;
-      d.tackleCd = rint(this.rng, 2, 4);
+      d.tackleCd = rint(this.rng, 2, 4) / STEP_K;
       const def = this.eff(d, 'def') + this.eff(d, 'spd') * 0.25;
       const dri = this.eff(c, 'dri') * 0.8 + this.eff(c, 'spd') * 0.45 + this.eff(c, 'vis') * 0.1;
       const p = clamp((def / (def + dri)) * 0.42, 0.05, 0.44);
@@ -1130,11 +1291,11 @@ export class Match {
         return;
       }
       // 막히지 못한 수비수의 늦은 태클
-      if (this.rng() < 0.075) { this.commitFoul(d, c); return; }
+      if (this.rng() < 0.075 * STEP_K) { this.commitFoul(d, c); return; }
     }
     // 지친 선수의 근육 부상
     const tired = this.sides[c.side].players.filter((e) => e.onPitch && e.stamina < 32 && !e.injured);
-    if (tired.length && this.rng() < 0.006) {
+    if (tired.length && this.rng() < 0.006 * STEP_K) {
       const e = pick(this.rng, tired);
       this.injure(e, this.sides[e.side], 'stamina');
     }
@@ -1242,10 +1403,13 @@ export class Match {
     this.sp = { type, side: sideName, x: clamp(x, 1.5, W - 1.5), y: clamp(y, 1.2, H - 1.2), t: 0, spots: null, taker: null };
     this.phase = 'setpiece';
     this.pause = 0;
+    this.clearDives();            // 세트피스에서는 키퍼가 바로 일어나 자리를 잡습니다
     this.ball.mode = 'set';
     this.ball.owner = null;
     this.ball.shot = null;
     this.ball.cross = false;
+    this.ball.receiver = null;
+    this.ball.passer = null;
     this.ball.x = this.sp.x;
     this.ball.y = this.sp.y;
     this.ball.px = this.sp.x;
@@ -1257,19 +1421,10 @@ export class Match {
     if (type === 'goalkick') side.stats.goalKicks += 1;
     this.sp.taker = this.pickTaker(type, side);
     this.arrangeSetPiece();
-    // 배치가 끝나면 선수들이 그 자리에 모여 있습니다 (자기 진영 프리킥은 제자리에서)
-    // 코너·공격 3분의1 프리킥은 자리를 잡고, 골킥은 흐름을 끊지 않습니다
-    const snap = type === 'corner' || (type === 'freekick' && prog(this.sp.x, side.dir) > 55);
-    this.sp.snap = snap;
-    if (snap) {
-      for (const [e, spot] of this.sp.spots) {
-        e.x = spot.x; e.y = spot.y; e.px = spot.x; e.py = spot.y;
-      }
-      this.ball.px = this.ball.x; this.ball.py = this.ball.y;
-    } else if (this.sp.taker) {
-      const e = this.sp.taker;
-      e.x = this.sp.x - side.dir * 1.6; e.y = this.sp.y; e.px = e.x; e.py = e.y;
-    }
+    // 자리로 모이기 — 예전처럼 한 프레임에 85u 튀지 않고 준비 틱에 걸쳐 미끄러지듯 이동합니다
+    this.sp.snap = false;
+    const warpN = Math.max(2, Math.min(4, SETUP_TICKS[type] || 2));
+    for (const [e, spot] of this.sp.spots) this.warpTo(e, spot.x, spot.y, warpN);
     this.say(type, sideName, { p: this.sp.taker?.name || '', t: side.team.short }, type);
   }
 
@@ -1288,13 +1443,35 @@ export class Match {
     const dir = side.dir;
     const gx = dir > 0 ? W : 0;
     const spots = new Map();
+    const taken = [];
     const weight = (e) => (e.pos === 'FW' ? 3 : e.pos === 'MF' ? 2 : 1);
     const atk = side.players.filter((e) => e.onPitch && e !== sp.taker && e.pos !== 'GK')
       .sort((a, b) => weight(b) - weight(a));
     const def = opp.players.filter((e) => e.onPitch && e.pos !== 'GK');
     const gkAtk = side.players.find((e) => e.onPitch && e.pos === 'GK');
     const gkDef = opp.players.find((e) => e.onPitch && e.pos === 'GK');
-    const put = (e, x, y) => { if (e) spots.set(e, { x: clamp(x, 1.5, W - 1.5), y: clamp(y, 1.5, H - 1.5) }); };
+    // 같은 자리에 둘 이상을 놓으면, 가까운 빈 자리로 조금씩 밀어내 겹침을 없앱니다
+    // (경기장 가장자리에서는 x 가 고정되므로 원 모양으로 넓게 찾습니다)
+    const free = (x, y) => {
+      const cx0 = clamp(x, 1.5, W - 1.5), cy0 = clamp(y, 1.5, H - 1.5);
+      const clear = (px, py) => !taken.some((q) => Math.hypot(q.x - px, q.y - py) < 2.6);
+      if (clear(cx0, cy0)) { taken.push({ x: cx0, y: cy0 }); return { x: cx0, y: cy0 }; }
+      let best = null, bestD = -1;
+      for (let ring = 2.9; ring <= 20.3; ring += 2.9) {
+        for (let k = 0; k < 12; k++) {
+          const ang = (k / 12) * Math.PI * 2;
+          const px = clamp(cx0 + Math.cos(ang) * ring, 1.5, W - 1.5);
+          const py = clamp(cy0 + Math.sin(ang) * ring, 1.5, H - 1.5);
+          let d = 99;
+          for (const q of taken) d = Math.min(d, Math.hypot(q.x - px, q.y - py));
+          if (d >= 2.6) { taken.push({ x: px, y: py }); return { x: px, y: py }; }
+          if (d > bestD) { bestD = d; best = { x: px, y: py }; }
+        }
+      }
+      taken.push(best);
+      return best;
+    };
+    const put = (e, x, y) => { if (e) spots.set(e, free(x, y)); };
 
     if (gkAtk) put(gkAtk, dir > 0 ? 6 : W - 6, CY);
     if (gkDef) put(gkDef, dir > 0 ? W - 2.4 : 2.4, CY + (sp.y > CY ? -1.8 : 1.5));
@@ -1305,20 +1482,26 @@ export class Match {
         [gx - dir * 6.5, CY - 5.5], [gx - dir * 11, CY + 2.5], [gx - dir * 8, CY + 7.5],
         [gx - dir * 15, CY - 7], [gx - dir * 18, CY + 4],
       ];
-      atk.forEach((e, i) => put(e, ...(box[i] || [gx - dir * (48 + (i - box.length) * 6), CY + (i % 2 ? 7 : -7)])));
+      atk.forEach((e, i) => {
+        if (i < box.length) put(e, ...box[i]);
+        else put(e, gx - dir * (22 + (i - box.length) * 4.5), CY + (((i - box.length) % 3) - 1) * 7);
+      });
       const mark = [
         [gx - dir * 3, CY - 7], [gx - dir * 3, CY + 7], [gx - dir * 6.5, CY - 2.5],
         [gx - dir * 6.5, CY + 5], [gx - dir * 10, CY - 6.5], [gx - dir * 10, CY + 3],
       ];
       def.forEach((e, i) => {
         if (i < mark.length) put(e, ...mark[i]);
-        else put(e, gx - dir * (20 + (i - mark.length) * 8), CY + (i % 2 ? 8 : -8));
+        else put(e, gx - dir * (18 + (i - mark.length) * 4.5), CY + (((i - mark.length) % 3) - 1) * 8);
       });
     } else if (sp.type === 'freekick') {
       const dGoal = Math.hypot(gx - sp.x, CY - sp.y);
       if (dGoal < 34) {
         const box = [[gx - dir * 9, CY - 4], [gx - dir * 13, CY + 2], [gx - dir * 10, CY + 7], [gx - dir * 18, CY - 5]];
-        atk.forEach((e, i) => put(e, ...(box[i] || [gx - dir * 26, CY + (i % 2 ? 7 : -7)])));
+        atk.forEach((e, i) => {
+          if (i < box.length) put(e, ...box[i]);
+          else put(e, gx - dir * (24 + (i - box.length) * 5), CY + (((i - box.length) % 3) - 1) * 7);
+        });
         // 벽: 공에서 골문 방향으로 9.15
         const ang = Math.atan2(CY - sp.y, gx - sp.x);
         def.forEach((e, i) => {
@@ -1327,22 +1510,23 @@ export class Match {
             const wy = sp.y + Math.sin(ang) * (9 + i * 0.9) + (i - 1.5) * 1.3;
             put(e, wx, wy);
           } else if (i < 8) put(e, gx - dir * (4 + (i - 4) * 3), CY + (i % 2 ? 5 : -5));
-          else put(e, gx - dir * 30, CY);
+          else put(e, gx - dir * (30 + (i - 8) * 4), CY + (((i - 8) % 3) - 1) * 6);
         });
       } else {
         atk.forEach((e, i) => put(e, sp.x + dir * (8 + i * 7), CY + ((i % 3) - 1) * 9));
-        def.forEach((e, i) => put(e, sp.x + dir * (5 + (i % 4) * 6), CY + ((i % 4) - 1.5) * 8));
+        def.forEach((e, i) => put(e, sp.x + dir * (4 + i * 5.5), CY + ((i % 3) - 1) * 7));
       }
     } else {  // goalkick
       const own = dir > 0 ? 0 : W;
-      atk.forEach((e, i) => {
-        if (e.pos === 'DF') put(e, own + dir * (14 + i * 6), CY + (i % 2 ? 16 : -16));
-        else if (e.pos === 'MF') put(e, own + dir * (38 + (i % 3) * 7), CY + ((i % 3) - 1) * 12);
-        else put(e, own + dir * (58 + (i % 2) * 8), CY + (i % 2 ? 10 : -10));
+      let dN = 0, mN = 0, fN = 0;
+      atk.forEach((e) => {
+        if (e.pos === 'DF') { put(e, own + dir * (14 + (dN++) * 6), CY + (dN % 2 ? 16 : -16)); }
+        else if (e.pos === 'MF') { put(e, own + dir * (34 + (mN++) * 6), CY + ((mN % 3) - 1) * 12); }
+        else { put(e, own + dir * (56 + (fN++) * 6), CY + (fN % 2 ? 10 : -10)); }
       });
       def.forEach((e, i) => {
         if (i < 3) put(e, sp.x + dir * (12 + i * 5), CY + (i - 1) * 8);
-        else put(e, own + dir * (46 + (i % 4) * 8), CY + ((i % 4) - 1.5) * 10);
+        else put(e, own + dir * (44 + i * 6), CY + (((i - 3) % 3) - 1) * 10);
       });
     }
     sp.spots = spots;
@@ -1365,22 +1549,25 @@ export class Match {
     this.updateStamina(false);
     this.movePlayers();
     const ownHalf = prog(sp.x, this.sides[sp.side].dir) < 55;
-    const need = sp.type === 'freekick' && ownHalf ? 3 : (SETUP_TICKS[sp.type] || 4);
-    if (sp.t >= need) this.executeSetPiece();
+    const need = sp.type === 'freekick' && ownHalf ? 3 : (SETUP_TICKS[sp.type] || 3);
+    if (sp.t >= need) {
+      this.executeSetPiece();
+      this.moveBall();          // 찬 그 틱에 공이 바로 출발합니다 (한 틱 멈춰 있던 문제)
+    }
   }
 
   executeSetPiece() {
     const sp = this.sp;
     const side = this.sides[sp.side];
-    const opp = this.sides[this.opposing[sp.side]];
     this.phase = 'play';
     this.sp = null;
     const taker = sp.taker && sp.taker.onPitch ? sp.taker : side.players.find((e) => e.onPitch && e.pos !== 'GK');
     if (!taker) { this.ball.mode = 'loose'; return; }
     taker.x = sp.x - side.dir * 0.8;
     taker.y = sp.y;
-    taker.px = taker.x; taker.py = taker.y;
+    taker.warp = null;          // px 는 그대로 두고 화면이 이 틱 동안 미끄러지듯 옮겨 갑니다
     this.ball.passer = taker;
+    this.ball.px = this.ball.x; this.ball.py = this.ball.y;
 
     if (sp.type === 'goalkick') {
       const style = side.tactic.pass || 0;
@@ -1394,7 +1581,7 @@ export class Match {
       }
       if (!target) { this.ball.mode = 'loose'; return; }
       this.passTo(taker, target, false);
-      this.ball.dur = clamp(0.2 + dist(taker, target) / 260, 0.22, 0.4);
+      this.ball.dur = clamp(Math.round(1 + dist(taker, target) / 40), 2, 3);   // 골킥은 길게 — 2~3틱
       return;
     }
 
@@ -1413,7 +1600,7 @@ export class Match {
       this.ball.from = { x: taker.x, y: taker.y };
       this.ball.to = { x: rec.x, y: rec.y };
       this.ball.t = 0;
-      this.ball.dur = 0.34;
+      this.ball.dur = 2;        // 크로스는 화면에서 궤적이 보이게 2틱
       this.ball.passer = taker;
       this.ball.receiver = rec;
       this.ball.cross = true;
@@ -1441,7 +1628,7 @@ export class Match {
         this.ball.from = { x: taker.x, y: taker.y };
         this.ball.to = { x: target.x, y: target.y };
         this.ball.t = 0;
-        this.ball.dur = 0.34;
+        this.ball.dur = 2;
         this.ball.passer = taker;
         this.ball.receiver = target;
         this.ball.cross = true;

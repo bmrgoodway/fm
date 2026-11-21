@@ -1,7 +1,7 @@
 // 라이브 매치 화면 — Canvas 2D 피치 + 60fps 보간 + 배속/전술/교체/실시간 기록
 // · 엔진은 틱(경기 15초)마다 상태를 만들고, 화면은 매 프레임 이전 좌표→현재 좌표를 보간(lerp)합니다.
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
-import { W as PW, H as PH, CY, GOAL_HALF } from './match.js';
+import { W as PW, H as PH, CY, GOAL_HALF, diveProgress } from './match.js';
 import { AXES, STEPS, stepLabel } from './tactics.js';
 import { FORMATIONS } from './data.js';
 import * as X from './world.js';
@@ -21,7 +21,7 @@ export function mountMatch(app, m, meta) {
   const myTeam = isHome ? home : away;
   let speed = 1, raf = 0, lastT = performance.now(), acc = 0, alpha = 0;
   let lastStats = 0, lastRatings = 0, outPid = null, drawer = null, flashTimer = 0, halfShown = false;
-  let paused = false;
+  let paused = false, goalPhase = false;   // 득점 연출이 끝나 재개되는 순간 배너를 닫기 위한 표시
 
   // 브라우저 자동 점검에서 읽는 진단 훅 (프레임 수·보간 계수·최근 이벤트)
   const diag = (window.__fm = window.__fm || { errors: [] });
@@ -31,6 +31,17 @@ export function mountMatch(app, m, meta) {
   diag.flash = () => ({ hidden: flash.hidden, score: $('m-score').textContent });
   diag.replaying = false;
   diag.shotFrames = 0; diag.shotFramesBad = 0;   // 슛 비행 중 배너가 떠 있던 프레임 수(점검용)
+  diag.gk = () => {
+    const out = [];
+    for (const s of ['home', 'away']) {
+      for (const e of m.sides[s].players) {
+        if (e.pos !== 'GK') continue;
+        out.push({ id: e.id, name: e.name, side: s, dive: e.dive ? { at: e.dive.at, landAt: e.dive.landAt, p: Math.round(diveProgress(e.dive, m.t, alpha) * 100) / 100 } : null, hold: e.holdT != null });
+      }
+    }
+    return out;
+  };
+  diag.ballAt = () => ({ x: Math.round(m.ball.x * 10) / 10, y: Math.round(m.ball.y * 10) / 10, mode: m.ball.mode, owner: m.ball.owner ? m.ball.owner.name : null, ownerPos: m.ball.owner ? m.ball.owner.pos : null });
 
   // 슛·골 판정은 공이 도착한 틱에 확정되지만, 화면에는 '공이 닿은 다음 틱'에 공개합니다.
   // 그래야 배너·스코어·중계 자막이 공의 실제 도착과 같은 순간에 나옵니다.
@@ -168,8 +179,8 @@ export function mountMatch(app, m, meta) {
      골이 들어오면 그 순간부터 거슬러 올라간 장면을 한 클립으로 잘라 보관합니다.
      0.35x 로 다시 재생하고, 끝나면 생방송으로 복귀합니다. */
   const CAP_MS = 45;            // 스냅샷 간격 (약 22fps)
-  const CLIP_BEFORE = 2800;     // 골 배너 시점에서 거슬러 올라가는 시간 (기점 패스·돌파 포함)
-  const CLIP_AFTER = 900;       // 골망 진입과 여운
+  const CLIP_BEFORE_TICKS = 8;  // 골 직전 몇 틱부터 (벽시계가 아니라 경기 틱 기준)
+  const CLIP_AFTER_TICKS = 1;   // 골망에 들어가는 순간까지
   const REPLAY_RATE = 0.35;
   const rec = { frames: [], next: 0, recording: null };
   const clips = [];
@@ -180,14 +191,14 @@ export function mountMatch(app, m, meta) {
   function capture(now, a) {
     const b = m.ball;
     const f = {
-      t: now, phase: m.phase,
+      t: now, tick: m.t, phase: m.phase,
       sp: m.sp ? { x: m.sp.x, y: m.sp.y } : null,
       netShake: !!(m.goalFlash && (m.t - m.goalFlash.at) < 14 && m.phase === 'goal'),
       goalFlash: m.goalFlash && (m.t - m.goalFlash.at) < 20 ? { name: m.goalFlash.name, side: m.goalFlash.side } : null,
       score: { ...m.score },
       ball: {
-        x: b.mode === 'net' ? b.x : lerp(b.px, b.x, a),
-        y: b.mode === 'net' ? b.y : lerp(b.py, b.y, a),
+        x: lerp(b.px, b.x, a),
+        y: lerp(b.py, b.y, a),
         mode: b.mode,
         ownerId: b.owner ? b.owner.id : null,
         receiverId: b.mode === 'pass' && b.receiver ? b.receiver.id : null,
@@ -197,11 +208,11 @@ export function mountMatch(app, m, meta) {
     };
     for (const s of ['home', 'away']) {
       f.sides[s] = m.sides[s].players.map((e) => {
-        const diveP = e.dive ? (m.t - e.dive.at + a) / Math.max(e.dive.dur || 2, 0.4) : 0;
+        const dip = e.dive ? diveProgress(e.dive, m.t, a) : 0;
         return [
           e.id, e.num, e.name, e.pos, e.dir, lerp(e.px, e.x, a), lerp(e.py, e.y, a),
           e.onPitch ? 1 : 0, Math.round(e.stamina), e.st.yellow, e.st.red, e.injured ? 1 : 0,
-          diveP > 0 && diveP <= 1.18 ? clamp01(diveP) : 0, e.dive ? (e.dive.to || 0) : 0,
+          dip > 0.02 ? dip : 0, e.dive ? (e.dive.to || 0) : 0,
         ];
       });
     }
@@ -278,22 +289,25 @@ export function mountMatch(app, m, meta) {
     return F.length > 1 ? F[F.length - 1].t - F[0].t : 0;
   }
 
-  // 골이 났을 때: 링 버퍼에서 '골 직전'부터 잘라 두고, 골망 진입까지 조금 더 담습니다
+  // 골이 났을 때: 링 버퍼에서 '골 직전'부터 틱 기준으로 잘라 둡니다
+  // — 재개(킥오프) 순간이동이 클립에 들어가지 않도록 마지막 킥오프 뒤부터만 담습니다
   function beginClip(ev) {
-    const now = performance.now();
-    const frames = rec.frames.filter((f) => f.t >= now - CLIP_BEFORE);
-    if (frames.length < 4) return;
+    const gTick = ev.tick;
+    const from = Math.max(gTick - CLIP_BEFORE_TICKS, (m.lastKickoffT ?? -1) + 1);
+    const untilTick = gTick + CLIP_AFTER_TICKS;
+    const frames = rec.frames.filter((f) => f.tick >= from && f.tick <= untilTick);
+    if (frames.length < 3) return;
     rec.recording = {
       id: ev.id, seq: ++clipSeq, scorer: ev.scorer || '', label: ev.label || '',
       scoreText: `${m.score.home} - ${m.score.away}`, side: ev.side || null,
-      frames, until: now + CLIP_AFTER,
+      frames, fromTick: from, untilTick, goalTick: gTick, max: frames.length + 4,
     };
   }
 
   function finalizeClip() {
     const c = rec.recording;
     rec.recording = null;
-    if (!c || c.frames.length < 4) return;
+    if (!c || c.frames.length < 3) return;
     clips.push(c);
     while (clips.length > 6) clips.shift();
     lastClip = c;
@@ -305,7 +319,7 @@ export function mountMatch(app, m, meta) {
   }
 
   function startReplay(clip) {
-    if (!clip || clip.frames.length < 4) { app.toast('아직 리플레이할 장면이 없습니다.'); return; }
+    if (!clip || clip.frames.length < 3) { app.toast('아직 리플레이할 장면이 없습니다.'); return; }
     if (replay.on) return;
     replay.on = true; replay.clip = clip;
     replay.from = clip.frames[0].t;
@@ -428,8 +442,8 @@ export function mountMatch(app, m, meta) {
 
     // 공의 '지금 화면 위치' — 선수 링·궤적도 이 위치에 맞춰 그립니다
     const b = S.ball;
-    const ballX = b.mode === 'net' ? b.x : lerp(b.px, b.x, a);
-    const ballY = b.mode === 'net' ? b.y : lerp(b.py, b.y, a);
+    const ballX = lerp(b.px ?? b.x, b.x, a);
+    const ballY = lerp(b.py ?? b.y, b.y, a);
 
     // 선수
     const r = Math.max(6, scale * 2.05);
@@ -445,13 +459,13 @@ export function mountMatch(app, m, meta) {
         ctx.beginPath(); ctx.ellipse(px + r * 0.22, py + r * 0.3, r * 0.95, r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
         // 골키퍼 다이빙
         // 다이빙 진행도(p)는 슛이 날아오는 틱 수에 맞춰 — 공이 도착할 때 손끝이 닿습니다
-        const diveP = e.dive
-          ? (e.dive.p != null ? e.dive.p : clamp01((S.t - e.dive.at + a) / Math.max(e.dive.dur || 2, 0.4)))
+        const dip = e.dive
+          ? (e.dive.p != null ? e.dive.p : diveProgress(e.dive, S.t, a))
           : 0;
-        const dive = e.pos === 'GK' && e.dive && diveP > 0 && diveP <= 1.18 ? { to: e.dive.to, p: diveP } : null;
+        const dive = e.pos === 'GK' && e.dive && dip > 0.02 ? { to: e.dive.to, p: dip } : null;
         if (dive) {
           const reach = dive.p;
-          const dy = Math.sign(dive.to || 1) * Math.min(Math.abs(dive.to), 6) * scale * 0.9 * reach;
+          const dy = Math.sign(dive.to || 1) * Math.min(Math.abs(dive.to), 8) * scale * 0.9 * reach;
           const dx = (e.dir > 0 ? -1 : 1) * r * 0.5 * reach;
           ctx.save();
           ctx.translate(px + dx, py + dy);
@@ -477,8 +491,8 @@ export function mountMatch(app, m, meta) {
         ctx.fillText(String(e.num), px, py + r * 0.04);
 
         // 공 소유 표시
-        // 공 소유 링은 공이 눈으로 도착한 뒤에 켜집니다 (패스 비행 중에는 리시버에게 안 붙음)
-        if (S.ball.owner === e && Math.hypot(CX(ballX) - px, CYp(ballY) - py) < Math.max(11, r * 2.4)) {
+        // 공 소유 링은 공이 발밑에 실제로 닿았을 때만 켜집니다 (비행 중·도착 전에는 안 붙음)
+        if (S.ball.owner === e && Math.hypot(CX(ballX) - px, CYp(ballY) - py) < Math.max(6, r * 0.8)) {
           ctx.beginPath(); ctx.arc(px, py, r + 3.2, 0, Math.PI * 2);
           ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.2; ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]);
         }
@@ -547,6 +561,9 @@ export function mountMatch(app, m, meta) {
     ctx.fillStyle = '#101014';
     ctx.beginPath(); ctx.arc(bx, by, br * 0.34, 0, Math.PI * 2); ctx.fill();
 
+    // 골대 강타·선방 스파크 (엔진의 fx 채널을 화면에 그립니다)
+    if (S === m) drawFx(CX, CYp, scale, a);
+
     // 구단 약칭 + 공격 방향 (코너)
     ctx.font = '900 11px "Pretendard Variable", Pretendard, sans-serif';
     ctx.fillStyle = c.ink; ctx.globalAlpha = 0.8;
@@ -554,6 +571,67 @@ export function mountMatch(app, m, meta) {
     ctx.textAlign = 'left'; ctx.fillText(`${S.sides.home.team.short} ${arrow(S.sides.home.dir)}`, 8, 16);
     ctx.textAlign = 'right'; ctx.fillText(`${arrow(S.sides.away.dir)} ${S.sides.away.team.short}`, cssW - 8, 16);
     ctx.globalAlpha = 1;
+  }
+
+  /* ── fx 채널 그리기 — 골대 강타(흰 스파크) · 선방(스파크) · 카드(선수 위로 떠오름) ── */
+  const FX_TICKS = 1.4;
+  function drawFx(CX, CYp, scale, a) {
+    const list = m.fx;
+    if (!list || !list.length) return;
+    for (let i = Math.max(0, list.length - 24); i < list.length; i++) {
+      const f = list[i];
+      if (!f) continue;
+      const age = m.t - f.at + a;
+      if (age < 0 || age > FX_TICKS) continue;
+      const k = clamp01(age / FX_TICKS);
+      if (f.kind === 'woodwork') {
+        // 골대를 맞은 자리에서 흰 스파크가 터집니다
+        const x = CX(f.x), y = CYp(f.y);
+        ctx.save();
+        ctx.globalAlpha = 1 - k * 0.9;
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(2, scale * 0.3);
+        ctx.beginPath(); ctx.arc(x, y, (1.0 + k * 4.6) * scale, 0, Math.PI * 2); ctx.stroke();
+        for (let s2 = 0; s2 < 8; s2++) {
+          const ang = (s2 / 8) * Math.PI * 2 + k * 0.8;
+          const r0 = (0.5 + k * 1.5) * scale, r1 = (1.9 + k * 5.0) * scale;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(ang) * r0, y + Math.sin(ang) * r0);
+          ctx.lineTo(x + Math.cos(ang) * r1, y + Math.sin(ang) * r1);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (f.kind === 'save') {
+        // 키퍼 손끝에서 공을 쳐낸 스파크
+        const x = CX(f.x), y = CYp(f.y);
+        ctx.save();
+        ctx.globalAlpha = 1 - k * 0.85;
+        ctx.strokeStyle = f.big ? '#ffdc1a' : '#ffffff';
+        ctx.lineWidth = Math.max(2, scale * 0.28);
+        ctx.beginPath(); ctx.arc(x, y, (0.9 + k * 4.0) * scale, 0, Math.PI * 2); ctx.stroke();
+        for (let s2 = 0; s2 < 6; s2++) {
+          const ang = -Math.PI / 2 + (s2 - 2.5) * 0.42;
+          const r0 = (0.4 + k * 1.3) * scale, r1 = (1.7 + k * 4.0) * scale;
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(ang) * r0, y + Math.sin(ang) * r0);
+          ctx.lineTo(x + Math.cos(ang) * r1, y + Math.sin(ang) * r1);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else if (f.kind === 'card') {
+        let who = null;
+        for (const s2 of ['home', 'away']) who = who || m.sides[s2].players.find((e) => e.id === f.pid);
+        if (!who) continue;
+        const x = CX(who.x), y = CYp(who.y) - (2.0 + k * 2.6) * scale;
+        ctx.save();
+        ctx.globalAlpha = 1 - k * 0.7;
+        ctx.fillStyle = f.color === 'red' ? '#ff614a' : '#ffdc1a';
+        ctx.strokeStyle = '#101014'; ctx.lineWidth = 1.4;
+        const cw = Math.max(4, scale * 0.62), ch = cw * 1.45;
+        ctx.fillRect(x - cw / 2, y - ch / 2, cw, ch);
+        ctx.strokeRect(x - cw / 2, y - ch / 2, cw, ch);
+        ctx.restore();
+      }
+    }
   }
 
   function contrastFor(c) {
@@ -804,8 +882,11 @@ export function mountMatch(app, m, meta) {
     }
     alpha = paused ? 1 : Math.min(acc / interval, 1);
     diag.alpha = alpha;
-    // 세트피스·득점 연출 중에는 자리 배치를 그대로 보여 줍니다
-    const a = (m.phase === 'setpiece' || m.phase === 'goal') ? 1 : alpha;
+    // 모든 국면(세트피스·득점 연출 포함)을 같은 규칙으로 보간합니다 — 화면이 멈춰 보이지 않게
+    const a = alpha;
+    // 득점 연출이 끝나고 재개되는 프레임에 GOAL 배너를 닫습니다 — 다음 플레이를 가리지 않게
+    if (m.phase === 'goal') goalPhase = true;
+    else if (goalPhase) { goalPhase = false; clearTimeout(flashTimer); flash.hidden = true; }
     draw(a);
 
     // 점검용: 슛이 날아가는 프레임에 GOAL 배너가 떠 있으면 세어 둡니다
@@ -818,8 +899,11 @@ export function mountMatch(app, m, meta) {
       rec.frames.push(f);
       if (rec.frames.length > 260) rec.frames.shift();   // 약 11초
       if (rec.recording) {
-        rec.recording.frames.push(f);
-        if (now >= rec.recording.until) finalizeClip();
+        // 골 직후 연출(경기 시계가 멈춘 구간)은 몇 프레임만 담고 바로 클립을 닫습니다
+        // — 재개(킥오프) 장면이 클립에 섞이지 않게.
+        const rc = rec.recording;
+        if (rc.frames.length < rc.max) rc.frames.push(f);
+        if (f.tick > rc.untilTick || rc.frames.length >= rc.max) finalizeClip();
       }
     }
 
@@ -867,6 +951,7 @@ export function mountMatch(app, m, meta) {
   root.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => {
     if (replay.on) endReplay();
     speed = Number(b.dataset.speed);
+    m.setSpeed(speed || 1);        // 득점 연출 길이를 배속에 맞춥니다(벽시계 2.3초 고정)
     root.querySelectorAll('.spd').forEach((x) => x.classList.toggle('on', x === b));
     $('m-pause').textContent = '일시정지';
     $('m-pause').setAttribute('aria-pressed', 'false');
@@ -915,7 +1000,7 @@ export function mountMatch(app, m, meta) {
     const clip = clips.find((c) => c.id === Number(b.dataset.replay));
     if (clip) startReplay(clip);
   });
-  diag.clips = () => clips.map((c) => ({ id: c.id, scorer: c.scorer, frames: c.frames.length, span: Math.round(clipSpan(c)), score: c.scoreText }));
+  diag.clips = () => clips.map((c) => ({ id: c.id, scorer: c.scorer, frames: c.frames.length, span: Math.round(clipSpan(c)), score: c.scoreText, fromTick: c.fromTick, goalTick: c.goalTick, untilTick: c.untilTick, kickoff: m.lastKickoffT }));
   diag.replayState = () => ({ on: replay.on, rate: REPLAY_RATE, bar: !$('replaybar').hidden, clip: replay.clip ? replay.clip.id : null });
 
   const onResize = () => { resize(); draw(m.done ? 1 : alpha); };
@@ -931,6 +1016,7 @@ export function mountMatch(app, m, meta) {
   }
 
   resize();
+  m.setSpeed(speed);
   draw(0);
   renderStats();
   renderFeed();
