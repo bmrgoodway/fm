@@ -1220,7 +1220,8 @@ export class Match {
     this.sp.taker = this.pickTaker(type, side);
     this.arrangeSetPiece();
     // 배치가 끝나면 선수들이 그 자리에 모여 있습니다 (자기 진영 프리킥은 제자리에서)
-    const snap = type !== 'freekick' || prog(this.sp.x, side.dir) > 55;
+    // 코너·공격 3분의1 프리킥은 자리를 잡고, 골킥은 흐름을 끊지 않습니다
+    const snap = type === 'corner' || (type === 'freekick' && prog(this.sp.x, side.dir) > 55);
     this.sp.snap = snap;
     if (snap) {
       for (const [e, spot] of this.sp.spots) {

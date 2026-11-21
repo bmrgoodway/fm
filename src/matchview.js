@@ -453,6 +453,7 @@ export function mountMatch(app, m, meta) {
         <span class="axis-end">${a.right}</span></div></li>`;
     }).join('');
     const bench = side.bench.filter((e) => !e.onPitch);
+  const posLabel = (e) => (e.injured ? '🚑 ' : '') + e.pos;
     const subs = side.players.filter((e) => e.onPitch).map((e) => `<li>
         <button type="button" class="sub-btn ${outPid === e.id ? 'sel' : ''}" data-htout="${e.id}">
           <span class="rn">${e.num}</span><span>${esc(e.name)}</span>
@@ -461,8 +462,11 @@ export function mountMatch(app, m, meta) {
     $('ht-body').innerHTML = `<div class="ht-cols">
       <div><h4>전술 정비</h4><ul class="axes compact">${axes}</ul></div>
       <div><h4>선수 교체 <span class="pill">${5 - side.subsUsed}명 남음</span></h4>
+        <p class="hint">나갈 선수를 고른 뒤 들어올 후보를 누르세요.</p>
+        <h4 class="sub">나갈 선수</h4>
         <ul class="sub-list ht-subs">${subs}</ul>
-        <ul class="sub-list ht-subs">${bench.map((e) => `<li><button type="button" class="sub-btn" data-htin="${e.id}" ${outPid ? '' : 'disabled'}>${esc(e.name)}<small>${e.pos} · ${e.p.ovr}</small></button></li>`).join('') || '<li class="muted sm">후보가 없습니다.</li>'}</ul>
+        <h4 class="sub">들어올 후보</h4>
+        <ul class="sub-list ht-subs">${bench.map((e) => `<li><button type="button" class="sub-btn" data-htin="${e.id}" ${outPid ? '' : 'disabled'}>${esc(e.name)}<small>${posLabel(e)} ${e.p.ovr}</small></button></li>`).join('') || '<li class="muted sm">후보가 없습니다.</li>'}</ul>
       </div>
     </div>`;
     $('ht-body').querySelectorAll('[data-ht]').forEach((b) => b.addEventListener('click', () => {
