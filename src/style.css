@@ -519,6 +519,26 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 .sub-btn small { margin-left: auto; font-size: 9.5px; color: var(--soft); font-weight: 800; }
 .sub-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* 넓은 화면: 피치 옆에 기록·중계·평점을 세운다 */
+@media (min-width: 1040px) {
+  .matchview {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    grid-template-areas: "bar bar" "stage panels" "controls drawer";
+    align-items: start; gap: 10px;
+  }
+  .scorebar { grid-area: bar; }
+  .stage { grid-area: stage; }
+  .mcontrols { grid-area: controls; }
+  .drawer { grid-area: drawer; }
+  .mpanels { grid-area: panels; display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 330px); min-height: 420px; overflow-y: auto; padding-right: 2px; }
+  .mstats { order: 1; }
+  .mfeed { order: 2; }
+  .mratings { order: 3; }
+  .mfeed .feed { max-height: 250px; }
+  .mratings .rating-cols { grid-template-columns: 1fr 1fr; }
+}
+
 /* ── 반응형 ───────────────────────────────────────────────────── */
 @media (max-width: 1000px) {
   .grid2, .squad-grid { grid-template-columns: 1fr; }

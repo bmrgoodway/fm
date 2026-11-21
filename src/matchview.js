@@ -100,7 +100,8 @@ export function mountMatch(app, m, meta) {
     const ratio = (PW + 4.0) / (PH + 4.0); // 피치 비율 그대로 — 여백 없이 꽉 채운다
     let w = stageW;
     let h = w / ratio;
-    const maxH = Math.max(240, Math.round(window.innerHeight * 0.66));
+    const wide = window.innerWidth >= 1040;
+    const maxH = Math.max(240, Math.round(window.innerHeight * (wide ? 0.64 : 0.66) - (wide ? 0 : 0)));
     if (h > maxH) { h = maxH; w = h * ratio; }
     cssW = Math.round(w); cssH = Math.round(h);
     canvas.style.width = cssW + 'px';
