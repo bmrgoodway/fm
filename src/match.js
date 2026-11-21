@@ -218,6 +218,7 @@ export class Match {
     this.aet = false;
     this.holdHalf = false;      // 화면이 하프타임 카드를 보여 주는 동안 엔진을 멈춥니다
     this.sp = null;             // 진행 중인 세트피스
+    this.lastSetPieceT = -99;   // 마지막 세트피스 시각(틱) — 화면·점검에서 흐름 판단용
     this.tickerId = 0;
     this.added1 = rint(this.rng, 1, 3);   // 전반 추가시간(분)
     this.added2 = rint(this.rng, 2, 5);   // 후반 추가시간(분)
@@ -1201,6 +1202,7 @@ export class Match {
     if (this.done) return;
     const side = this.sides[sideName];
     if (!side) return;
+    this.lastSetPieceT = this.t;
     this.sp = { type, side: sideName, x: clamp(x, 1.5, W - 1.5), y: clamp(y, 1.2, H - 1.2), t: 0, spots: null, taker: null };
     this.phase = 'setpiece';
     this.pause = 0;
