@@ -27,6 +27,10 @@ const api = {
 
 /* ─────────────────────────── 시작 ─────────────────────────── */
 export function init() {
+  // 화면 오류를 조용히 삼키지 않고 한곳에 모읍니다 (점검·문의 대응용)
+  window.__fm = window.__fm || { errors: [] };
+  window.addEventListener('error', (e) => window.__fm.errors.push(String(e.message || e)));
+  window.addEventListener('unhandledrejection', (e) => window.__fm.errors.push(String(e.reason)));
   const theme = local.get('theme', 'day');
   document.documentElement.setAttribute('data-theme', theme === 'night' ? 'night' : 'day');
   state.savedGame = W.loadWorld();

@@ -27,6 +27,17 @@ export function teamPower(w, teamId) {
   return Math.round(sum(top) / top.length);
 }
 
+// 출전 가능 여부 — 퇴장 누적 정지(bans)나 부상(inj) 중이면 뛰지 못합니다.
+export function available(w, p) {
+  return !!p && !(p.bans > 0) && !(p.inj > 0);
+}
+export function ifUnavailable(p) {
+  if (!p) return '';
+  if (p.bans > 0) return `정지 ${p.bans}경기`;
+  if (p.inj > 0) return `부상 ${p.inj}경기`;
+  return '';
+}
+
 // 포지션 불일치 보정
 export function posFactor(slotPos, playerPos) {
   if (slotPos === playerPos) return 1;
@@ -295,7 +306,8 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
   events.sort((a, b) => a.minute - b.minute);
   // 출전 선수 · 평점
   for (const teamId of [homeId, awayId]) {
-    const sq = squadOf(w, teamId).sort((a, b) => b.ovr - a.ovr).slice(0, 11);
+    const fit = squadOf(w, teamId).filter((p) => available(w, p));
+    const sq = (fit.length >= 11 ? fit : squadOf(w, teamId)).sort((a, b) => b.ovr - a.ovr).slice(0, 11);
     const conceded = teamId === homeId ? ag : hg;
     for (const p of sq) {
       p.season.apps += 1;
@@ -373,7 +385,10 @@ export function autoLineup(w, teamId, formationId = null) {
   const t = w.teams[teamId];
   const fid = formationId || t.formation;
   const slots = FORMATIONS[fid].slots;
-  const squad = squadOf(w, teamId).slice();
+  let squad = squadOf(w, teamId).slice();
+  // 출전 정지·부상 선수는 빼고 고릅니다 (11명이 안 되면 어쩔 수 없이 포함)
+  const fit = squad.filter((p) => available(w, p));
+  if (fit.length >= 11) squad = fit;
   const used = new Set();
   const starters = [];
   for (const slot of slots) {
@@ -538,11 +553,17 @@ export function fillLineup(w) {
   const used = new Set(l.starters.filter(Boolean));
   const slots = FORMATIONS[l.formation].slots;
   for (let i = 0; i < 11; i++) {
-    if (l.starters[i]) continue;
-    const cand = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id)).sort((a, b) => (b.pos === slots[i].pos ? 10 : 0) + b.ovr / 10 - ((a.pos === slots[i].pos ? 10 : 0) + a.ovr / 10))[0];
+    if (l.starters[i]) {
+      const cur = w.players[l.starters[i]];
+      if (cur && !available(w, cur)) l.starters[i] = null;   // 정지·부상 선수는 자동으로 빼 둡니다
+      else continue;
+    }
+    const pool = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id));
+    const fit = pool.filter((p) => available(w, p));
+    const cand = (fit.length ? fit : pool).sort((a, b) => (b.pos === slots[i].pos ? 10 : 0) + b.ovr / 10 - ((a.pos === slots[i].pos ? 10 : 0) + a.ovr / 10))[0];
     if (cand) { l.starters[i] = cand.id; used.add(cand.id); }
   }
-  const rest = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id)).sort((a, b) => b.ovr - a.ovr);
+  const rest = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id)).sort((a, b) => (available(w, b) ? 1 : 0) - (available(w, a) ? 1 : 0) || b.ovr - a.ovr);
   l.bench = rest.slice(0, 7).map((p) => p.id);
 }
 
@@ -599,6 +620,7 @@ export function advanceSeason(w) {
     p.value = valueOf(p); p.wage = wageOf(p);
     if (p.ovr !== before) growth.push({ name: p.name, teamId: p.teamId, from: before, to: p.ovr });
     p.season = freshSeasonStats();
+    p.bans = 0; p.inj = 0;   // 새 시즌에는 정지·부상이 풀립니다
   }
   // 은퇴 & 유스 영입
   const retired = [];

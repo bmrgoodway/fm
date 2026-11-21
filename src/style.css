@@ -519,6 +519,41 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 .sub-btn small { margin-left: auto; font-size: 9.5px; color: var(--soft); font-weight: 800; }
 .sub-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+/* ── 경기 화면: 전/후반·공격 방향·자막 티커·하프타임 ──────────── */
+.sb-phase { display: inline-flex; align-items: center; gap: 4px; }
+.half-pill, .dir-pill {
+  font-style: normal; font-size: 9px; font-weight: 900; letter-spacing: 0.03em;
+  border: 1.5px solid var(--line); padding: 0 4px; background: var(--paper2); white-space: nowrap;
+}
+.half-pill { background: var(--yellow); color: #101014; }
+.ticker {
+  display: flex; align-items: center; gap: 8px; min-height: 34px;
+  border: var(--bw) solid var(--line); background: var(--ink); color: var(--bg);
+  padding: 5px 10px; box-shadow: var(--shadow-sm); overflow: hidden;
+}
+.ticker .tk-min {
+  flex: none; font-size: 11px; font-weight: 900; font-variant-numeric: tabular-nums;
+  background: var(--yellow); color: #101014; padding: 1px 6px; border: 1.5px solid #101014;
+}
+.ticker .tk-text { font-size: 12.5px; font-weight: 800; line-height: 1.35; }
+.tk-in { animation: tkIn 0.28s ease-out; }
+@keyframes tkIn { from { transform: translateY(8px); opacity: 0.2; } to { transform: none; opacity: 1; } }
+.goalflash .gf-score { font-size: 13px; font-weight: 900; color: #fff; letter-spacing: 0.06em; }
+.goalflash .gf-name small { font-weight: 700; color: var(--yellow); }
+.rating-cols .cb { font-style: normal; font-size: 8px; line-height: 1; font-weight: 900; }
+.rating-cols .cb.y { color: #e0b400; }
+.rating-cols .cb.r { color: #ff614a; }
+.rating-cols .cb.i { color: #ff8a76; }
+.rating-cols li.off { opacity: 0.55; }
+.halftime .half-card { width: min(760px, 100%); text-align: left; }
+.halftime .half-card h2 { text-align: center; }
+.half-body { border-top: 1.5px dashed color-mix(in srgb, var(--line) 30%, transparent); padding-top: 10px; }
+.ht-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ht-cols h4 { font-size: 12px; color: var(--soft); margin-bottom: 6px; }
+.ht-subs { max-height: 168px; }
+.halftime .axes { gap: 7px; }
+.halftime .axis-eff { display: none; }
+
 /* 넓은 화면: 피치 옆에 기록·중계·평점을 세운다 */
 @media (min-width: 1040px) {
   .matchview {
@@ -543,8 +578,8 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .mratings .rating-cols { grid-template-columns: 1fr 1fr; }
   .matchview .card { padding: 10px; gap: 7px; }
   .matchview .card-head h3 { font-size: 14px; }
-  .stat-rows th, .stat-rows td { padding: 0 4px; line-height: 1.45; }
-  .stat-rows td.sv { font-size: 12px; }
+  .stat-rows th, .stat-rows td { padding: 0 4px; line-height: 1.40; }
+  .stat-rows td.sv { font-size: 11.5px; }
   .stat-rows th { font-size: 10px; }
   .rating-cols li { padding: 0; font-size: 9.5px; line-height: 1.35; }
   .rating-cols h4 { margin-bottom: 2px; font-size: 10.5px; }
@@ -566,6 +601,10 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 }
 @media (max-width: 720px) {
   body { font-size: 14px; }
+  .ht-cols { grid-template-columns: 1fr; }
+  .ht-subs { max-height: 132px; }
+  .ticker .tk-text { font-size: 11.5px; }
+  .goalflash b { font-size: 30px; }
   .tabs { flex-wrap: wrap; overflow-x: visible; }
   .tab { flex: 1 1 auto; text-align: center; padding: 8px 8px; font-size: 12px; }
   .hero { grid-template-columns: 1fr; }

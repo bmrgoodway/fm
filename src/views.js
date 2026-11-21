@@ -150,6 +150,7 @@ function nextMatchCard(app, w) {
   const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
   const oppForm = w.form?.[oppId] || [];
   const myForm = me.recent || [];
+  const unavailable = W.squadOf(w, w.myTeamId).filter((p) => p.bans > 0 || p.inj > 0);
   const bar = (a, b) => `<span class="cmp-bar"><i class="me" data-w="${Math.round((a / (a + b)) * 100)}"></i></span>`;
   return `<article class="card next">
     <div class="card-head"><h3>다음 경기</h3><span class="pill">${label} · ${isHome ? '홈' : '원정'}</span></div>
@@ -163,6 +164,7 @@ function nextMatchCard(app, w) {
       <div><dt>최근 5경기</dt><dd>${formChips(myForm.slice(-5))}<span class="vs-sep">vs</span>${formChips(opp.recent?.slice(-5) || [])}</dd></div>
       <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(me.formation, me, false)}<span class="vs-sep">vs</span>${miniPitch(opp.formation, opp, true)}</dd></div>
       <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(me.tactic))}</span><span class="vs-sep">vs</span><span>${esc(tacticWords(opp.tactic))}</span></dd></div>
+      ${unavailable.length ? `<div><dt>결장</dt><dd class="tac"><span class="pill xs">${unavailable.length}명</span><span class="sm">${unavailable.map((p) => `${esc(p.name)}(${W.ifUnavailable(p)})`).join(', ')}</span></dd></div>` : ''}
     </dl>
     <div class="actions">
       <button class="btn primary" data-act="play" type="button">경기 시작 ▶</button>
@@ -273,6 +275,7 @@ function playerCard(w, p, opts = {}) {
       <div><small>득점/도움</small><b>${st.goals || 0} / ${st.assists || 0}</b></div>
       <div><small>평균 평점</small><b>${st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(2) : '—'}</b></div>
     </div>
+    ${(p.bans > 0 || p.inj > 0) ? `<p class="warn-bar">${p.bans > 0 ? `⛔ 출전 정지 ${p.bans}경기` : ''}${p.bans > 0 && p.inj > 0 ? ' · ' : ''}${p.inj > 0 ? `🚑 부상 ${p.inj}경기 결장` : ''}</p>` : ''}
     ${opts.note ? `<p class="hint">${opts.note}</p>` : ''}
   </div>`;
 }
@@ -321,7 +324,7 @@ function squadTab(app, w) {
     <div class="card-head"><h3>선수단 ${w.teams[w.myTeamId].squad.length}명</h3><span class="pill">주급 합계 ${W.fmt(W.teamWageTotal(w, w.myTeamId))}만/주</span></div>
     <div class="table-wrap"><table class="tbl squad">
       <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>스피드</th><th>슈팅</th><th>패스</th><th>수비</th><th>체력</th><th>몸값</th><th>출전</th></tr></thead>
-      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b></td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
+      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
     </table></div>
   </article>`;
 }
