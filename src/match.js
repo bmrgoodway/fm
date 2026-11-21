@@ -102,7 +102,7 @@ const SAY = {
   ],
   miss: [
     '{p}의 슛이 골문을 벗어납니다.',
-    '아쉽습니다. {p}의 슛이 옆그물을 맞춥니다.',
+    '아쉽습니다. {p}의 슛이 골망 옆을 때립니다.',
     '{p}가 거듭 탄식합니다. 슛이 뜹니다.',
     '{p}의 슛이 수비 다리에 걸립니다.',
   ],
@@ -118,7 +118,7 @@ const SAY = {
     '코너킥! 박스 안이 빽빽해집니다.',
   ],
   freekick: [
-    '파울! 자유투가 주어집니다.',
+    '파울! 프리킥이 주어집니다.',
     '프리킥 찬스 — {p}가 공을 정리합니다.',
     '주심이 휘슬을 불고 프리킥을 선언합니다.',
   ],
@@ -238,6 +238,9 @@ export class Match {
     this.kit = { home: homeKit, away: awayKit };
     this.sides.home.kit = homeKit;
     this.sides.away.kit = awayKit;
+    // 공의 비행은 '틱' 단위입니다 (dur = 날아가는 데 걸리는 틱 수).
+    // 판정은 공이 도착한 그 틱에 내리지만, 화면(중계·스코어·배너)은 한 틱 늦춰 공개합니다.
+    // 그래야 공이 골라인·골키퍼에 실제로 닿은 뒤에 GOAL 배너와 스코어가 뜹니다.
     this.ball = {
       x: W / 2, y: CY, px: W / 2, py: CY, owner: null, mode: 'carry',
       from: null, to: null, t: 0, dur: 0, passer: null, receiver: null, cross: false,
@@ -311,6 +314,7 @@ export class Match {
   }
   pushEvent(ev) {
     ev.id = ++this.lastEventId;
+    ev.tick = this.t;
     ev.minute = this.minute();
     ev.label = this.clock();
     this.events.push(ev);
@@ -375,11 +379,13 @@ export class Match {
     }
     this.t += 1;
     this.snapshot();
+    if (this.done) return;
     if (this.phase === 'setpiece') {
       this.stepSetPiece();
       this.checkClock();
       return;
     }
+    if (this.phase !== 'play') { this.checkClock(); return; }
     // 한 틱(=경기 15초) 안에서 세 번의 플레이 단계를 돌린다 — 패스·슛이 더 자주 나온다
     for (let i = 0; i < SUBSTEPS; i++) {
       this.updateStamina(false);
@@ -404,12 +410,8 @@ export class Match {
     }
     const b = this.ball;
     b.px = b.x; b.py = b.y;
-    if (b.mode === 'pass' || b.mode === 'shot') {
-      b.trail.push({ x: b.x, y: b.y });
-      if (b.trail.length > 12) b.trail.shift();
-    } else if (b.mode === 'carry' || b.mode === 'set') {
-      b.trail.length = 0;
-    }
+    // 비행 궤적은 moveBall 이 매 단계마다 남깁니다 (여기서는 공을 소유했을 때만 정리)
+    if (b.mode === 'carry' || b.mode === 'set' || b.mode === 'loose') b.trail.length = 0;
   }
 
   checkClock() {
@@ -795,7 +797,8 @@ export class Match {
     ball.from = { x: c.x, y: c.y };
     ball.to = { x: m.x, y: m.y };
     ball.t = 0;
-    ball.dur = clamp(Math.round(d / 30), 1, 3);
+    // dur = 날아가는 틱 수 (멀수록 오래). 1x 화면에서 짧은 패스는 0.13~0.4초
+    ball.dur = clamp(0.12 + d / 220, 0.15, 0.34);
     ball.passer = c;
     ball.receiver = m;
     ball.cross = !!cross;
@@ -825,20 +828,36 @@ export class Match {
     const xg = this.xgFor(c, dGoal, pressure) * (header ? 0.5 : 1);
     const aimY = CY + (this.rng() - 0.5) * 9;
     const ball = this.ball;
+    const gk = this.sides[this.opposing[c.side]].players.find((e) => e.pos === 'GK' && e.onPitch);
+    // 결과는 슛을 때리는 순간 정해 두되(애니메이션을 미리 맞추기 위해),
+    // 스코어·배너 반영은 공이 골라인·키퍼에 닿은 뒤(resolveShot)에 합니다.
+    const onTargetP = clamp(0.24 + this.eff(c, 'sho') / 300 + (33 - dGoal) / 90 - pressure * 0.05, 0.14, 0.72);
+    const r = this.rng();
+    let outcome = 'miss';
+    if (r < xg) outcome = 'goal';
+    else if (r < xg + 0.05) outcome = 'woodwork';
+    else if (r < xg + 0.05 + onTargetP * 0.55) outcome = 'save';
+    const big = this.rng() < 0.3;
+    const dur = clamp(0.25 + dGoal / 45, 0.3, 0.9);
     ball.mode = 'shot';
     ball.from = { x: c.x, y: c.y };
     ball.to = { x: gx, y: aimY };
     ball.t = 0;
-    ball.dur = clamp(Math.round(dGoal / 24), 1, 3);
+    ball.dur = dur;
     ball.owner = null;
     ball.trail = [{ x: c.x, y: c.y }];
-    ball.shot = { shooter: c, xg, pressure, header, aimY };
+    ball.shot = { shooter: c, xg, pressure, header, aimY, outcome, big, onTargetP, gk };
     ball.passer = null;
     c.st.shots += 1;
     side.stats.shots += 1;
     side.stats.xg += xg;
     side.stats.shotDist += dGoal;
     c.decCd = 2;
+    // 골키퍼 다이빙도 슛과 '동시에' 시작합니다 — 공이 도착할 즈음 손끝이 간신히 닿도록
+    if (gk) {
+      const off = outcome === 'goal' ? (this.rng() < 0.5 ? -1 : 1) * (2.4 + this.rng() * 3.2) : 0;
+      gk.dive = { at: this.t, dur, to: clamp(aimY - gk.y + off, -7, 7), save: outcome === 'save' };
+    }
     if (this.lastPass && this.t - this.lastPass.t <= 6 && this.lastPass.from.side === c.side && this.lastPass.from !== c) {
       this.assistCand = this.lastPass.from;
       this.lastPass.from.st.keyPasses += 1;
@@ -855,19 +874,14 @@ export class Match {
     const c = s.shooter;
     const side = this.sides[c.side];
     const oppSide = this.sides[this.opposing[c.side]];
-    const gk = oppSide.players.find((e) => e.pos === 'GK' && e.onPitch);
-    const r = this.rng();
-    const onTargetP = clamp(0.24 + this.eff(c, 'sho') / 300 + (33 - Math.hypot((c.dir > 0 ? W : 0) - c.x, CY - c.y)) / 90 - s.pressure * 0.05, 0.14, 0.72);
-    // 골키퍼 다이빙 연출
-    if (gk) gk.dive = { at: this.t, to: clamp(s.aimY - gk.y, -7, 7), save: false, x: gk.x, y: gk.y };
-    if (r < s.xg) { this.goal(c, s); return; }
-    const woodP = 0.05;
-    if (r < s.xg + woodP) {
+    const gk = s.gk && s.gk.onPitch ? s.gk : oppSide.players.find((e) => e.pos === 'GK' && e.onPitch);
+    if (s.outcome === 'goal') { this.goal(c, s); return; }
+    if (s.outcome === 'woodwork') {
       side.stats.onTarget += 1;
       c.st.onTarget += 1;
       this.say('woodwork', c.side, { p: c.name }, 'woodwork');
       this.fx.push({ kind: 'woodwork', at: this.t, x: c.dir > 0 ? W : 0, y: s.aimY });
-      // 골대 맞고 나온 공 — 리바운드 또는 골킥
+      // 골대 맞고 나온 공 — 세컨드볼 또는 골킥
       if (this.rng() < 0.55) {
         const atk = side.players.filter((e) => e.onPitch && e.pos !== 'GK' && Math.hypot((c.dir > 0 ? W : 0) - e.x, CY - e.y) < 20);
         if (atk.length) {
@@ -883,17 +897,17 @@ export class Match {
       this.setPiece('goalkick', this.opposing[c.side], gks.x, gks.y);
       return;
     }
-    if (r < s.xg + woodP + onTargetP * 0.55) {
+    if (s.outcome === 'save') {
       // 유효슈팅 — 골키퍼 선방
       side.stats.onTarget += 1;
       c.st.onTarget += 1;
       c.rd += 0.04;
-      const big = this.rng() < 0.3;
+      const big = s.big;
       if (gk) {
         gk.st.saves += 1;
         gk.rd += big ? 0.3 : 0.16;
         oppSide.stats.saves += 1;
-        gk.dive.save = true;
+        if (gk.dive) gk.dive.save = true;
       }
       this.say(big ? 'supersave' : 'save', this.opposing[c.side], { p: gk ? gk.name : '골키퍼' }, 'save');
       // 선방 후: 골문을 벗어나면 코너킥
@@ -903,13 +917,13 @@ export class Match {
         this.setPiece('corner', c.side, spot.x, spot.y);
         return;
       }
-      // 리바운드
+      // 세컨드볼
       const atk = side.players.filter((e) => e.onPitch && e.pos !== 'GK' && Math.hypot((c.dir > 0 ? W : 0) - e.x, CY - e.y) < 18);
       if (atk.length && this.rng() < 0.35) {
         atk.sort((a, b2) => Math.hypot((c.dir > 0 ? W : 0) - a.x, CY - a.y) - Math.hypot((c.dir > 0 ? W : 0) - b2.x, CY - b2.y));
         const r2 = atk[0];
         ball.owner = r2; ball.mode = 'carry'; ball.x = r2.x; ball.y = r2.y; r2.decCd = 0;
-        this.pushEvent({ type: 'rebound', side: c.side, text: `리바운드! ${r2.name}에게 흘러갑니다.` });
+        this.pushEvent({ type: 'rebound', side: c.side, text: `세컨드볼! ${r2.name}에게 흘러갑니다.` });
         ball.shot = null;
         return;
       }
@@ -946,15 +960,16 @@ export class Match {
     const opp = this.sides[this.opposing[c.side]];
     if (opp.players) for (const e of opp.players) if (e.onPitch && (e.pos === 'GK' || e.pos === 'DF')) e.rd -= 0.05;
     const line = this.phrase('goal', c.side, { p: c.name });
-    this.pushEvent({ type: 'goal', side: c.side, text: `⚽ ${this.clock()} ${line}${c.assistName ? ` (도움 ${c.assistName})` : ''} — ${this.scoreText()}`, scorer: c.name });
-    // 공이 골망으로 들어가는 연출
+    this.pushEvent({ type: 'goal', side: c.side, text: `⚽ ${this.clock()} ${line}${c.assistName ? ` (도움 ${c.assistName})` : ''} — ${this.scoreText()}`, scorer: c.name, score: { ...this.score } });
+    // 공이 골망으로 들어가는 연출 — 판정은 이미 골라인 도착 뒤에 났습니다
     const gx = c.dir > 0 ? W : 0;
     this.ball.mode = 'net';
     this.ball.from = { x: gx, y: s.aimY };
     this.ball.to = { x: gx + c.dir * 2.4, y: s.aimY };
     this.ball.x = gx; this.ball.y = s.aimY;
+    this.ball.px = gx; this.ball.py = s.aimY;
     this.ball.t = 0;
-    this.ball.dur = 2;
+    this.ball.dur = 0.55;
     this.ball.owner = null;
     this.ball.shot = null;
     this.ball.trail = [];
@@ -965,7 +980,10 @@ export class Match {
     this.pendingRestart = this.opposing[c.side];
   }
 
-  /* ───────────── 볼 이동 ───────────── */
+  /* ────── 볼 이동 ──────
+     패스·슛은 from→to 를 dur 틱에 걸쳐 날아가고, 도착한 그 지점에서 결과가 확정됩니다.
+     (화면은 확정된 판정을 한 틱 늦춰 보여 줍니다 — matchview.js 의 '판정 공개') */
+
   moveBall() {
     const b = this.ball;
     if (b.mode === 'carry' && b.owner) {
@@ -975,70 +993,32 @@ export class Match {
       return;
     }
     if (b.mode === 'pass' || b.mode === 'shot' || b.mode === 'net') {
-      b.t += 1;
-      const p = clamp(b.t / Math.max(b.dur, 1), 0, 1);
+      b.t += 1 / SUBSTEPS;
+      const p = clamp(b.t / Math.max(b.dur, 0.01), 0, 1);
+      // 패스는 리시버를 따라갑니다 — 공이 움직이는 선수 발밑으로 정확히 도착합니다
+      if (b.mode === 'pass' && b.receiver && b.receiver.onPitch) {
+        b.to.x = b.receiver.x; b.to.y = b.receiver.y;
+      }
       b.x = b.from.x + (b.to.x - b.from.x) * p;
       b.y = b.from.y + (b.to.y - b.from.y) * p;
       if (b.mode === 'net') return;
+      b.trail.push({ x: b.x, y: b.y });
+      if (b.trail.length > 20) b.trail.shift();
       if (b.mode === 'pass') {
         const opps = this.sides[this.opposing[b.passer.side]].players.filter((e) => e.onPitch && e.pos !== 'GK');
         for (const o of opps) {
           const d = Math.hypot(o.x - b.x, o.y - b.y);
-          if (d < 1.9 && this.rng() < 0.07 + this.eff(o, 'def') / 1000) {
+          // 공이 지나가는 길목의 수비수가 끊을 수 있습니다
+          if (d < 1.9 && this.rng() < (0.07 + this.eff(o, 'def') / 1000)) {
             this.intercept(o, b.passer);
             return;
           }
         }
       }
       if (p >= 1) {
-        if (b.mode === 'shot') return this.resolveShot();
-        const rec = b.receiver;
-        if (!rec || !rec.onPitch) { b.mode = 'loose'; b.owner = null; return; }
-        const opps = this.sides[this.opposing[rec.side]].players.filter((e) => e.onPitch && e.pos !== 'GK');
-        const near = opps.filter((o) => dist(o, rec) < 3.2).sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
-        if (near && this.rng() < 0.13 + this.eff(near, 'def') / 950) {
-          b.passer.st.passOk += 1;
-          if (b.cross && this.rng() < 0.22) {
-            const spot = this.cornerSpot(rec.side);
-            this.setPiece('corner', rec.side, spot.x, spot.y);
-            return;
-          }
-          this.intercept(near, b.passer);
-          return;
-        }
-        // 크로스는 수비가 걷어내는 경우가 많습니다
-        if (b.cross && this.rng() < 0.38) {
-          const clears = this.sides[this.opposing[rec.side]].players
-            .filter((e) => e.onPitch && e.pos !== 'GK')
-            .sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
-          if (clears) {
-            b.owner = clears; b.mode = 'carry'; b.cross = false;
-            b.x = clears.x; b.y = clears.y; clears.decCd = 1;
-            clears.st.tackles += 1; clears.rd += 0.04;
-            this.sides[clears.side].stats.tackles += 1;
-            this.pushEvent({ type: 'clear', side: clears.side, text: `${clears.name}${hasJong(clears.name) ? '이' : '가'} 크로스를 걷어냅니다.` });
-            return;
-          }
-        }
-        if (b.cross && this.rng() < 0.08) {
-          const opp2 = this.opposing[rec.side];
-          const spot = this.goalKickSpot(opp2);
-          this.setPiece('goalkick', opp2, spot.x, spot.y);
-          return;
-        }
-        b.owner = rec; b.mode = 'carry';
-        if (b.passer) { b.passer.st.passOk += 1; this.sides[b.passer.side].stats.passOk += 1; }
-        rec.decCd = 0;
-        if (rec.pos !== 'GK' && prog(rec.x, rec.dir) > 81 && Math.abs(rec.y - CY) < 13) {
-          const pr = this.pressureOn(rec);
-          const dG = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
-          if (pr < 2.6 && this.rng() < (b.cross ? 0.26 : 0.52)) { this.shoot(rec, dG, pr); return; }
-        }
-        if (b.cross && Math.abs(rec.y - CY) < 13 && prog(rec.x, rec.dir) > 70 && rec.pos === 'FW') {
-          const dGoal = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
-          if (this.rng() < 0.16) { this.shoot(rec, dGoal, this.pressureOn(rec), true); return; }
-        }
-        b.cross = false;
+        b.t = b.dur;
+        if (b.mode === 'shot') { this.resolveShot(); return; }
+        this.resolvePass();
       }
       return;
     }
@@ -1052,6 +1032,62 @@ export class Match {
       for (const e of all) { const d = dist(e, b); if (d < bd) { bd = d; best = e; } }
       if (best && bd < 1.6) { b.owner = best; b.mode = 'carry'; best.decCd = 1; }
     }
+  }
+
+  /* 패스가 리시버에게 실제로 닿은 순간의 처리 */
+  resolvePass() {
+    const b = this.ball;
+    const rec = b.receiver;
+    const passer = b.passer;
+    b.mode = 'loose';
+    b.owner = null;
+    if (!rec || !rec.onPitch) return;
+    const opps = this.sides[this.opposing[rec.side]].players.filter((e) => e.onPitch && e.pos !== 'GK');
+    const near = opps.filter((o) => dist(o, rec) < 3.2).sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
+    if (near && this.rng() < 0.13 + this.eff(near, 'def') / 950) {
+      if (passer) passer.st.passOk += 1;
+      if (b.cross && this.rng() < 0.22) {
+        const spot = this.cornerSpot(rec.side);
+        this.setPiece('corner', rec.side, spot.x, spot.y);
+        return;
+      }
+      this.intercept(near, passer);
+      return;
+    }
+    // 크로스는 수비가 걷어내는 경우가 많습니다
+    if (b.cross && this.rng() < 0.38) {
+      const clears = this.sides[this.opposing[rec.side]].players
+        .filter((e) => e.onPitch && e.pos !== 'GK')
+        .sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
+      if (clears) {
+        b.owner = clears; b.mode = 'carry'; b.cross = false;
+        b.x = clears.x; b.y = clears.y; clears.decCd = 1;
+        clears.st.tackles += 1; clears.rd += 0.04;
+        this.sides[clears.side].stats.tackles += 1;
+        this.pushEvent({ type: 'clear', side: clears.side, text: `${clears.name}${hasJong(clears.name) ? '이' : '가'} 크로스를 걷어냅니다.` });
+        return;
+      }
+    }
+    if (b.cross && this.rng() < 0.08) {
+      const opp2 = this.opposing[rec.side];
+      const spot = this.goalKickSpot(opp2);
+      this.setPiece('goalkick', opp2, spot.x, spot.y);
+      return;
+    }
+    b.owner = rec; b.mode = 'carry';
+    b.x = rec.x + rec.dir * 0.9; b.y = rec.y;
+    if (passer) { passer.st.passOk += 1; this.sides[passer.side].stats.passOk += 1; }
+    rec.decCd = 0;
+    if (rec.pos !== 'GK' && prog(rec.x, rec.dir) > 81 && Math.abs(rec.y - CY) < 13) {
+      const pr = this.pressureOn(rec);
+      const dG = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
+      if (pr < 2.6 && this.rng() < (b.cross ? 0.26 : 0.52)) { this.shoot(rec, dG, pr); return; }
+    }
+    if (b.cross && Math.abs(rec.y - CY) < 13 && prog(rec.x, rec.dir) > 70 && rec.pos === 'FW') {
+      const dGoal = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
+      if (this.rng() < 0.16) { this.shoot(rec, dGoal, this.pressureOn(rec), true); return; }
+    }
+    b.cross = false;
   }
 
   intercept(defender, passer) {
@@ -1358,7 +1394,7 @@ export class Match {
       }
       if (!target) { this.ball.mode = 'loose'; return; }
       this.passTo(taker, target, false);
-      this.ball.dur = clamp(Math.round(dist(taker, target) / 34), 1, 3);
+      this.ball.dur = clamp(0.2 + dist(taker, target) / 260, 0.22, 0.4);
       return;
     }
 
@@ -1377,7 +1413,7 @@ export class Match {
       this.ball.from = { x: taker.x, y: taker.y };
       this.ball.to = { x: rec.x, y: rec.y };
       this.ball.t = 0;
-      this.ball.dur = 2;
+      this.ball.dur = 0.34;
       this.ball.passer = taker;
       this.ball.receiver = rec;
       this.ball.cross = true;
@@ -1405,7 +1441,7 @@ export class Match {
         this.ball.from = { x: taker.x, y: taker.y };
         this.ball.to = { x: target.x, y: target.y };
         this.ball.t = 0;
-        this.ball.dur = 2;
+        this.ball.dur = 0.34;
         this.ball.passer = taker;
         this.ball.receiver = target;
         this.ball.cross = true;

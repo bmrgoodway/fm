@@ -464,6 +464,43 @@ html[data-theme="night"] .growth .up { color: #37e07a; } html[data-theme="night"
 }
 @keyframes gf { from { transform: translate(-50%, -50%) scale(0.88); opacity: 0; } to { transform: translate(-50%, -50%) scale(1); opacity: 1; } }
 .goalflash { pointer-events: none; }
+
+/* ── 득점 리플레이 ── */
+.replay-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.goal-replay {
+  position: absolute; left: 50%; top: 64%; transform: translate(-50%, -50%); z-index: 3;
+  background: var(--yellow); color: #101014; border: 2px solid #101014;
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.45); font-family: inherit;
+  font-weight: 900; font-size: 12.5px; padding: 6px 12px; cursor: pointer; white-space: nowrap;
+  animation: gf 0.3s ease-out;
+}
+.goal-replay:hover { background: #fff; }
+.replaybar {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 4;
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  background: rgba(10, 10, 14, 0.86); color: #fff; border-bottom: 2px solid #fff; padding: 6px 8px;
+}
+.replaybar .rb-badge {
+  flex: none; font-size: 10.5px; font-weight: 900; letter-spacing: 0.08em;
+  background: var(--coral); color: #fff; border: 1.5px solid #fff; padding: 1px 6px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.replaybar .rb-info {
+  font-size: 11px; font-weight: 800; white-space: nowrap; overflow: hidden;
+  text-overflow: ellipsis; max-width: 42%; min-width: 0;
+}
+.replaybar .rb-track {
+  flex: 1 1 90px; height: 6px; background: rgba(255, 255, 255, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.5); min-width: 48px;
+}
+.replaybar .rb-track i { display: block; height: 100%; width: 0; background: var(--yellow); }
+.replaybar .btn { flex: none; padding: 3px 8px; font-size: 11px; background: #fff; color: #101014; border: 2px solid #101014; font-weight: 900; }
+.replaybar .btn.ghost { background: transparent; color: #fff; border-color: rgba(255, 255, 255, 0.85); }
+.feed .feed-rp {
+  margin-left: auto; flex: none; align-self: center; padding: 0 4px; font-size: 10px; line-height: 1.5;
+  border: 1.5px solid var(--line); background: var(--paper); cursor: pointer;
+}
+.feed .feed-rp:hover { background: var(--yellow); }
 .gf-badge { background: var(--c1, var(--green)); color: var(--c2, #04220f); border: 2px solid #fff; padding: 1px 8px; font-size: 11px; font-weight: 900; }
 .goalflash b { font-size: clamp(26px, 5vw, 44px); letter-spacing: -0.04em; color: var(--yellow); }
 .gf-name { font-size: 12.5px; font-weight: 800; text-align: center; }

@@ -134,8 +134,10 @@ console.log('\n[3] 세트피스');
   ok(inBox >= 3, '코너 시 공격수들이 박스로 모임', `박스 안 ${inBox}명`);
   const defInBox = m.sides.away.players.filter((e) => e.onPitch && e.x > 82).length;
   ok(defInBox >= 5, '수비수들도 문전에 배치', `수비 ${defInBox}명`);
-  for (let i = 0; i < 4; i++) m.tick();
-  ok(m.phase !== 'setpiece', '준비 후 킥 전개', `phase=${m.phase}`);
+  // 배치가 끝나면 실제로 차서 흐름이 이어져야 합니다 (수비 걷어내기·파울로 새 세트피스가 나올 수 있음)
+  let g = 0;
+  while (m.phase === 'setpiece' && m.sp && m.sp.type === 'corner' && g < 20) { m.tick(); g++; }
+  ok(!(m.phase === 'setpiece' && m.sp && m.sp.type === 'corner'), '준비 후 킥 전개', `phase=${m.phase}${m.sp ? ' · ' + m.sp.type : ''} · ${g}틱`);
 }
 {
   const m = newMatch('gs', 'dj', 'gk');
