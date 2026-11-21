@@ -548,9 +548,16 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 .halftime .half-card { width: min(760px, 100%); text-align: left; }
 .halftime .half-card h2 { text-align: center; }
 .half-body { border-top: 1.5px dashed color-mix(in srgb, var(--line) 30%, transparent); padding-top: 10px; }
-.ht-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.ht-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; align-items: start; }
 .ht-cols h4 { font-size: 12px; color: var(--soft); margin-bottom: 6px; }
 .ht-subs { max-height: 168px; }
+.ht-cols > div { min-width: 0; }
+.ht-subcols { gap: 10px; }
+.ht-subcols h5 { font-size: 11px; color: var(--soft); margin: 0 0 4px; font-weight: 800; }
+.ht-subcols .sub-list { max-height: 200px; }
+.ht-subcols .sub-btn { font-size: 11px; padding: 3px 5px; }
+.ht-subcols .sub-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ht-subcols .sub-btn small { flex: none; }
 .halftime .axes { gap: 7px; }
 .halftime .axis-eff { display: none; }
 
@@ -603,7 +610,8 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 @media (max-width: 720px) {
   body { font-size: 14px; }
   .ht-cols { grid-template-columns: 1fr; }
-  .ht-subs { max-height: 132px; }
+  .ht-subcols { grid-template-columns: 1fr; }
+  .ht-subcols .sub-list { max-height: 140px; }
   .ticker .tk-text { font-size: 11.5px; }
   .goalflash b { font-size: 30px; }
   .tabs { flex-wrap: wrap; overflow-x: visible; }
