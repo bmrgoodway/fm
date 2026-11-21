@@ -1,33 +1,45 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-theme="day">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Football Manager · 준비 중 · BMR APPS</title>
-<meta name="description" content="Football Manager — 준비 중인 페이지입니다 (BMR APPS)">
-<meta name="theme-color" content="#0abbee">
+<title>Football Manager · GOODWAY APPS</title>
+<meta name="description" content="2D 바둑알 매치 엔진으로 즐기는 미니 풋볼 매니저. 10팀 리그와 컵대회, 전술 4축, 선수 교체, 이적 시장을 로그인 없이 브라우저에서. 커리어는 이 기기에 저장됩니다.">
+<meta name="theme-color" content="#f6f2e4">
+<meta name="color-scheme" content="light dark">
 <meta name="robots" content="noindex">
 <link rel="icon" href="https://wjvqavianqceeyyxonfg.supabase.co/functions/v1/hub-favicon?slug=fm">
 </head>
-<body>
-<!-- 준비 중 안내 페이지입니다. 앱을 만들면 이 파일(index.html)을 내 앱 화면으로 바꾸세요.
-     개발에 필요한 정보는 BMR APPS 허브의 '내 서비스 정보 → 개발 정보'와 저장소 README.md 에 있습니다. -->
+<body data-view="select">
+<a class="skip" href="#app">본문으로 바로 가기</a>
+
 <header class="top">
-  <a class="mark" href="https://bmrgoodway.github.io/" aria-label="BMR APPS 메인 화면"><span>BMR</span><span>APPS</span></a>
+  <a class="mark" href="https://bmrgoodway.github.io/" aria-label="BMR APPS 메인 화면">
+    <svg viewBox="0 0 48 48" role="img" aria-hidden="true" focusable="false">
+      <rect x="1" y="1" width="46" height="46" fill="#02c245" stroke="#101014" stroke-width="2"/>
+      <circle cx="24" cy="24" r="13" fill="#ffffff" stroke="#101014" stroke-width="2"/>
+      <path d="M24 13l5 4-2 6h-6l-2-6z" fill="#101014"/>
+      <path d="M13 20l5 2M35 20l-5 2M19 35l2-6M29 35l-2-6" stroke="#101014" stroke-width="2" fill="none"/>
+    </svg>
+  </a>
+  <div class="brand">
+    <b>Football Manager</b>
+    <small>GOODWAY APPS · FM</small>
+  </div>
+  <nav class="nav" aria-label="화면 설정">
+    <button type="button" class="icon-btn" id="btn-theme" aria-label="밤 화면으로 바꾸기" title="낮/밤 화면">☾</button>
+  </nav>
 </header>
-<main class="wrap">
-  <section class="hero">
-    <div class="copy">
-      <span class="eyebrow">준비 중</span>
-      <h1 data-app-name>Football Manager</h1>
-      <p class="desc" data-app-desc hidden></p>
-      <p class="notice"><b>준비 중인 페이지입니다.</b> 곧 이 주소에서 서비스를 열 예정이에요.</p>
-      <a class="btn" href="https://bmrgoodway.github.io/">BMR APPS 서비스 둘러보기</a>
-    </div>
-    <div class="art" aria-hidden="true"><i class="a"></i><i class="b"></i><i class="c"></i><i class="d"></i><i class="e"></i><i class="f"></i></div>
-  </section>
+
+<main id="app" tabindex="-1">
+  <noscript><p class="card">이 앱은 브라우저에서 바로 실행됩니다. 자바스크립트를 켜 주세요.</p></noscript>
 </main>
-<footer class="foot">별무리 개발자들이 함께 만들고 나누는 공간 · <a href="https://bmrgoodway.github.io/">BMR APPS</a></footer>
+
+<footer class="foot">
+  <p><b>Football Manager</b> — 바둑알 22명이 뛰는 미니 축구 감독 게임 · <a href="https://bmrgoodway.github.io/">GOODWAY APPS</a></p>
+</footer>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script type="module" src="/src/main.js"></script>
 </body>
 </html>
