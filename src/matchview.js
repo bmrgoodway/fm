@@ -128,7 +128,7 @@ export function mountMatch(app, m, meta) {
     let w2 = stageW;
     let h = w2 / ratio;
     const wide = window.innerWidth >= 1040;
-    const maxH = Math.max(240, Math.round(window.innerHeight * (wide ? 0.66 : 0.68)));
+    const maxH = Math.max(240, Math.round(window.innerHeight * (wide ? 0.6 : 0.66)));
     if (h > maxH) { h = maxH; w2 = h * ratio; }
     cssW = Math.round(w2); cssH = Math.round(h);
     canvas.style.width = cssW + 'px';

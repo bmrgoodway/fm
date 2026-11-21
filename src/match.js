@@ -1015,7 +1015,7 @@ export class Match {
             b.x = clears.x; b.y = clears.y; clears.decCd = 1;
             clears.st.tackles += 1; clears.rd += 0.04;
             this.sides[clears.side].stats.tackles += 1;
-            this.pushEvent({ type: 'clear', side: clears.side, text: `${clears.name}가 크로스를 걷어냅니다.` });
+            this.pushEvent({ type: 'clear', side: clears.side, text: `${clears.name}${hasJong(clears.name) ? '이' : '가'} 크로스를 걷어냅니다.` });
             return;
           }
         }
@@ -1258,18 +1258,18 @@ export class Match {
     const put = (e, x, y) => { if (e) spots.set(e, { x: clamp(x, 1.5, W - 1.5), y: clamp(y, 1.5, H - 1.5) }); };
 
     if (gkAtk) put(gkAtk, dir > 0 ? 6 : W - 6, CY);
-    if (gkDef) put(gkDef, dir > 0 ? W - 1.2 : 1.2, CY + (sp.y > CY ? -1.5 : 1.5));
+    if (gkDef) put(gkDef, dir > 0 ? W - 2.4 : 2.4, CY + (sp.y > CY ? -1.8 : 1.5));
     put(sp.taker, sp.x - dir * 1.6, sp.y + (sp.y > CY ? -1.4 : 1.4));
 
     if (sp.type === 'corner') {
       const box = [
-        [gx - dir * 6.5, CY - 2.2], [gx - dir * 11, CY + 0.5], [gx - dir * 7, CY + 5.5],
-        [gx - dir * 16, CY - 5.5], [gx - dir * 20, CY + 2],
+        [gx - dir * 6.5, CY - 5.5], [gx - dir * 11, CY + 2.5], [gx - dir * 8, CY + 7.5],
+        [gx - dir * 15, CY - 7], [gx - dir * 18, CY + 4],
       ];
       atk.forEach((e, i) => put(e, ...(box[i] || [gx - dir * (48 + (i - box.length) * 6), CY + (i % 2 ? 7 : -7)])));
       const mark = [
-        [gx - dir * 2.4, CY - 3.6], [gx - dir * 2.4, CY + 3.6], [gx - dir * 5.2, CY - 1],
-        [gx - dir * 5.2, CY + 4.8], [gx - dir * 8.4, CY - 3], [gx - dir * 8.4, CY + 2.4],
+        [gx - dir * 3, CY - 7], [gx - dir * 3, CY + 7], [gx - dir * 6.5, CY - 2.5],
+        [gx - dir * 6.5, CY + 5], [gx - dir * 10, CY - 6.5], [gx - dir * 10, CY + 3],
       ];
       def.forEach((e, i) => {
         if (i < mark.length) put(e, ...mark[i]);
