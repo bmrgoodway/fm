@@ -159,10 +159,10 @@ export function mountMatch(app, m, meta) {
         ctx.beginPath(); ctx.ellipse(px + r * 0.22, py + r * 0.3, r * 0.95, r * 0.75, 0, 0, Math.PI * 2); ctx.fill();
         // 몸
         ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2);
-        ctx.fillStyle = t.primary; ctx.fill();
+        ctx.fillStyle = side.kit || t.primary; ctx.fill();
         ctx.lineWidth = Math.max(1.6, r * 0.24); ctx.strokeStyle = '#101014'; ctx.stroke();
         // 등번호
-        ctx.fillStyle = contrastFor(t);
+        ctx.fillStyle = contrastFor(side.kit || t.primary);
         ctx.font = `900 ${Math.round(r * 1.02)}px "Pretendard Variable", Pretendard, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(String(e.num), px, py + r * 0.04);
@@ -199,12 +199,12 @@ export function mountMatch(app, m, meta) {
     ctx.globalAlpha = 1;
   }
 
-  function contrastFor(t) {
+  function contrastFor(c) {
     // 배경색 밝기로 글자색 결정
-    const hex = (t.primary || '#ffffff').replace('#', '');
+    const hex = String(c || '#ffffff').replace('#', '');
     const r = parseInt(hex.slice(0, 2), 16), g = parseInt(hex.slice(2, 4), 16), b = parseInt(hex.slice(4, 6), 16);
     const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return lum > 0.62 ? '#101014' : (t.secondary && t.secondary !== '#ffffff' ? t.secondary : '#ffffff');
+    return lum > 0.62 ? '#101014' : '#ffffff';
   }
 
   /* ── 패널 갱신 ── */

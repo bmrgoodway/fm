@@ -8,6 +8,24 @@ export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
 const TICKS = 360, TICKS_ET = 480;
 const SUBSTEPS = 3;
 
+/* 유니폼 색이 비슷하면 원정팀은 다른 키트를 입는다 */
+function rgb(hex) {
+  const h = String(hex || '').replace('#', '');
+  if (h.length !== 6) return [0, 0, 0];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function colorGap(a, b) {
+  const [r1, g1, b1] = rgb(a), [r2, g2, b2] = rgb(b);
+  return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+}
+const ALT_KITS = ['#ffdc1a', '#ff614a', '#7e65c1', '#02c245', '#101014', '#0abbee', '#ffffff'];
+function pickAwayKit(homeKit, away) {
+  const cands = [...ALT_KITS, away.secondary];
+  for (const c of cands) if (c && colorGap(homeKit, c) > 120 && colorGap(away.primary, c) > 60) return c;
+  return '#ffffff';
+}
+
+
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 // 골문 쪽으로 얼마나 전진했는지 (0=자기 골문, 100=상대 골문)
 const prog = (x, dir) => (dir > 0 ? x : W - x);
@@ -49,6 +67,14 @@ export class Match {
       home: this.buildSide(homeId, homeLineup, 1, 'home'),
       away: this.buildSide(awayId, awayLineup, -1, 'away'),
     };
+    // 키트 색이 겹치면 원정팀은 대체 유니폼
+    const homeKit = this.sides.home.team.primary;
+    const awayKit = colorGap(homeKit, this.sides.away.team.primary) < 110
+      ? pickAwayKit(homeKit, this.sides.away.team)
+      : this.sides.away.team.primary;
+    this.kit = { home: homeKit, away: awayKit };
+    this.sides.home.kit = homeKit;
+    this.sides.away.kit = awayKit;
     this.ball = { x: W / 2, y: CY, owner: null, mode: 'carry', from: null, to: null, t: 0, dur: 0, passer: null, receiver: null, cross: false, tx: 0, ty: 0, vx: 0, vy: 0, lastShot: null };
     this.startPossession('home', 'kickoff');
     this.pushEvent({ type: 'kickoff', text: `킥오프! ${world.teams[homeId].short} vs ${world.teams[awayId].short}` });
