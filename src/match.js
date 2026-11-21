@@ -30,6 +30,15 @@ function pickAwayKit(homeKit, away) {
 }
 
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+// 받침 유무로 조사를 고릅니다 (남상현'이' / 류재현'이' / 조민성'이' / 김선우'가')
+const hasJong = (word) => {
+  const s = String(word || '').trim();
+  if (!s) return false;
+  const c = s.charCodeAt(s.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return false;
+  return (c - 0xac00) % 28 > 0;
+};
+const JOSA = { '가': ['이', '가'], '는': ['은', '는'], '를': ['을', '를'], '와': ['과', '와'] };
 // 골문 쪽으로 얼마나 전진했는지 (0=자기 골문, 100=상대 골문)
 const prog = (x, dir) => (dir > 0 ? x : W - x);
 
@@ -158,8 +167,9 @@ const SAY = {
     '{p}가 솟아올라 머리로 때립니다!',
   ],
   half: [
-    '전반 종료. 라커룸에서 전술을 정비할 시간입니다.',
-    '하프타임 — 양 팀이 라커룸으로 향합니다.',
+    '선수들이 라커룸으로 향합니다.',
+    '15분간의 휴식 — 감독이 전술을 정비할 시간입니다.',
+    '하프타임. 양 팀이 라커룸에 모입니다.',
   ],
   secondHalf: [
     '후반전 시작! 양 팀 진영을 바꿔 경기를 이어갑니다.',
@@ -283,10 +293,14 @@ export class Match {
   phrase(kind, sideName, vars = {}) {
     const pool = SAY[kind] || SAY.build;
     const team = sideName ? (this.sides[sideName]?.team?.short || '') : '';
+    const names = { p: vars.p || '', p2: vars.p2 || '', t: team };
     return pick(this.rng, pool)
-      .replace(/\{p\}/g, vars.p || '')
-      .replace(/\{p2\}/g, vars.p2 || '')
-      .replace(/\{t\}/g, team)
+      .replace(/\{(p|p2|t)\}([가는를와])?/g, (mm, k, j) => {
+        const name = names[k] ?? '';
+        if (!j) return name;
+        const pair = JOSA[j];
+        return name + (hasJong(name) ? pair[0] : pair[1]);
+      })
       .replace(/\{n\}/g, String(vars.n ?? ''));
   }
   say(kind, sideName, vars = {}, type = null) {
@@ -1217,7 +1231,7 @@ export class Match {
       const e = this.sp.taker;
       e.x = this.sp.x - side.dir * 1.6; e.y = this.sp.y; e.px = e.x; e.py = e.y;
     }
-    this.say(type, sideName, { t: side.team.short }, type);
+    this.say(type, sideName, { p: this.sp.taker?.name || '', t: side.team.short }, type);
   }
 
   pickTaker(type, side) {

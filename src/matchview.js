@@ -444,7 +444,7 @@ export function mountMatch(app, m, meta) {
     $('ht-score').textContent = `${m.score.home} - ${m.score.away}`;
     const my = m.userSide === 'home' ? s.shots.home : s.shots.away;
     const opp = m.userSide === 'home' ? s.shots.away : s.shots.home;
-    $('ht-note').textContent = `전반 ${m.minute()}분 종료 — 슈팅 ${my} : ${opp}. 라커룸에서 전술·선수를 정비하세요.`;
+    $('ht-note').textContent = `전반 ${m.clock()} 종료 — 슈팅 ${my} : ${opp}. 라커룸에서 전술·선수를 정비하세요.`;
     const axes = AXES.map((a) => {
       const v = side.tactic[a.key] || 0;
       return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
@@ -584,7 +584,7 @@ export function mountMatch(app, m, meta) {
     $('halftime').hidden = true;
     m.startSecondHalf();
     halfShown = false;
-    lastStats = 0; lastRatings = 0;
+    lastStats = m.events.length; lastRatings = m.events.length;   // 지난 이벤트를 다시 띄우지 않습니다
     renderStats(); renderFeed(); renderTicker(); renderRatings();
     start();
   });

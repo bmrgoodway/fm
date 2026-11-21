@@ -559,11 +559,12 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .matchview {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
-    grid-template-areas: "bar bar" "stage panels" "controls drawer";
+    grid-template-areas: "bar bar" "stage panels" "ticker panels" "controls drawer";
     align-items: start; gap: 10px;
   }
   .scorebar { grid-area: bar; }
   .stage { grid-area: stage; }
+  .ticker { grid-area: ticker; }
   .mcontrols { grid-area: controls; }
   .drawer { grid-area: drawer; }
   .mpanels { grid-area: panels; display: flex; flex-direction: column; align-items: stretch; gap: 10px; height: var(--pitch-h, 560px); max-height: calc(100vh - 240px); overflow: hidden; }
