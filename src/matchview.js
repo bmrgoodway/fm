@@ -109,6 +109,8 @@ export function mountMatch(app, m, meta) {
     canvas.style.margin = '0 auto';
     canvas.width = Math.round(cssW * dpr);
     canvas.height = Math.round(cssH * dpr);
+    const mv = canvas.closest('.matchview');
+    if (mv) mv.style.setProperty('--pitch-h', cssH + 'px');
   }
 
   function draw() {
@@ -210,7 +212,7 @@ export function mountMatch(app, m, meta) {
 
   /* ── 패널 갱신 ── */
   const statRows = [
-    ['shots', '슈팅'], ['onTarget', '유효슈팅'], ['xg', '기대득점(xG)'], ['passes', '패스 성공'], ['tackles', '태클'], ['saves', '선방'],
+    ['shots', '슈팅'], ['onTarget', '유효슈팅'], ['xg', '기대득점(xG)'], ['saves', '선방'],
   ];
   function renderStats() {
     const s = m.stats();
