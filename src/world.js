@@ -4,6 +4,7 @@ import { makeRng, rint, pick, clamp, gauss, shuffle } from './rng.js';
 import { TEAM_DEFS, FORMATIONS, FORMATION_IDS, overall, valueOf, wageOf, buildSquad, freshSeasonStats, STAT_KEYS, statsFor, randomName } from './data.js';
 import { KL_TEAMS, KL_ROSTERS, KL_DIVISIONS, KL_BY_ID, KL_SEASON } from './kleague2026.js';
 import { defaultRoles, resolveRoles, roleFor, resolveSetPiece } from './tactics.js';
+import { entryFromQuick, recordEntries } from './history.js';
 
 export const SAVE_KEY = 'career';
 export const SAVE_VERSION = 1;
@@ -482,7 +483,7 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
     const mates = squadOf(w, teamId).filter((p) => p.id !== s.id && p.pos !== 'GK');
     const a = mates.length ? mates[Math.floor(rng() * Math.min(mates.length, 8))] : null;
     picked.push({ teamId, goal: true, scorer: s, assist: rng() < 0.65 ? a : null });
-    events.push({ minute, type: 'goal', teamId, scorerId: s.id, assistId: a?.id ?? null });
+    events.push({ minute, type: 'goal', side: teamId === homeId ? 'home' : 'away', teamId, scorerId: s.id, scorer: s.name, assistId: a?.id ?? null, assist: a?.name ?? null });
     s.season.goals += 1;
     if (a) a.season.assists += 1;
   };
@@ -518,7 +519,21 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
     // 라운드마다 AI 선수도 실제 출전·평점만큼 성장합니다 (내 경기는 applyResult 가 처리)
     if (opts.grow !== false) growTeamFromMatch(w, teamId, perf, `${opts.stamp || 'q'}-${homeId}-${awayId}`);
   }
-  return { hg, ag, events };
+  // 경기 요약에 남길 경량 기록 — 빠른 시뮬레이션도 큰 그림(점유율·슈팅·코너·카드)은 남깁니다.
+  const possH = Math.round(clamp(50 + (sh - sa) * 1.1 + 3 + (rng() - 0.5) * 8, 32, 68));
+  const light = (goals, mine, theirs) => {
+    const shots = Math.round(clamp(goals + 3 + rint(rng, 0, 8) + (mine - theirs) / 9, goals, 26));
+    const onTarget = Math.round(clamp(goals + rint(rng, 0, Math.max(1, Math.round((shots - goals) * 0.55))), goals, shots));
+    return {
+      poss: 0, shots, onTarget,
+      xg: Math.round((goals * 0.82 + shots * 0.085 + rng() * 0.25) * 100) / 100,
+      corners: rint(rng, 1, 9), fouls: rint(rng, 5, 15), offsides: rint(rng, 0, 4),
+      yellow: rint(rng, 0, 3), red: rng() < 0.045 ? 1 : 0,
+    };
+  };
+  const stats = { home: light(hg, sh, sa), away: light(ag, sa, sh) };
+  stats.home.poss = possH; stats.away.poss = 100 - possH;
+  return { hg, ag, events, stats };
 }
 
 /* 한 라운드의 나머지 경기 처리 */
@@ -532,12 +547,15 @@ function growHere(w, round) {
 
 export function playOtherFixtures(w, round, skipUser = true) {
   const grow = growHere(w, round);
+  // 이번 라운드에 치른 경기의 '요약'을 모아 두었다가 한 번에 기록합니다 (저장소 쓰기를 라운드당 1회로).
+  const summaries = [];
   if (round.type === 'league') {
     for (const f of round.fixtures) {
       if (f.played) continue;
       if (skipUser && (f.home === w.myTeamId || f.away === w.myTeamId)) continue;
       const r = simMatchQuick(w, f.home, f.away, { stamp: `l${round.no}`, grow });
-      f.played = true; f.hg = r.hg; f.ag = r.ag; f.events = r.events;
+      f.played = true; f.hg = r.hg; f.ag = r.ag;
+      summaries.push(entryFromQuick(w, round, f, r));
       pushRecent(w, f.home, r.hg > r.ag ? 'W' : r.hg < r.ag ? 'L' : 'D');
       pushRecent(w, f.away, r.ag > r.hg ? 'W' : r.ag < r.hg ? 'L' : 'D');
     }
@@ -555,12 +573,14 @@ export function playOtherFixtures(w, round, skipUser = true) {
       if (draw) hg += 1; // 연장 승부 (표시용)
       m.played = true; m.hg = hg; m.ag = ag; m.aet = draw;
       m.winner = hg > ag ? m.home : m.away;
+      summaries.push(entryFromQuick(w, round, m, { ...r, hg, ag, aet: draw }));
     }
     round.played = stage.matches.every((m) => m.played);
     const next = round.stage + 1;
     if (round.played && next < cupStageCount(w)) buildCupStage(w, next);
     if (round.played) settleRound(w, round);
   }
+  if (summaries.length) recordEntries(w, summaries);
 }
 
 function rngBool(w, key) {
@@ -1653,7 +1673,12 @@ export function saveWorld(w) {
   try { local.set(SAVE_KEY, { ...w, savedAt: Date.now() }); return true; } catch { return false; }
 }
 export function loadWorld() {
-  const w = local.get(SAVE_KEY, null);
+  return fixWorld(local.get(SAVE_KEY, null));
+}
+
+/* 세이브(저장소·파일·수동 슬롯)에서 읽은 세계를 현재 버전에 맞게 보정합니다.
+   구버전 세이브가 필드 없이 들어와도 그대로 이어지도록 하는 단일 통로입니다. */
+export function fixWorld(w) {
   if (!w || w.version !== SAVE_VERSION) return null;
   if (!w.myTeamId || !w.teams?.[w.myTeamId]) return null;
   // 모드·디비전 정보가 없는 세이브 = 기존 커스텀 리그 세이브 (그대로 이어집니다)
@@ -1731,17 +1756,36 @@ export function resultOf(w, round, teamId) {
   return { mine, opp, res: mine > opp ? 'W' : mine < opp ? 'L' : 'D', home: m.home === teamId, oppId: m.home === teamId ? m.away : m.home };
 }
 export function myFixtures(w) {
+  return teamFixtures(w, w.myTeamId);
+}
+
+/* 한 구단의 이번 시즌 일정 — 타 구단 스쿼드 모달의 '경기 결과' 목록에 씁니다.
+   { round, fixture, home, away, isHome, oppId, gf, ga, res('W'|'D'|'L'|null) } */
+export function teamFixtures(w, teamId) {
   const out = [];
   for (const r of w.calendar) {
     if (r.type === 'league') {
-      const f = r.fixtures.find((x) => x.home === w.myTeamId || x.away === w.myTeamId);
+      const f = r.fixtures.find((x) => x.home === teamId || x.away === teamId);
       if (f) out.push({ round: r, fixture: f });
     } else {
       const st = w.cup.stages[r.stage];
       if (!st) continue;
-      const m = st.matches.find((x) => x.home === w.myTeamId || x.away === w.myTeamId);
+      const m = st.matches.find((x) => x.home === teamId || x.away === teamId);
       if (m) out.push({ round: r, fixture: m });
     }
   }
-  return out;
+  return out.map(describeFixture(w, teamId));
 }
+
+const describeFixture = (w, teamId) => ({ round, fixture }) => {
+  const isHome = fixture.home === teamId;
+  const oppId = isHome ? fixture.away : fixture.home;
+  const played = !!fixture.played;
+  const gf = isHome ? fixture.hg : fixture.ag;
+  const ga = isHome ? fixture.ag : fixture.hg;
+  return {
+    round, fixture, home: fixture.home, away: fixture.away, isHome, oppId,
+    played, gf: played ? gf : null, ga: played ? ga : null,
+    res: played ? (gf > ga ? 'W' : gf < ga ? 'L' : 'D') : null,
+  };
+};

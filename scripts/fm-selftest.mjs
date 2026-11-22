@@ -20,7 +20,7 @@
 //   24) 가격 협상·FA·시즌 임대(임대 종료 반환)
 //   25) 4단계 필드가 없는 구버전 세이브 호환
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel } from '../src/world.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
 import { FORMATIONS, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -28,6 +28,11 @@ import { roleFor, resolveRoles, defaultRole, rolesForLabel, ROLE_TUNING, MENTALI
 import { boardPos, renderSeason, renderHub, renderSelect, renderModal } from '../src/views.js';
 import { staminaColor, STAMINA_COLORS } from '../src/matchview.js';
 import { scoutReport, threatOf } from '../src/scout.js';
+// 5차 — 경기 요약 로그 · 프리셋 · 저장 슬롯
+import { setLogStore, getEntry, recordEntries, entryFromMatch, logInfo, LOG_BUDGET, matchKey } from '../src/history.js';
+import { setPresetStore, readPresets, addPreset, overwritePreset, deletePreset, applyPreset } from '../src/presets.js';
+import { setSlotStore, saveSlot, loadSlot, deleteSlot, readSlots, exportPayload, exportFileName, parseSaveFile, slotMeta, SLOT_COUNT } from '../src/saves.js';
+import { readFileSync } from 'node:fs';
 
 const N = Number(process.argv[2] || 24);
 const prog = (x, dir) => (dir > 0 ? x : 100 - x);   // 공격 방향 기준 진행도
@@ -81,6 +86,8 @@ function playUserRounds(w, n = 1) {
     const { round, fixture } = nx;
     const m = simulateInstant(w, fixture.home, fixture.away, `${w.seed}-s${w.season}-r${round.no}`, round.type === 'cup', fixture.home === w.myTeamId ? 'home' : 'away');
     applyResult(w, m);
+    // 앱(app.js endMatch)과 같게: 내 경기도 요약 로그에 남깁니다 (저장소가 없으면 무해)
+    if (recordEntries) recordEntries(w, [entryFromMatch(w, m, round, fixture.home, fixture.away)]);
     if (round.type === 'league') {
       fixture.played = true; fixture.hg = m.score.home; fixture.ag = m.score.away;
     } else {
@@ -1845,6 +1852,219 @@ console.log('\n[27] K리그 2026 모드 — 실제 구단·선수, 4부 승강�
   let cm = '';
   try { cm = renderModal({ ...app, state: { ...app.state, modal: { kind: 'club', team: 'jinju' } } }); } catch (e) { cm = 'ERR ' + e.message; }
   ok(cm.includes('club-squad') && /jinju|진주/.test(cm), '구단 모달에 선수단 표가 그려집니다', cm.startsWith('ERR') ? cm : `${cm.length}자`);
+}
+
+/* ── 28. 5차 — 이전 경기 터록 · 전술·명단 프리셋 · 저장/불러오기 · 로고 ── */
+console.log('\n[28] 이전 경기 결과 · 전술·명단 프리셋 · 저장/불러오기 · 로고');
+{
+  /* 테스트용 저장소 — node 에는 localStorage 가 없으므로 메모리로 갈아 끼밉니다. */
+  const memStore = () => {
+    const m = new Map();
+    return {
+      _m: m,
+      get(k, f = null) { return m.has(k) ? JSON.parse(m.get(k)) : f; },
+      set(k, v) { m.set(k, JSON.stringify(v)); },
+      remove(k) { m.delete(k); },
+    };
+  };
+  const fullStore = () => ({ get: () => null, set() { throw new Error('QuotaExceededError'); }, remove() {} });
+  const logStore = memStore(), slotStore = memStore(), presetStore = memStore();
+  setLogStore(logStore); setSlotStore(slotStore); setPresetStore(presetStore);
+
+  /* ── (1) 내 경기 · AI 경기 요약 ── */
+  const hw = createWorld('gs', 20261212);
+  const nx = userNextMatch(hw);
+  const hm = simulateInstant(hw, nx.fixture.home, nx.fixture.away, 'v5-a', nx.round.type === 'cup', 'home');
+  applyResult(hw, hm);
+  recordEntries(hw, [entryFromMatch(hw, hm, nx.round, nx.fixture.home, nx.fixture.away)]);
+  nx.fixture.played = true; nx.fixture.hg = hm.score.home; nx.fixture.ag = hm.score.away;
+  finishRound(hw, nx.round); playOtherFixtures(hw, nx.round, true);
+  const e1 = getEntry(hw, nx.round, nx.fixture.home, nx.fixture.away);
+  ok(!!e1 && e1.hg === hm.score.home && e1.ag === hm.score.away, '내 경기 결과가 요약으로 저장됩니다', e1 ? `${e1.hg}-${e1.ag} ${e1.k}` : '없음');
+  ok(!!e1 && e1.g.length === hm.score.home + hm.score.away, '저장된 득점 장면 수가 스코어와 맞습니다', e1 ? `${e1.g.length}장면` : '');
+  ok(!!e1 && e1.g.every((g) => g[0] >= 1 && g[0] <= 120 && ['h', 'a'].includes(g[1]) && g[2]), '득점 장면마다 시간·팀·득점자가 있습니다');
+  ok(!!e1 && e1.rt.h.length === 11 && e1.rt.a.length === 11, '양 팀 출전 선수 평점이 함께 저장됩니다', e1 ? `${e1.rt.h.length}+${e1.rt.a.length}명` : '');
+  ok(!!e1 && Array.isArray(e1.s.h) && e1.s.h.length === 9 && e1.s.h[0] + e1.s.a[0] === 100, '주요 기록 9종과 점유율 합 100%', e1 ? `점유율 ${e1.s.h[0]}:${e1.s.a[0]}` : '');
+  const otherPlayed = hw.calendar.filter((r) => r.type === 'league' && r.played).flatMap((r) => r.fixtures.map((f) => ({ r, f }))).filter((x) => x.f.home !== hw.myTeamId && x.f.away !== hw.myTeamId);
+  ok(otherPlayed.length > 0 && otherPlayed.every((x) => !!getEntry(hw, x.r, x.f.home, x.f.away)), 'AI 경기(다른 구단) 요약도 함께 남습니다', `${otherPlayed.length}경기`);
+  const aiEntry = otherPlayed.length ? getEntry(hw, otherPlayed[0].r, otherPlayed[0].f.home, otherPlayed[0].f.away) : null;
+  ok(!!aiEntry && aiEntry.g.length === aiEntry.hg + aiEntry.ag && Array.isArray(aiEntry.s.h), 'AI 경기 요약에도 득점자·주요 기록이 있습니다');
+  const aiNames = (otherPlayed.length ? getEntry(hw, otherPlayed[0].r, otherPlayed[0].f.home, otherPlayed[0].f.away) : null)?.g || [];
+  const aiTeams = new Set([...otherPlayed.slice(0, 4)].flatMap((x) => (getEntry(hw, x.r, x.f.home, x.f.away)?.g || []).map((g) => g[2])));
+  ok(aiNames.every((g) => g[2] && ['h', 'a'].includes(g[1])), 'AI 경기 득점자는 실제 선수 이름으로, 홈/원정 구분과 함께 남습니다', [...aiTeams].slice(0, 3).join(', '));
+
+  /* 컵대회 경기(연장)도 요약에 남는지 */
+  const cupWorld = createWorld('gs', 20261213);
+  let cupSeed = 0, cupTried = false, cupOk = true;
+  while (!cupTried && cupSeed < 40) {
+    ensureProgress(cupWorld);   // 앱처럼: 내 경기가 없는 라운드는 먼저 진행
+    const n2 = userNextMatch(cupWorld);
+    if (!n2) break;
+    const m2 = simulateInstant(cupWorld, n2.fixture.home, n2.fixture.away, `v5-c${cupSeed}`, n2.round.type === 'cup', 'home');
+    applyResult(cupWorld, m2);
+    recordEntries(cupWorld, [entryFromMatch(cupWorld, m2, n2.round, n2.fixture.home, n2.fixture.away)]);
+    n2.fixture.played = true; n2.fixture.hg = m2.score.home; n2.fixture.ag = m2.score.away;
+    finishRound(cupWorld, n2.round); playOtherFixtures(cupWorld, n2.round, true);
+    if (n2.round.type === 'cup') {
+      cupTried = true;
+      const ce = getEntry(cupWorld, n2.round, n2.fixture.home, n2.fixture.away);
+      cupOk = !!ce && ce.k.startsWith('C');
+    }
+    cupSeed += 1;
+  }
+  ok(cupTried && cupOk, '컵대회 경기 요약도 라운드 키와 함께 남습니다');
+
+  /* ── (2) 저장 크기 — 경기 기록은 가법게 ── */
+  const info = logInfo(hw);
+  ok(info.bytes < LOG_BUDGET, '경기 기록이 예산(0.7MB) 안에 있습니다', `${Math.round(info.bytes / 1024)}KB · ${info.total}경기`);
+  ok(info.bytes / Math.max(1, info.total) < 400, '경기 1건당 요약이 400B 미만입니다', `${Math.round(info.bytes / Math.max(1, info.total))}B`);
+
+  /* ── (3) 전술·명단 프리셋 ── */
+  const pw = createWorld('gs', 20261214);
+  setFormation(pw, '4-2-3-1');
+  pw.myLineup.tactic = { line: 0.5, pass: -0.5, press: 0.8, route: 0.3, mentality: 0.75 };
+  setSetPiece(pw, 'corner', 'near');
+  setTraining(pw, 'attack');
+  const want = {
+    formation: pw.myLineup.formation,
+    tactic: JSON.stringify(pw.myLineup.tactic),
+    roles: JSON.stringify(pw.myLineup.roles),
+    setpiece: JSON.stringify(pw.myLineup.setpiece),
+    starters: JSON.stringify(pw.myLineup.starters),
+    bench: JSON.stringify(pw.myLineup.bench),
+    training: pw.teams.gs.training,
+  };
+  const saved = addPreset(pw, '홈 압박 4-2-3-1');
+  ok(saved.ok && readPresets().list.length === 1, '프리셋이 이름으로 저장됩니다', saved.ok ? saved.preset.name : saved.why);
+  ok(readPresets().list[0].starters.filter(Boolean).length === 11, '선발 11명이 함께 저장됩니다');
+  // 설정을 마구 바꿔본 뒤 한 번에 되살리기
+  setFormation(pw, '4-4-2');
+  pw.myLineup.tactic = { line: -0.6, pass: 0.6, press: -0.8, route: -0.4, mentality: -1 };
+  setSetPiece(pw, 'corner', 'short');
+  setTraining(pw, 'defense');
+  const res1 = applyPreset(pw, readPresets().list[0]);
+  ok(res1.ok && pw.myLineup.formation === want.formation, '불러오면 포메이션이 되살아납니다', pw.myLineup.formation);
+  ok(JSON.stringify(pw.myLineup.tactic) === want.tactic, '전술 4축 · 팀 성향이 그대로 되살아납니다', JSON.stringify(pw.myLineup.tactic));
+  ok(JSON.stringify(pw.myLineup.roles) === want.roles, '포지션별 역할이 그대로 되살아납니다');
+  ok(JSON.stringify(pw.myLineup.setpiece) === want.setpiece, '세트피스 지시가 그대로 되살아납니다');
+  ok(pw.teams.gs.training === want.training, '주간 훈련이 그대로 되살아납니다', pw.teams.gs.training);
+  ok(JSON.stringify(pw.myLineup.starters) === want.starters, '선발 11명이 그대로 되살아납니다');
+  ok(JSON.stringify(pw.myLineup.bench) === want.bench, '후보 명단도 그대로 되살아납니다');
+
+  /* 이적 · 부상 · 정지 — 빠진 자리만 다른 선수로 */
+  const preset = readPresets().list[0];
+  const goneRef = preset.starters[0];         // 골키퍼가 이적
+  const hurtRef = preset.starters[5];         // 미드필더가 부상
+  const goneP = pw.players[goneRef.pid];
+  pw.teams.gs.squad = pw.teams.gs.squad.filter((id) => id !== goneP.id);
+  pw.teams.dj.squad.push(goneP.id); goneP.teamId = 'dj';
+  pw.players[hurtRef.pid].inj = 2;
+  const res2 = applyPreset(pw, preset);
+  ok(res2.ok && res2.changed >= 2, '이적·부상으로 빠진 자리를 다른 선수로 채우고 알려 줍니다', res2.notes?.join(' ') || '');
+  ok(!pw.myLineup.starters.includes(goneP.id) && !pw.myLineup.starters.includes(hurtRef.pid), '이적·부상 선수는 선발에서 빠집니다');
+  ok(pw.myLineup.starters.filter(Boolean).length === 11 && new Set(pw.myLineup.starters).size === 11, '선발 11명이 중복 없이 채워집니다');
+  const gkSlot = FORMATIONS[pw.myLineup.formation].slots.findIndex((s) => s.pos === 'GK');
+  ok(pw.players[pw.myLineup.starters[gkSlot]]?.pos === 'GK', '빈 골키퍼 자리는 다른 골키퍼로 채웁니다');
+
+  /* 커스텀 → K리그 혼용·알 수 없는 값도 안전하게 */
+  const klw = createWorld('geumsan', 20261215, { mode: 'kleague' });
+  const cross = applyPreset(klw, preset);
+  const klIds = new Set(squadOf(klw, 'geumsan').map((p) => p.id));
+  ok(cross.ok && klw.myLineup.starters.filter(Boolean).length === 11 && klw.myLineup.starters.every((id) => !id || klIds.has(id)),
+    '다른 모드(K리그)에 불러와도 ID·포지션 폴백으로 채워집니다', cross.notes?.join(' ') || '그대로');
+  const broken = { ...preset, formation: '9-9-9', roles: preset.roles.map(() => 'no-such-role'), setpiece: null, training: 'x' };
+  const res3 = applyPreset(klw, broken);
+  ok(res3.ok && FORMATIONS[klw.myLineup.formation] && klw.myLineup.roles.every((r) => typeof r === 'string' && r.length > 1),
+    '알 수 없는 포메이션·역할은 지금 값과 기본 역할로 안전하게') ;
+  ok(overwritePreset(pw, readPresets().list[0].id).ok, '덮어쓰기가 됩니다');
+  const delOk = deletePreset(readPresets().list[0].id);
+  ok(delOk.ok && readPresets().list.length === 0, '삭제가 됩니다');
+
+  /* ── (4) 수동 세이브 슬롯 ── */
+  const sw = createWorld('gs', 20261216);
+  playUserRounds(sw, 3);
+  const s1 = saveSlot(0, sw);
+  ok(s1.ok && s1.bytes < 400 * 1024, '슬롯 저장이 경량 형식으로 됩니다', s1.ok ? `${Math.round(s1.bytes / 1024)}KB` : s1.why);
+  ok(SLOT_COUNT >= 3 && SLOT_COUNT <= 5, '수동 슬롯이 3~5개입니다', `${SLOT_COUNT}개`);
+  const meta0 = readSlots().list[0].meta;
+  ok(meta0.teamName === sw.teams[sw.myTeamId].name && meta0.season === seasonLabel(sw) && !!meta0.round && meta0.played > 0,
+    '슬롯에 구단명·시즌·라운드·진행 경기가 표시됩니다', `${meta0.teamName} · ${meta0.season} · ${meta0.round} · ${meta0.played}경기`);
+  const l0 = loadSlot(0);
+  ok(l0.ok, '슬롯에서 불러오기가 됩니다');
+  const lw = l0.world;
+  ok(!!lw && lw.myTeamId === sw.myTeamId && Object.keys(lw.players).length === Object.keys(sw.players).length, '선수단 구성이 그대로 복원됩니다');
+  ok(JSON.stringify(standings(lw)) === JSON.stringify(standings(sw)), '순위표(승점·득실)가 그대로 복원됩니다');
+  ok(JSON.stringify(lw.myLineup) === JSON.stringify(sw.myLineup), '라인업·전술이 그대로 복원됩니다');
+  const sp = squadOf(sw, sw.myTeamId)[0];
+  ok(JSON.stringify(lw.players[sp.id].stats) === JSON.stringify(sp.stats) && lw.players[sp.id].season.apps === sp.season.apps && lw.players[sp.id].ovr === sp.ovr,
+    '선수 능력치·시즌 기록이 그대로 복원됩니다', `${sp.name} ${sp.ovr}`);
+  ok(lw.calendar.filter((r) => r.played).length === sw.calendar.filter((r) => r.played).length, '진행한 라운드가 그대로 복원됩니다');
+  ok(!!lw.cup.stages.length, '코리아컵 대진도 그대로 복원됩니다');
+  // 여러 슬롯
+  saveSlot(1, lw);
+  ok(readSlots().list.filter(Boolean).length === 2, '여러 슬롯에 따로 저장됩니다');
+  ok(deleteSlot(1).ok && readSlots().list[1] === null, '슬롯을 지울 수 있습니다');
+  // 용량 초과
+  setSlotStore(fullStore());
+  const bad = saveSlot(2, sw);
+  ok(!bad.ok && /저장 공간/.test(bad.why || ''), '저장 공간이 모자라면 이유를 돌려줍니다', bad.why || '');
+  setSlotStore(slotStore);
+
+  /* ── (5) JSON 내보내기 / 파일에서 불러오기 ── */
+  const payload = exportPayload(sw);
+  const json = JSON.stringify(payload);
+  const back = parseSaveFile(json);
+  ok(back.ok && back.world.myTeamId === sw.myTeamId && JSON.stringify(standings(back.world)) === JSON.stringify(standings(sw)),
+    'JSON 으로 내보낸 세이브를 다시 읽어도 그대로입니다', `${Math.round(json.length / 1024)}KB`);
+  ok(/^fm-.+\.json$/.test(exportFileName(sw)), '내보내기 파일 이름이 구단·시즌을 담습니다', exportFileName(sw));
+  const legacy = parseSaveFile(JSON.stringify(JSON.parse(JSON.stringify(sw))));
+  ok(legacy.ok, '예전 형식(세계 객체 그대로) 파일도 읽습니다');
+  ok(!parseSaveFile('이건 JSON 이 아님').ok && !parseSaveFile('{"a":1}').ok && !parseSaveFile('').ok, '잘못된 파일은 거절합니다');
+
+  /* ── (6) 로고 → 앱 안 첫 화면 ── */
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const markTag = (html.match(/<a class="mark"[^>]*>/) || [''])[0];
+  ok(/data-act="home"/.test(markTag) && !/href="https?:\/\/bmrgoodway/.test(markTag),
+    '메인 로고가 외부 허브로 나가지 않고 앱 첫 화면을 열게 되어 있습니다', markTag.slice(0, 90));
+
+  /* ── (7) 화면 ── */
+  const hap = { world: sw, savedGame: sw, defs: Object.fromEntries([...TEAM_DEFS.map((t) => [t.id, t]), ...KL_TEAMS.map((t) => [t.id, t])]), state: { tab: 'schedule', pickMode: 'custom', pickDiv: 1, divTab: 1, posFilter: 'ALL', sortKey: 'ovr', sortDir: -1, marketDiv: 0, seasonPhase: 'preview', seasonResult: null, selSlot: null, selPid: null } };
+  let hub2 = '';
+  try { hub2 = renderHub(hap); } catch (e) { hub2 = 'ERR ' + e.message; }
+  ok(hub2.includes('data-act="saves"') && hub2.includes('저장/불러오기'), '허브에 저장/불러오기 버튼이 있습니다');
+  const sched = hap.state.tab;
+  hap.state.tab = 'squad';
+  let sq = '';
+  try { sq = renderHub(hap); } catch (e) { sq = 'ERR ' + e.message; }
+  ok(sq.includes('전술·명단 프리셋') && sq.includes('data-act="preset-save"'), '전술/선수단 탭에 프리셋 UI가 그려집니다', sq.startsWith('ERR') ? sq : `${sq.length}자`);
+  hap.state.tab = sched;
+  const playedRound = sw.calendar.find((r) => r.type === 'league' && r.played);
+  const pf = playedRound.fixtures.find((f) => f.home === sw.myTeamId || f.away === sw.myTeamId) || playedRound.fixtures[0];
+  let mm2 = '';
+  try { mm2 = renderModal({ ...hap, state: { ...hap.state, modal: { kind: 'match', round: playedRound.no, home: pf.home, away: pf.away, back: null } } }); } catch (e) { mm2 = 'ERR ' + e.message; }
+  ok(mm2.includes('득점 장면') && mm2.includes('출전 선수 평점'), '이전 경기 결과 모달이 득점·기록·평점을 그립니다', mm2.startsWith('ERR') ? mm2 : `${mm2.length}자`);
+  const aiPf = playedRound.fixtures.find((f) => f.home !== sw.myTeamId && f.away !== sw.myTeamId);
+  let am = '';
+  try { am = renderModal({ ...hap, state: { ...hap.state, modal: { kind: 'match', round: playedRound.no, home: aiPf.home, away: aiPf.away, back: null } } }); } catch (e) { am = 'ERR ' + e.message; }
+  ok(am.includes('득점 장면') && am.includes('빠른 시뮬레이션'), '다른 구단끼리 경기도 같은 모달로 열립니다', am.startsWith('ERR') ? am : `${am.length}자`);
+  let sm2 = '';
+  try { sm2 = renderModal({ ...hap, state: { ...hap.state, modal: { kind: 'saves' } } }); } catch (e) { sm2 = 'ERR ' + e.message; }
+  ok(sm2.includes('slot-list') && sm2.includes('JSON 파일로 내보내기') && sm2.includes('파일에서 불러오기'), '저장/불러오기 모달이 슬롯·파일 버튼을 그립니다', sm2.startsWith('ERR') ? sm2 : `${sm2.length}자`);
+  const oppTeam = Object.keys(sw.teams).find((id) => id !== sw.myTeamId);
+  let cm2 = '';
+  try { cm2 = renderModal({ ...hap, state: { ...hap.state, modal: { kind: 'club', team: oppTeam } } }); } catch (e) { cm2 = 'ERR ' + e.message; }
+  ok(cm2.includes('경기 결과') && cm2.includes('data-act="match"'), '타 구단 모달에 경기 결과 목록이 그려집니다', cm2.startsWith('ERR') ? cm2 : `${cm2.length}자`);
+  let pd = '';
+  try { pd = renderModal({ ...hap, state: { ...hap.state, modal: { kind: 'preset-delete', id: 'x' } } }); } catch (e) { pd = 'ERR ' + e.message; }
+  ok(pd === '' || !pd.startsWith('ERR'), '없는 프리셋 삭제 요청은 빈 화면으로 안전하게 처리됩니다');
+
+  /* 지난 경기 줄이 실제로 눌러지는지 (일정 탭 HTML) */
+  hap.state.tab = 'schedule';
+  let schedHtml = '';
+  try { schedHtml = renderHub(hap); } catch (e) { schedHtml = 'ERR ' + e.message; }
+  ok(/data-act="match" data-round="\d+"/.test(schedHtml), '일정 탭의 치른 경기 행이 클릭 대상(data-act=match)으로 그려집니다');
+
+  setLogStore(null); setSlotStore(null); setPresetStore(null);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

@@ -4,6 +4,9 @@ import { KL_TEAMS, KL_DIVISIONS, KL_ROSTERS } from './kleague2026.js';
 import * as W from './world.js';
 import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING, SET_PIECES, SET_PIECE_TYPES, resolveSetPiece, setPieceKey, setPieceLabel, setPieceEffect } from './tactics.js';
 import { scoutReport } from './scout.js';
+import { getEntry, STAT_FIELDS, STAT_LABELS, unpackStats, logInfo } from './history.js';
+import { readPresets } from './presets.js';
+import { readSlots, slotMeta, slotsBytes, SLOT_COUNT } from './saves.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -25,6 +28,17 @@ export function applyTeamColors(root, world) {
 export const badge = (t, cls = '') => `<span class="badge ${cls}" data-team="${t.id}" aria-hidden="true">${esc(t.short.slice(0, 2))}</span>`;
 const formChips = (rec) => (rec && rec.length ? `<span class="form">${rec.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>` : '<span class="muted sm">경기 없음</span>');
 const won = (v) => `${W.fmt(v)}억`;
+
+/* 저장 시각 · 용량 표기 */
+const whenText = (ts) => {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+const kbText = (bytes) => (!bytes ? '0KB' : bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(bytes / 1024))}KB`);
+const compLabel = (w, round) => (round.type === 'cup' ? W.cupLabelOf(w, round.stage) : (W.isKL(w) ? `${W.divName(w, round.div || W.divOf(w, w.myTeamId))} 리그 ${round.leagueRound}R` : `리그 ${round.leagueRound}R`));
+const resWord = (res) => (res === 'W' ? '승' : res === 'L' ? '패' : res === 'D' ? '무' : '');
 
 /* 성장·훈련 표시 도우미 */
 const statWords = (keys) => [...new Set(keys || [])].map((k) => STAT_LABEL[k] || k);
@@ -188,7 +202,10 @@ export function renderHub(app) {
       <div><small>스쿼드 전력</small><b>${W.teamPower(w, w.myTeamId)}</b></div>
       <div><small>리그 라운드</small><b>${lr > divRounds ? '종료' : `${lr} / ${divRounds}R`}</b></div>
     </div>
-    <button class="btn small ghost" data-act="new-game" type="button">새 게임</button>
+    <div class="club-acts">
+      <button class="btn small ghost" data-act="saves" type="button">💾 저장/불러오기</button>
+      <button class="btn small ghost" data-act="new-game" type="button">새 게임</button>
+    </div>
   </section>
   <nav class="tabs" aria-label="앱 탭">${TABS.map((t) => `<button type="button" class="tab ${app.state.tab === t.id ? 'on' : ''}" data-act="tab" data-tab="${t.id}" aria-current="${app.state.tab === t.id}">${t.label}${t.id === 'market' && (w.offers || []).length ? ` <span class="tab-n">${w.offers.length}</span>` : ''}</button>`).join('')}</nav>
   <section class="tab-body">${body(app, w)}</section>`;
@@ -330,11 +347,13 @@ function roundFixtures(app, w) {
   const rows = fx.map((f) => {
     const played = f.played;
     const mine = f.home === w.myTeamId || f.away === w.myTeamId;
-    return `<li class="${mine ? 'mine' : ''}">
+    // 치른 경기는 눌러서 그날의 기록(득점자·슈팅·점유율·평점)을 다시 봅니다
+    const attr = played ? ` class="clickable ${mine ? 'mine' : ''}" data-act="match" data-round="${round.no}" data-home="${f.home}" data-away="${f.away}" tabindex="0"` : ` class="${mine ? 'mine' : ''}"`;
+    return `<li${attr}>
       ${teamLine(w, f.home)}
       <span class="score">${played ? `${f.hg} : ${f.ag}` : 'vs'}</span>
       ${teamLine(w, f.away)}
-      ${played ? '' : '<span class="muted xs">예정</span>'}
+      ${played ? `<button class="mini-link" type="button" data-act="match" data-round="${round.no}" data-home="${f.home}" data-away="${f.away}" aria-label="${esc(w.teams[f.home]?.short || '')} ${esc(w.teams[f.away]?.short || '')} 경기 기록">기록 ▸</button>` : '<span class="muted xs">예정</span>'}
     </li>`;
   }).join('');
   return `<ul class="fixtures">${rows}</ul>`;
@@ -349,7 +368,7 @@ function recentList(app, w) {
     const oppId = isHome ? f.away : f.home;
     const g = isHome ? f.hg : f.ag, o = isHome ? f.ag : f.hg;
     const res = g > o ? 'W' : g < o ? 'L' : 'D';
-    return `<li><i class="f-${res}">${res === 'W' ? '승' : res === 'L' ? '패' : '무'}</i>${teamLine(w, oppId)}<span class="score">${g} : ${o}</span><span class="muted xs">${x.round.type === 'cup' ? W.cupLabelOf(w, x.round.stage) : '리그 ' + x.round.leagueRound + 'R'}</span></li>`;
+    return `<li class="clickable" data-act="match" data-round="${x.round.no}" data-home="${f.home}" data-away="${f.away}" tabindex="0"><i class="f-${res}">${res === 'W' ? '승' : res === 'L' ? '패' : '무'}</i>${teamLine(w, oppId)}<span class="score">${g} : ${o}</span><button class="mini-link" type="button" data-act="match" data-round="${x.round.no}" data-home="${f.home}" data-away="${f.away}" aria-label="${esc(w.teams[oppId]?.short || '')} 경기 기록">기록 ▸</button></li>`;
   }).join('')}</ul>`;
 }
 
@@ -393,7 +412,7 @@ function scheduleTab(app, w) {
         const isHome = f.home === w.myTeamId;
         const oppId = isHome ? f.away : f.home;
         const r = W.resultOf(w, x.round, w.myTeamId);
-        return `<tr><td>${x.round.no}</td><td>${x.round.type === 'cup' ? W.cupLabelOf(w, x.round.stage) : '리그'}</td><td>${teamLine(w, oppId)}</td><td>${isHome ? '홈' : '원정'}</td><td>${r ? `<b class="res-${r.res}">${r.mine} : ${r.opp}</b>` : '<span class="muted">예정</span>'}</td></tr>`;
+        return `<tr${r ? ` class="clickable" data-act="match" data-round="${x.round.no}" data-home="${f.home}" data-away="${f.away}" tabindex="0"` : ''}><td>${x.round.no}</td><td>${x.round.type === 'cup' ? W.cupLabelOf(w, x.round.stage) : '리그'}</td><td>${teamLine(w, oppId)}</td><td>${isHome ? '홈' : '원정'}</td><td>${r ? `<b class="res-${r.res}">${r.mine} : ${r.opp}</b> <button class="mini-link" type="button" data-act="match" data-round="${x.round.no}" data-home="${f.home}" data-away="${f.away}" aria-label="${esc(w.teams[oppId]?.short || '')} 경기 기록">기록 ▸</button>` : '<span class="muted">예정</span>'}</td></tr>`;
       }).join('')}</tbody>
     </table></div>
   </article>`;
@@ -589,6 +608,37 @@ function filterBar(app, opts = {}) {
 }
 const squadFilterBar = (app) => filterBar(app);
 
+/* ── 전술·명단 프리셋 ──
+   지금 설정을 이름 붙여 저장해 두고, 다음에 한 번에 되살립니다.
+   불러오기는 presets.js 가 실제 폴백(이적·부상·정원)까지 처리합니다. */
+function presetCard(w) {
+  const list = readPresets().list;
+  return `<article class="card presets">
+    <div class="card-head"><h3>전술·명단 프리셋</h3><span class="pill">${list.length}개 저장됨</span></div>
+    <div class="preset-save">
+      <input id="preset-name" class="search" maxlength="24" placeholder="프리셋 이름 (예: 홈 4-2-3-1 압박)" aria-label="새 프리셋 이름" />
+      <button class="btn small primary" data-act="preset-save" type="button">현재 설정 저장</button>
+    </div>
+    ${list.length ? `<ul class="preset-list">${list.map((p) => {
+      const n = (p.starters || []).filter(Boolean).length;
+      return `<li class="preset">
+        <div class="pr-main">
+          <b>${esc(p.name)}</b>
+          <small>${esc(p.formation)} · ${esc(tacticWords(p.tactic || {}))} · ${esc(p.div || '')}</small>
+          <small class="muted">${esc(whenText(p.at))} · 선발 ${n}명 · 훈련 ${esc(W.TRAINING[p.training]?.name || '—')}</small>
+        </div>
+        <div class="pr-ops">
+          <button class="btn small primary" data-act="preset-load" data-id="${esc(p.id)}" type="button">불러오기</button>
+          <button class="btn small" data-act="preset-overwrite" data-id="${esc(p.id)}" type="button" title="지금 설정으로 이 프리셋을 덮어씁니다">덮어쓰기</button>
+          <button class="btn small ghost" data-act="preset-delete" data-id="${esc(p.id)}" type="button">삭제</button>
+        </div>
+      </li>`;
+    }).join('')}</ul>`
+      : '<p class="muted sm">아직 저장한 프리셋이 없습니다. 지금 만든 전술·선발을 이름 붙여 저장하면 다음에 한 번에 불러올 수 있습니다.</p>'}
+    <p class="hint">포메이션 · 전술 4축 · 팀 성향 · 세트피스 · 포지션별 역할 · 주간 훈련 · 선발 11명(과 후보)을 함께 저장합니다. 불러올 때 이적·부상·정지로 빠진 선수는 같은 포지션의 뛸 수 있는 선수로 자동 보정합니다.</p>
+  </article>`;
+}
+
 function squadTab(app, w) {
   const info = W.lineupInfo(w);
   const l = w.myLineup;
@@ -631,6 +681,7 @@ function squadTab(app, w) {
       <ul class="bench">${bench.map((p) => `<li><button type="button" class="bench-btn ${app.state.selBench === p.id ? 'sel' : ''}" data-act="bench" data-pid="${p.id}"><span class="bn">${p.num}</span><span>${esc(p.name)}</span><small>${p.pos} · ${p.ovr}</small></button></li>`).join('') || '<li class="muted sm">후보가 없습니다.</li>'}</ul>
     </article>
     <div class="stack">
+      ${presetCard(w)}
       <article class="card">${playerCard(w, selP, selNote)}</article>
       <article class="card">
         <div class="card-head"><h3>팀 성향</h3><span class="pill">${esc(mentNow.name)}</span></div>
@@ -790,10 +841,12 @@ function cupBracket(w) {
     const done = ms.filter((m) => m.played).length;
     const cur = active < 0 ? count - 1 : active;
     const open = i === count - 1 || (i === cur && ms.length <= 8);
+    const rd = w.calendar.find((r) => r.type === 'cup' && r.stage === i);
     const rows = ms.map((m) => {
       const winnerSide = m.played ? (m.winner === m.home ? 'h' : 'a') : '';
       const mine = m.home === w.myTeamId || m.away === w.myTeamId;
-      return `<li class="cup-match ${mine ? 'mine' : ''}">
+      const click = m.played && rd ? ` class="cup-match ${mine ? 'mine' : ''} clickable" data-act="match" data-round="${rd.no}" data-home="${m.home}" data-away="${m.away}" tabindex="0"` : ` class="cup-match ${mine ? 'mine' : ''}"`;
+      return `<li${click}>
         <span class="cm-team ${winnerSide === 'h' ? 'win' : ''}">${esc(w.teams[m.home]?.short || '?')}</span>
         <span class="cm-score">${m.played ? `${m.hg}<i>:</i>${m.ag}` : 'vs'}</span>
         <span class="cm-team ${winnerSide === 'a' ? 'win' : ''}">${esc(w.teams[m.away]?.short || '?')}</span>
@@ -942,10 +995,204 @@ export function renderSeason(app) {
 }
 
 
+/* ── 경기 요약 모달 ────────────────────────────────────────────
+   이미 치른 경기를 누르면 그날의 스코어·득점자·주요 기록·평점을 다시 보여 줍니다.
+   기록은 history.js 의 경량 요약(내 경기·AI 경기 모두)을 읽고, 그 이전 세이브는
+   경기 이벤트(득점자 ID)만으로 최소한의 장면을 보여 줍니다. */
+function matchSummaryModal(app, m) {
+  const w = app.world;
+  if (!w) return '';
+  const round = w.calendar.find((r) => r.no === Number(m.round));
+  if (!round) return '';
+  const list = round.type === 'league' ? round.fixtures : (w.cup.stages[round.stage]?.matches || []);
+  const f = list.find((x) => x.home === m.home && x.away === m.away);
+  if (!f || !f.played) return '';
+  const home = w.teams[m.home], away = w.teams[m.away];
+  if (!home || !away) return '';
+  const entry = getEntry(w, round, m.home, m.away);
+  const mine = f.home === w.myTeamId || f.away === w.myTeamId;
+
+  // 골 장면 — 요약 → (없으면) 예전 세이브의 경기 이벤트
+  let goals = (entry?.g || []).slice();
+  if (!goals.length && Array.isArray(f.events)) {
+    goals = f.events.filter((e) => e.type === 'goal').map((e) => [
+      Math.max(1, Math.round(e.minute || 1)),
+      e.teamId === m.home ? 'h' : 'a',
+      w.players[e.scorerId]?.name || '',
+      w.players[e.assistId]?.name || '',
+    ]);
+  }
+  const goalRows = goals.slice().sort((a, b) => a[0] - b[0]).map((g) => {
+    const side = g[1] === 'a' ? 'away' : 'home';
+    const team = side === 'home' ? home : away;
+    return `<li class="goal-${side}"><span class="gm-min">${g[0]}'</span>${badge(team)}<span class="gm-name">${esc(g[2] || '득점')}</span>${g[3] ? `<small class="gm-assist">도움 ${esc(g[3])}</small>` : ''}</li>`;
+  }).join('');
+
+  const st = entry?.s ? { home: unpackStats(entry.s.h), away: unpackStats(entry.s.a) } : null;
+  const statRows = st ? STAT_FIELDS.map((k) => {
+    const h = st.home[k], a = st.away[k];
+    if (!h && !a) return '';
+    const val = (v) => (k === 'poss' ? `${v}%` : k === 'xg' ? Number(v).toFixed(2) : String(v));
+    return `<tr><td class="sv ${h >= a ? 'lead' : ''}">${val(h)}</td><th>${STAT_LABELS[k]}</th><td class="sv ${a > h ? 'lead' : ''}">${val(a)}</td></tr>`;
+  }).join('') : '';
+
+  const ratings = (arr) => (Array.isArray(arr) && arr.length
+    ? `<ul class="mrlist">${arr.map(([num, name, pos, rating, g, a2]) => `<li><span class="rn">${num}</span><span class="rname">${esc(name)}</span><span class="pos">${esc(pos)}</span>${g ? `<i class="g" title="득점">⚽${g > 1 ? g : ''}</i>` : ''}${a2 ? `<i class="a" title="도움">🅰${a2 > 1 ? a2 : ''}</i>` : ''}<b class="${rating >= 7.5 ? 'hi' : rating < 6 ? 'lo' : ''}">${Number(rating).toFixed(1)}</b></li>`).join('')}</ul>`
+    : '<p class="muted sm">이 경기의 선수 평점은 남아 있지 않습니다.</p>');
+
+  const scoreLine = `${f.hg} : ${f.ag}`;
+  const extras = [];
+  if (f.aet) extras.push('연장');
+  if (f.pens) extras.push(`승부차기 ${esc(f.pens)}`);
+  const back = m.back;
+
+  return `<div class="modal-back" data-act="modal-close"><div class="modal wide match-modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="modal-head">
+      <div><h3 id="m-title">${esc(home.name)} <span class="muted">vs</span> ${esc(away.name)}</h3>
+        <p class="sm">${esc(compLabel(w, round))}${mine ? ' · 내 경기' : ''}${extras.length ? ` · ${extras.join(' · ')}` : ''}</p></div>
+      <button class="btn small ghost modal-x" data-act="modal-close" type="button">닫기</button>
+    </div>
+    <div class="mres">
+      <div class="mres-side">${badge(home, 'mid')}<b>${esc(home.short)}</b></div>
+      <div class="mres-score">${scoreLine}</div>
+      <div class="mres-side">${badge(away, 'mid')}<b>${esc(away.short)}</b></div>
+    </div>
+    <h4 class="sub">득점 장면</h4>
+    ${goalRows ? `<ul class="mgoals">${goalRows}</ul>` : '<p class="muted sm">득점 없이 끝난 경기입니다.</p>'}
+    ${statRows ? `<h4 class="sub">주요 기록</h4>
+      <div class="mstat-head"><b>${esc(home.short)}</b><span></span><b>${esc(away.short)}</b></div>
+      <table class="tbl stat-rows">${statRows}</table>` : ''}
+    ${entry ? '' : '<p class="warn-bar">이 경기는 스코어만 저장되어 있습니다 (기록 로그가 생기기 전의 경기).</p>'}
+    ${entry?.rt ? `<h4 class="sub">출전 선수 평점</h4>
+      <div class="mm-ratings"><div class="mm-col"><h5>${esc(home.short)}</h5>${ratings(entry.rt.h)}</div><div class="mm-col"><h5>${esc(away.short)}</h5>${ratings(entry.rt.a)}</div></div>` : ''}
+    ${entry?.quick ? '<p class="hint">빠른 시뮬레이션으로 처리된 경기입니다. 스코어·득점자와 큰 흐름(점유율·슈팅·카드)만 기록합니다.</p>' : ''}
+    <div class="actions">
+      ${back?.kind === 'club' ? `<button class="btn" data-act="club" data-team="${esc(back.team)}" type="button">← ${esc(w.teams[back.team]?.short || '')} 선수단</button>` : ''}
+      <button class="btn ghost" data-act="modal-close" type="button">닫기</button>
+    </div>
+  </div></div>`;
+}
+
+/* ── 저장 / 불러오기 모달 ──────────────────────────────────── */
+function autosaveBytes(w) {
+  if (!w) return 0;
+  try { return JSON.stringify({ ...w, savedAt: 0 }).length; } catch { return 0; }
+}
+
+function confirmBar(app) {
+  const c = app.state.modal?.confirm;
+  if (!c) return '';
+  const slots = readSlots();
+  const s = c.i != null ? slots.list[c.i] : null;
+  if (c.op === 'save') {
+    return `<div class="confirm-bar">
+      <p><b>슬롯 ${c.i + 1}</b>에 지금 커리어를 덮어쓸까요?${s ? ` 기존 세이브(${esc(s.meta.teamName)} · ${esc(s.meta.season)} · ${esc(s.meta.round)})는 사라집니다.` : ''}</p>
+      <div class="actions"><button class="btn small danger" data-act="slot-confirm" data-i="${c.i}" data-op="save" type="button">덮어쓰기</button><button class="btn small" data-act="slot-cancel" type="button">취소</button></div>
+    </div>`;
+  }
+  if (c.op === 'load') {
+    return `<div class="confirm-bar">
+      <p><b>슬롯 ${c.i + 1}</b>(${esc(s?.meta.teamName || '')} · ${esc(s?.meta.season || '')} · ${esc(s?.meta.round || '')})으로 돌아갑니다. <b>지금 진행 중인 커리어는 이 슬롯에 저장하지 않으면 사라집니다.</b></p>
+      <div class="actions"><button class="btn small primary" data-act="slot-confirm" data-i="${c.i}" data-op="load" type="button">불러오기</button><button class="btn small" data-act="slot-cancel" type="button">취소</button></div>
+    </div>`;
+  }
+  if (c.op === 'delete') {
+    return `<div class="confirm-bar">
+      <p><b>슬롯 ${c.i + 1}</b>의 세이브를 지울까요? 되돌릴 수 없습니다.</p>
+      <div class="actions"><button class="btn small danger" data-act="slot-confirm" data-i="${c.i}" data-op="delete" type="button">삭제</button><button class="btn small" data-act="slot-cancel" type="button">취소</button></div>
+    </div>`;
+  }
+  if (c.op === 'import') {
+    const meta = c.meta || {};
+    return `<div class="confirm-bar">
+      <p>파일에서 <b>${esc(meta.teamName || '커리어')}</b> · ${esc(meta.season || '')} · ${esc(meta.round || '')} 세이브를 불러옵니다. <b>지금 커리어는 사라집니다.</b></p>
+      <div class="actions"><button class="btn small primary" data-act="slot-confirm" data-op="import" type="button">파일 세이브 불러오기</button><button class="btn small" data-act="slot-cancel" type="button">취소</button></div>
+    </div>`;
+  }
+  return '';
+}
+
+function savesModal(app) {
+  const w = app.world || app.savedGame;
+  const slots = readSlots();
+  const info = logInfo(w);
+  const meta = w ? slotMeta(w) : null;
+  const row = (s, i) => (s
+    ? `<li class="slot on">
+        <div class="sl-main"><b>슬롯 ${i + 1} · ${esc(s.meta?.teamName || '')}</b>
+          <small>${esc(s.meta?.div || '')} · ${esc(s.meta?.season || '')} · ${esc(s.meta?.round || '')} · ${Number(s.meta?.played || 0)}경기 진행</small>
+          <small class="muted">${esc(whenText(s.at))} 저장 · ${kbText(s.bytes)}</small>
+        </div>
+        <div class="sl-ops">
+          <button class="btn small primary" data-act="slot-load" data-i="${i}" type="button">불러오기</button>
+          <button class="btn small" data-act="slot-save" data-i="${i}" type="button">덮어쓰기</button>
+          <button class="btn small ghost" data-act="slot-delete" data-i="${i}" type="button">삭제</button>
+        </div>
+      </li>`
+    : `<li class="slot empty">
+        <div class="sl-main"><b>슬롯 ${i + 1}</b><small class="muted">비어 있음</small></div>
+        <div class="sl-ops"><button class="btn small ${w ? 'primary' : ''}" data-act="slot-save" data-i="${i}" type="button" ${w ? '' : 'disabled'}>여기에 저장</button></div>
+      </li>`);
+
+  return `<div class="modal-back" data-act="modal-close"><div class="modal wide saves-modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <div class="modal-head">
+      <div><h3 id="m-title">저장 / 불러오기</h3>
+        <p class="sm">${w && meta ? `${esc(meta.teamName)} · ${esc(meta.div)} · ${esc(meta.season)} · ${esc(meta.round)}` : '아직 커리어가 없습니다. 슬롯이나 파일에서 불러오세요.'}</p></div>
+      <button class="btn small ghost modal-x" data-act="modal-close" type="button">닫기</button>
+    </div>
+    <p class="hint">경기는 행동마다 <b>자동 저장</b>됩니다. 아래 <b>수동 슬롯 ${SLOT_COUNT}개</b>는 지금 시점을 따로 남겨 두었다가 언제든 돌아오는 곳입니다.</p>
+    <ul class="slot-list">${slots.list.map((s, i) => row(s, i)).join('')}</ul>
+    ${confirmBar(app)}
+    <div class="file-row">
+      <button class="btn primary" data-act="save-export" type="button" ${w ? '' : 'disabled'}>⬇ JSON 파일로 내보내기</button>
+      <button class="btn" data-act="save-import" type="button">⬆ 파일에서 불러오기</button>
+      <input type="file" id="save-file" accept=".json,application/json" data-import hidden />
+    </div>
+    <p class="hint">파일로 내보내면 다른 기기·브라우저에서 그대로 이어서 할 수 있습니다. 저장 용량 — 자동 저장 <b>${kbText(autosaveBytes(w))}</b> · 슬롯 <b>${kbText(slotsBytes())}</b> · 경기 기록 <b>${kbText(info.bytes)}</b> (${info.total}경기)</p>
+  </div></div>`;
+}
+
+/* ── 프리셋 삭제 확인 ── */
+function presetDeleteModal(app, m) {
+  const p = readPresets().list.find((x) => x.id === m.id);
+  if (!p) return '';
+  return `<div class="modal-back" data-act="modal-close"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+    <h3 id="m-title">프리셋 '${esc(p.name)}'을 지울까요?</h3>
+    <p>${esc(p.formation)} · ${esc(tacticWords(p.tactic || {}))} · ${esc(whenText(p.at))} 저장. 저장한 설정은 사라지고 지금 전술은 그대로입니다.</p>
+    <div class="actions"><button class="btn danger" data-act="preset-delete-confirm" data-id="${esc(p.id)}" type="button">프리셋 삭제</button><button class="btn" data-act="modal-close" type="button">취소</button></div>
+  </div></div>`;
+}
+
+/* ── 타 구단 경기 결과 ─────────────────────────────────────────
+   순위표·이적시장·일정에서 연 구단 모달에 그 구단의 이번 시즌 경기 결과를 붙입니다.
+   줄을 누르면 같은 경기 요약 모달이 열립니다. */
+function clubMatchesBlock(w, teamId) {
+  const all = W.teamFixtures(w, teamId);
+  const played = all.filter((x) => x.played);
+  if (!played.length) return `<h4 class="sub">경기 결과</h4><p class="muted sm">이번 시즌 치른 경기가 없습니다.</p>`;
+  const win = played.filter((x) => x.res === 'W').length;
+  const draw = played.filter((x) => x.res === 'D').length;
+  const loss = played.filter((x) => x.res === 'L').length;
+  const row = (x) => `<button type="button" class="mrow" data-act="match" data-round="${x.round.no}" data-home="${x.home}" data-away="${x.away}" data-back="club" data-back-team="${teamId}">
+    <i class="f-${x.res}">${resWord(x.res)}</i>
+    <span class="mr-comp">${esc(compLabel(w, x.round))}</span>
+    <span class="mr-opp">${x.isHome ? '홈' : '원정'} vs ${esc(w.teams[x.oppId]?.short || '?')}</span>
+    <b class="mr-score">${x.gf} : ${x.ga}</b>
+    <small class="muted xs">기록 ▸</small>
+  </button>`;
+  const recent = played.slice(-5).reverse();
+  return `<h4 class="sub">경기 결과 <span class="muted xs">— ${played.length}경기 ${win}승 ${draw}무 ${loss}패 · 누르면 그 경기 기록</span></h4>
+    <div class="club-matches">${recent.map(row).join('')}</div>
+    ${played.length > recent.length ? `<details class="club-all"><summary>이번 시즌 경기 결과 ${played.length}경기 모두 보기</summary>${played.slice().reverse().map(row).join('')}</details>` : ''}`;
+}
+
 /* ── 확인 모달 ── */
 export function renderModal(app) {
   const m = app.state.modal;
   if (!m) return '';
+  if (m.kind === 'match') return matchSummaryModal(app, m);
+  if (m.kind === 'saves') return savesModal(app);
+  if (m.kind === 'preset-delete') return presetDeleteModal(app, m);
   if (m.kind === 'new-game') {
     return `<div class="modal-back" data-act="modal-close"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
       <h3 id="m-title">새 게임을 시작할까요?</h3>
@@ -1033,6 +1280,7 @@ export function renderModal(app) {
         <div><small>평균 나이</small><b>${squad.length ? (squad.reduce((a, p) => a + p.age, 0) / squad.length).toFixed(1) : '—'}</b></div>
       </div>
       <p class="sm">${esc(t.bio)}</p>
+      ${clubMatchesBlock(w, t.id)}
       <h4 class="sub">선수단 ${squad.length}명 <span class="muted xs">— 선수를 누르면 상세 기록이 열립니다</span></h4>
       <div class="table-wrap"><table class="tbl club-squad">
         <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>잠재</th><th>출전</th><th>골</th><th>도움</th><th>평점</th></tr></thead>

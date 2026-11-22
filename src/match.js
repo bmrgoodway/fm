@@ -2040,7 +2040,7 @@ export class Match {
     const opp = this.sides[this.opposing[c.side]];
     if (opp.players) for (const e of opp.players) if (e.onPitch && (e.pos === 'GK' || e.pos === 'DF')) e.rd -= 0.05;
     const line = this.phrase('goal', c.side, { p: c.name });
-    this.pushEvent({ type: 'goal', side: c.side, text: `⚽ ${this.clock()} ${line}${c.assistName ? ` (도움 ${c.assistName})` : ''} — ${this.scoreText()}`, scorer: c.name, score: { ...this.score } });
+    this.pushEvent({ type: 'goal', side: c.side, text: `⚽ ${this.clock()} ${line}${c.assistName ? ` (도움 ${c.assistName})` : ''} — ${this.scoreText()}`, scorer: c.name, pid: c.id, assist: c.assistName || null, score: { ...this.score } });
     // 공이 골망으로 들어가는 연출 — 판정은 이미 골라인 도착 뒤에 났습니다
     const gx = c.dir > 0 ? W : 0;
     this.ball.mode = 'net';

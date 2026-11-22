@@ -7,6 +7,9 @@ import { renderSelect, renderHub, renderSeason, renderModal, applyTeamColors } f
 import { mountMatch } from './matchview.js';
 import { Match, applyResult, lineupFor } from './match.js';
 import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect, setPieceLabel } from './tactics.js';
+import { entryFromMatch, recordEntries } from './history.js';
+import { addPreset, overwritePreset, deletePreset, readPresets, applyPreset, applyMessage } from './presets.js';
+import { saveSlot, loadSlot, deleteSlot, exportPayload, exportFileName, parseSaveFile, slotBytes } from './saves.js';
 
 const defs = {};
 for (const t of TEAM_DEFS) defs[t.id] = t;
@@ -26,7 +29,12 @@ const api = {
   get savedGame() { return state.savedGame; },
   get state() { return state; },
   defs,
-  save: () => { if (state.world) W.saveWorld(state.world); },
+  save: () => {
+    if (!state.world) return false;
+    const ok = W.saveWorld(state.world);
+    if (!ok) toast('브라우저 저장 공간이 부족해 자동 저장하지 못했습니다. 저장/불러오기에서 슬롯을 정리하거나 JSON으로 내보내 주세요.', 'warn');
+    return ok;
+  },
   toast,
   endMatch,
 };
@@ -46,8 +54,14 @@ export function init() {
   }
   document.addEventListener('click', onClick);
   document.addEventListener('input', onFilterInput);
+  document.addEventListener('change', onFileChange);
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && state.modal) { state.modal = null; render(); }
+    if (e.key === 'Escape' && state.modal) { state.modal = null; render(); return; }
+    // 줄 전체를 누르는 버튼(치른 경기 행 등)은 키보드 Enter·Space 로도 열립니다
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-act][tabindex]')) {
+      e.preventDefault();
+      e.target.click();
+    }
   });
   document.getElementById('btn-theme').addEventListener('click', toggleTheme);
   render();
@@ -132,6 +146,115 @@ function onClick(e) {
   const keepScroll = () => window.scrollTo(0, window.scrollY);
 
   switch (act) {
+    /* 로고 — 앱 첫 화면. 예전에는 허브(bmrgoodway.github.io)로 나갔습니다. */
+    case 'home': {
+      e.preventDefault();
+      if (state.view === 'match') { toast('경기 중에는 이동하지 않습니다. 경기를 마친 뒤에 돌아올 수 있습니다.'); break; }
+      state.modal = null;
+      if (state.world) { state.view = 'hub'; state.tab = 'schedule'; state.selPid = null; state.selSlot = null; }
+      else state.view = 'select';
+      window.scrollTo(0, 0);
+      render();
+      break;
+    }
+    /* 저장 / 불러오기 */
+    case 'saves':
+      if (state.view === 'match') { toast('경기 중에는 저장/불러오기를 열 수 없습니다. 경기를 마친 뒤 열어 주세요.'); break; }
+      state.modal = { kind: 'saves' }; render(); break;
+    case 'slot-save': {
+      const i = Number(el.dataset.i);
+      if (!w) { toast('저장할 커리어가 없습니다.', 'warn'); break; }
+      if (slotBytes(i) > 0) { state.modal = { kind: 'saves', confirm: { op: 'save', i } }; render(); }
+      else doSlotSave(i);
+      break;
+    }
+    case 'slot-load': {
+      const i = Number(el.dataset.i);
+      if (slotBytes(i) > 0) { state.modal = { kind: 'saves', confirm: { op: 'load', i } }; render(); }
+      break;
+    }
+    case 'slot-delete': {
+      const i = Number(el.dataset.i);
+      if (slotBytes(i) > 0) { state.modal = { kind: 'saves', confirm: { op: 'delete', i } }; render(); }
+      break;
+    }
+    case 'slot-cancel':
+      if (state.modal) { state.modal.confirm = null; render(); }
+      break;
+    case 'slot-confirm': {
+      const i = Number(el.dataset.i);
+      const op = el.dataset.op;
+      if (op === 'save') doSlotSave(i);
+      else if (op === 'load') doSlotLoad(i);
+      else if (op === 'delete') {
+        const r = deleteSlot(i);
+        state.modal = { kind: 'saves' };
+        if (r.ok) { render(); toast(`슬롯 ${i + 1}을(를) 비웠습니다.`, 'ok'); }
+        else { render(); toast(r.why, 'warn'); }
+      } else if (op === 'import') {
+        const pend = state.pendingImport;
+        if (!pend?.world) { toast('불러올 파일이 없습니다.', 'warn'); break; }
+        state.pendingImport = null;
+        adoptWorld(pend.world, `파일에서 불러왔습니다`);
+      }
+      break;
+    }
+    case 'save-export':
+      if (w) exportSave(w);
+      else toast('내보낼 커리어가 없습니다.', 'warn');
+      break;
+    case 'save-import':
+      document.getElementById('save-file')?.click();
+      break;
+    /* 전술·명단 프리셋 */
+    case 'preset-save': {
+      if (!w) break;
+      const input = document.getElementById('preset-name');
+      const name = (input?.value || '').trim();
+      if (!name) { toast('프리셋 이름을 먼저 적어 주세요.', 'warn'); input?.focus(); break; }
+      const r = addPreset(w, name);
+      if (!r.ok) { toast(r.why, 'warn'); break; }
+      api.save(); keepScroll(); render();
+      toast(`프리셋 '${r.preset.name}'을(를) 저장했습니다.`, 'ok');
+      break;
+    }
+    case 'preset-load': {
+      if (!w) break;
+      const p = readPresets().list.find((x) => x.id === el.dataset.id);
+      if (!p) { toast('프리셋을 찾을 수 없습니다.', 'warn'); break; }
+      const res = applyPreset(w, p);
+      if (!res.ok) { toast('프리셋을 불러오지 못했습니다.', 'warn'); break; }
+      api.save(); keepScroll(); render();
+      toast(applyMessage(p, res), res.changed || res.empty ? 'warn' : 'ok');
+      if (res.notes?.length) setTimeout(() => toast(res.notes.join(' '), 'info'), 2700);
+      break;
+    }
+    case 'preset-overwrite': {
+      if (!w) break;
+      const r = overwritePreset(w, el.dataset.id);
+      if (!r.ok) { toast(r.why || '덮어쓰지 못했습니다.', 'warn'); break; }
+      api.save(); keepScroll(); render();
+      toast(`프리셋 '${r.preset.name}'을(를) 지금 설정으로 덮어썼습니다.`, 'ok');
+      break;
+    }
+    case 'preset-delete':
+      state.modal = { kind: 'preset-delete', id: el.dataset.id };
+      render(); break;
+    case 'preset-delete-confirm': {
+      const r = deletePreset(el.dataset.id);
+      state.modal = null;
+      render();
+      toast(r.ok ? '프리셋을 삭제했습니다.' : '프리셋을 삭제하지 못했습니다.', r.ok ? 'ok' : 'warn');
+      break;
+    }
+    /* 이전 경기 결과 */
+    case 'match': {
+      if (!w) break;
+      const back = el.dataset.back === 'club' && el.dataset.backTeam ? { kind: 'club', team: el.dataset.backTeam } : null;
+      state.modal = { kind: 'match', round: Number(el.dataset.round), home: el.dataset.home, away: el.dataset.away, back };
+      render();
+      break;
+    }
     case 'pick-mode':
       state.pickMode = el.dataset.mode === 'kleague' ? 'kleague' : 'custom';
       state.pickDiv = state.pickMode === 'kleague' ? 4 : 1;
@@ -353,6 +476,76 @@ function newGame(teamId) {
   toast(`${state.world.teams[teamId].name} 감독 취임! 첫 경기를 준비하세요.`, 'ok');
 }
 
+/* ─────────────────────────── 저장 / 불러오기 ─────────────────────────── */
+const kbText = (bytes) => (!bytes ? '0KB' : bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)}MB` : `${Math.max(1, Math.round(bytes / 1024))}KB`);
+
+/* 읽어 온 세계로 감독 자리를 옵깁니다 (슬롯·파일 모두 같은 길). */
+function adoptWorld(world, why = '불러왔습니다') {
+  state.world = world;
+  state.savedGame = world;
+  state.view = 'hub'; state.tab = 'schedule';
+  state.modal = null; state.selPid = null; state.selSlot = null; state.roleSlot = null;
+  state.seasonResult = null; state.seasonPhase = 'preview'; state.pending = null;
+  if (W.isKL(world)) { state.pickMode = 'kleague'; state.pickDiv = W.divOf(world, world.myTeamId) || 1; }
+  W.saveWorld(world);
+  window.scrollTo(0, 0);
+  render();
+  const t = world.teams[world.myTeamId];
+  toast(`${why} — ${t?.name || ''} · ${W.seasonLabel(world)}`, 'ok');
+}
+
+function doSlotSave(i) {
+  const w = state.world;
+  if (!w) { toast('저장할 커리어가 없습니다.', 'warn'); return; }
+  const r = saveSlot(i, w);
+  state.modal = { kind: 'saves' };
+  render();
+  if (r.ok) toast(`슬롯 ${i + 1}에 저장했습니다 (${kbText(r.bytes)}).`, 'ok');
+  else toast(r.why, 'warn');
+}
+
+function doSlotLoad(i) {
+  const r = loadSlot(i);
+  if (!r.ok) { toast(r.why, 'warn'); return; }
+  adoptWorld(r.world, `슬롯 ${i + 1}에서 불러왔습니다`);
+}
+
+/* 파일로 내보내기 — 기기 간 이동·백업용 JSON */
+function exportSave(w) {
+  const name = exportFileName(w);
+  try {
+    const blob = new Blob([JSON.stringify(exportPayload(w))], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    toast(`세이브 파일을 내보냈습니다 — ${name}`, 'ok');
+  } catch {
+    toast('파일을 만들지 못했습니다. 브라우저 저장 공간을 확인해 주세요.', 'warn');
+  }
+}
+
+/* 파일 고르기 → 읽기 → 확인 모달 */
+function onFileChange(e) {
+  const el = e.target.closest('[data-import]');
+  if (!el || !el.files || !el.files.length) return;
+  const file = el.files[0];
+  const reader = new FileReader();
+  reader.onload = () => {
+    const r = parseSaveFile(String(reader.result || ''));
+    if (!r.ok) { toast(r.why, 'warn'); render(); return; }
+    state.pendingImport = r;
+    state.modal = { kind: 'saves', confirm: { op: 'import', meta: r.meta } };
+    render();
+  };
+  reader.onerror = () => { toast('파일을 읽지 못했습니다.', 'warn'); render(); };
+  reader.readAsText(file);
+  el.value = '';
+}
 /* ─────────────────────────── 경기 ─────────────────────────── */
 function startMatch(instant) {
   const w = state.world;
@@ -399,6 +592,8 @@ function endMatch(m, meta) {
   const w = state.world;
   if (!w) return;
   const { round, fixture } = meta;
+  // 이 경기의 요약을 별도 로그에 남깁니다 (이전 경기 결과 모달의 재료).
+  try { recordEntries(w, [entryFromMatch(w, m, round, fixture.home, fixture.away)]); } catch { /* 기록 실패는 경기 결과에 영향을 주지 않습니다 */ }
   applyResult(w, m);
   if (round.type === 'league') {
     fixture.played = true; fixture.hg = m.score.home; fixture.ag = m.score.away;
