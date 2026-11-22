@@ -327,13 +327,15 @@ function growthCard(w) {
   const g = w.lastGrowth;
   const list = (g?.list || []).filter((x) => x.d !== 0 || x.plus.length || x.minus.length);
   if (!list.length) return '';
-  const up = list.filter((x) => x.d > 0).length, down = list.filter((x) => x.d < 0).length;
+  const up = list.filter((x) => x.d > 0 || (x.d === 0 && x.plus.length > x.minus.length)).length;
+  const down = list.filter((x) => x.d < 0 || (x.d === 0 && x.minus.length > x.plus.length)).length;
   return `<article class="card growth-card">
     <div class="card-head"><h3>📈 지난 경기 선수 성장</h3><span class="pill">${up}명 상승 · ${down}명 하락</span></div>
     <ul class="growth">${list.slice(0, 14).map((x) => {
       const words = logWords({ up: x.plus, dn: x.minus });
       const p = w.players[x.pid];
-      return `<li><b>${esc(x.name)}</b><span class="muted xs">${esc(x.pos)} · ${x.age}세</span><b class="${x.d >= 0 ? 'up' : 'down'}">${x.from === x.to ? `${x.to}` : `${x.from}→${x.to}`}</b><small class="gr-words">${esc(words || '변화 없음')}</small>${p ? statusPill(p) : ''}</li>`;
+      const gain = x.d > 0 || (x.d === 0 && x.plus.length > x.minus.length);
+      return `<li><b>${esc(x.name)}</b><span class="muted xs">${esc(x.pos)} · ${x.age}세</span><b class="${gain ? 'up' : 'down'}">${x.from === x.to ? `${x.to}` : `${x.from}→${x.to}`}</b><small class="gr-words">${esc(words || '변화 없음')}</small>${p ? statusPill(p) : ''}</li>`;
     }).join('')}</ul>
     <p class="hint">출전·평점·득점에 따라 매 라운드 자랍니다. 잠재력 가까이 간 선수는 성장이 둔해지고, 30대는 서서히 내려갑니다.</p>
   </article>`;
