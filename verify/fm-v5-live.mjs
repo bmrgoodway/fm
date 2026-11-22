@@ -163,6 +163,16 @@ await page.locator('.confirm-bar [data-act="slot-confirm"]').click();
 await sleep(1000);
 const afterLoad = await page.evaluate(() => document.querySelector('.club-id h2')?.textContent || '');
 ok(afterLoad === beforeLoad && afterLoad.length > 0, '파일에서 불러온 커리어로 이어집니다', afterLoad);
+// 슬롯 불러오기도 같은 길로 동작하는지 (확인 → 커리어 교체)
+await page.locator('[data-act="saves"]').first().click();
+await page.locator('.slot-list .slot [data-act="slot-load"]').first().click();
+await sleep(300);
+ok(await page.locator('.confirm-bar').isVisible(), '슬롯 불러오기는 확인을 한 번 받습니다');
+await page.locator('.confirm-bar [data-act="slot-confirm"]').click();
+await page.waitForFunction(() => document.body.dataset.view === 'hub', null, { timeout: 15000 });
+await sleep(400);
+const afterSlot = await page.evaluate(() => document.querySelector('.club-id h2')?.textContent || '');
+ok(afterSlot === beforeLoad && !(await page.locator('.modal').count()), '슬롯에서 불러온 커리어로 이어집니다', afterSlot);
 const storage = await page.evaluate(() => {
   const keys = Object.keys(localStorage).filter((k) => k.startsWith('fm:'));
   let total = 0;
@@ -194,5 +204,5 @@ await mc.close();
 
 ok(errs.length === 0, '콘솔 오류 0건', errs.slice(0, 3).join(' | '));
 await b.close();
-console.log(fails ? `\n❌ ${fails}개 실패` : '\n✅ 로컬 검증 통과');
+console.log(fails ? `\n❌ ${fails}개 실패` : '\n✅ 검증 통과');
 process.exit(fails ? 1 : 0);
