@@ -1699,10 +1699,10 @@ console.log('\n[26] 포지셔닝 — 공격 지원 · 수비 블록 · 몰림');
   const crowd6 = (acc.crowd6 / Math.max(1, acc.frames)) * 100;
   ok(near22 >= 1.8, '공을 잡고 올라가면 동료가 22u 안에 붙어 있습니다', `평균 ${near22.toFixed(2)}명 (개선 전 1.5)`);
   ok(ownHalf <= 3.6, '파이널 서드 공격 때 우리 진영에 남는 선수가 적습니다', `평균 ${ownHalf.toFixed(2)}명 (개선 전 4.2)`);
-  ok(defBox <= 1.8, '상대가 전방에 있어도 수비수가 우리 박스에 다 몰리지 않습니다', `박스 안 ${defBox.toFixed(2)}명 (개선 전 2.1)`);
+  ok(defBox <= 1.8, '상대가 전방에 있어도 수비수가 우리 박스에 다 몰리지 않습니다', `박스 안 ${defBox.toFixed(2)}명 (개선 전 3.2)`);
   ok(defSix <= 1.6, '6야드 박스 안에 수비수가 겹쳐 서지 않습니다', `평균 ${defSix.toFixed(2)}명`);
-  ok(lineGap >= 8, '수비 라인과 2선 사이에 간격이 있습니다(두 줄 블록)', `간격 ${lineGap.toFixed(1)}u (개선 전 6.6)`);
-  ok(crowd < 45, '한 구역(24x18u)에 10명 이상 몰리는 시간이 절반 아래입니다', `전체 틱의 ${crowd.toFixed(1)}% (개선 전 53%)`);
+  ok(lineGap >= 8, '수비 라인과 2선 사이에 간격이 있습니다(두 줄 블록)', `간격 ${lineGap.toFixed(1)}u`);
+  ok(crowd < 45, '한 구역(24x18u)에 10명 이상 몰리는 시간이 절반 아래입니다', `전체 틱의 ${crowd.toFixed(1)}% (개선 전 44%)`);
   ok(crowd6 < 45, '좁은 구역(15x11u)에 6명 이상 몰리지 않습니다', `${crowd6.toFixed(1)}%`);
 }
 
