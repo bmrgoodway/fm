@@ -19,7 +19,7 @@ const WARP_TICKS = 2;     // 세트피스·재개 때 제자리로 모이는 데
 const DIVE_LAND_TICKS = 2; // 다이빙을 마친 키퍼가 일어나는 데 쓰는 틱 수
 // 같은 팀 선수가 이보다 가까워지면 서로 부드럽게 밀어냅니다(오픈 플레이).
 // 중앙에 바둑알이 한데 뭉치는 현상을 줄이는 장치입니다.
-const SEP_R = 4.2;
+const SEP_R = 4.6;
 const GIVE_GO_TICKS = 4;    // 원투 패스 후 리턴을 기다리는 창(틱)
 const MISTIME_RUN = 0.15;   // 침투 러닝이 라인을 넘어 먼저 출발하는 비율(오프사이드 위험)
 
@@ -271,6 +271,9 @@ export class Match {
     this.offsideGoals = 0;      // 오프사이드 위치에서 나온 득점(항상 0이어야 합니다) — 회귀 점검용
     this.offsideCd = { home: 0, away: 0 };   // 방금 깃발이 올라간 팀은 잠시 라인을 확인합니다
     this.lastSetPieceT = -99;   // 마지막 세트피스 시각(틱) — 화면·점검에서 흐름 판단용
+    this.lastSwitchT = -99;     // 마지막 사이드 전환 시각(틱) — 바로 되돌리는 패스를 막는 데 씁니다
+    this.lastSwitchFrom = null; // 그 전환이 출발한 쪽(y) — 되돌림 판정 기준
+    this.recoverT = { home: 0, away: 0 };   // 세트피스 뒤 수비 라인 복귀 중인 구간(틱)
     this.tickerId = 0;
     this.added1 = rint(this.rng, 1, 3);   // 전반 추가시간(분)
     this.added2 = rint(this.rng, 2, 5);   // 후반 추가시간(분)
@@ -647,15 +650,21 @@ export class Match {
     }
   }
 
-  /* ───────────── 체력 ───────────── */
+  /* ───────────── 체력 ─────────────
+     90분을 뛰면 실제로 지칩니다. 소모는 '그 틱에 뛴 거리'에 비례하고,
+     압박 축이 높을수록 같은 시간에 더 많이 쓰며, 체력 능력치가 높은 선수는 덜 지칩니다.
+     (예전 계수는 90분에 98 남아 압박 전술의 대가도, 후반 교체도 생기지 않았습니다) */
   updateStamina(paused) {
     for (const s of ['home', 'away']) {
       const press = this.sides[s].tactic.press || 0;
       for (const e of this.sides[s].players) {
         if (!e.onPitch) continue;
         const moved = e.moved || 0;
-        if (paused) { e.stamina = clamp(e.stamina + 0.03, 0, 100); continue; }
-        const drain = (0.004 + moved * 0.011) * (1.72 - e.p.stats.sta * 0.009) * (1 + Math.max(0, press) * 0.16) / SUBSTEPS;
+        if (paused) { e.stamina = clamp(e.stamina + 0.05, 0, 100); continue; }
+        const effort = 0.62 + Math.min(1.4, moved / 0.55) * 0.55;      // 0.62(거의 안 뛴 틱) ~ 1.39(전력 질주)
+        const pressTax = clamp(1 + press * 0.57, 0.7, 1.6);           // 강한 압박은 같은 시간에 더 많이
+        const cond = 1.5 - (e.p.stats.sta || 60) * 0.006;              // 체력 능력치 60 → 1.14, 85 → 0.99
+        const drain = 0.115 * effort * pressTax * cond / SUBSTEPS;
         e.stamina = clamp(e.stamina - drain, 0, 100);
       }
     }
@@ -765,11 +774,14 @@ export class Match {
       const hasBall = owningSide === s;
       side._shape = this.computeShape(side, hasBall);
       if (!hasBall) {
-        const cands = side.players
+        const all = side.players
           .filter((e) => e.onPitch && e.pos !== 'GK' && !e.injured)
           .sort((a, b) => dist(a, this.ball) - dist(b, this.ball));
         // 압박수만큼 달려들되, 반발력(separate)이 같은 자리에 겹치는 것을 막아 줍니다
-        side._pressers = cands;
+        // 세트피스(코너)를 찬 직후에는 수비 라인으로 돌아가는 중인 DF 를 압박 후보에서 뺍니다.
+        // (예전에는 문전에 남아 있던 DF 가 '가까운 선수'라 압박 1순위가 되어 공 쪽으로 다시 질주했습니다)
+        const ready = all.filter((e) => !(e.pos === 'DF' && this.isRecovering(e, side)));
+        side._pressers = ready.length >= 2 ? ready : all;
       } else side._pressers = [];
     }
     for (const s of ['home', 'away']) {
@@ -786,6 +798,7 @@ export class Match {
         let sp = (0.42 + this.eff(e, 'spd') / 100 * 0.62) * STEP_K;
         if (e === this.ball.owner) sp *= 1.06;
         else if (e.press) sp *= 1.12;
+        else if (!hasBall && e.pos === 'DF' && this.isRecovering(e, side)) sp *= 1.55;   // 코너 뒤 라인 복귀는 전력으로
         else if (!hasBall && d > 10) sp *= 1.2;   // 수비 전환 — 제자리로 빨리 돌아갑니다
         else if (this.ball.mode === 'pass' && this.ball.lead && this.ball.receiver === e) sp *= 1.28;  // 스루패스를 쫓는 질주
         if (e.injured) sp *= 0.72;
@@ -795,8 +808,11 @@ export class Match {
           if (d < 0.45) { e.moved = 0; continue; }   // 골문 앞 미세한 떨림 방지
           const ownX = side.dir > 0 ? 0 : W;
           const currOut = Math.abs(e.x - ownX), tgtOut = Math.abs(tgt.x - ownX);
-          // 위험할 때는 골문 앞으로 빠르게 복귀, 평소 전진·조정은 천천히
-          sp *= tgtOut < currOut - 0.6 ? 1.9 : 0.9;
+          // 위험할 때는 골문 앞으로 빠르게 복귀, 평소 전진은 천천히.
+          // 골키퍼는 각도선을 따라 옆으로(측면 이동)는 더 발 빠르게 섭니다 — 다이빙 전 자리 잡기.
+          const latGap = Math.abs(tgt.y - e.y);
+          sp *= tgtOut < currOut - 0.6 ? 1.9 : 1.3;
+          if (latGap > 2) sp *= 1.6;
         }
         if (this.phase === 'setpiece') sp *= 3.4;   // 세트피스 때는 빠르게 자리를 잡습니다
         const step = Math.min(d, sp);
@@ -813,7 +829,15 @@ export class Match {
     if (this.phase === 'play') this.separate();
   }
 
-  /* 반발력(Separation) — 같은 팀 선수가 4.2u 안으로 겹치면 서로 반대로 밀립니다.
+  /* 세트피스(코너·문전 프리킥)를 찬 팀의 DF 가 아직 상대 진영에 남아 복귀 중인가 */
+  isRecovering(e, side) {
+    if (e.pos !== 'DF') return false;
+    const until = this.recoverT[e.side] || 0;
+    if (this.t > until) return false;
+    return prog(e.x, side.dir) > 48;
+  }
+
+  /* 반발력(Separation) — 같은 팀 선수가 4.6u 안으로 겹치면 서로 반대로 밀립니다.
      공 소유자·압박수는 덜 밀려 자기 임무(공을 지키기·빼앗기)를 놓지 않습니다. */
   separate() {
     for (const s of ['home', 'away']) {
@@ -872,7 +896,7 @@ export class Match {
     // 스위퍼: 우리 볼 때 상대 진영 전개면 박스 앞까지, 수비 전환·위험 지역이면 즉시 복귀
     let sweep;
     if (hasBall) {
-      sweep = clamp((ballP - 44) / 40, 0, 1) * (8.5 + Math.max(0, sh.line) * 4.5);
+      sweep = clamp((ballP - 44) / 40, 0, 1) * (10 + Math.max(0, sh.line) * 5);
     } else if (ballP > 60) {
       sweep = clamp((ballP - 60) / 30, 0, 1) * 4.5;   // 상대 진영에서 상대 볼 — 조금만 나옵니다
     } else {
@@ -938,7 +962,7 @@ export class Match {
     const def = this.sides[this.opposing[info.side]];
     if (!atk || !def) return;
     atk.stats.offsides += 1;
-    this.offsideCd[atk.name] = this.t + 16;
+    this.offsideCd[atk.name] = this.t + 24;
     const name = rec ? rec.name : '';
     if (rec) rec.rd -= 0.05;
     this.offsideFlash = { at: this.t, x: info.x, y: info.y, line: info.line, lineX: atk.dir > 0 ? info.line : W - info.line, side: def.name };
@@ -1263,6 +1287,9 @@ export class Match {
       const inBox = mProg > 78 && Math.abs(m.y - CY) < 15;
 
       let score = forward * 1.55 - d * 0.012 - risk * 1.7 + Math.min(open, 12) * 0.12;
+      // 전진한 만큼 점수를 줍니다 — 예전에는 옆으로 보내면 0점이라 '가장 열린 반대편 윙어'로만
+      // 공이 왕복했습니다. 뒤로 가는 패스는 조금 감점, 앞으로 나아가는 패스는 보상합니다.
+      score += clamp(mProg - ballP, -12, 14) * 0.05;
       score += (m.pos === 'FW' ? 0.15 : 0) + (m.pos === 'MF' ? 0.08 : 0);
       // 오프사이드 위치의 동료는 후보에서 뺍니다 — 라인을 보는 패서는 그 선수를 쓰지 않습니다.
       // (가끔 라인을 놓친 패스만 실제 오프사이드로 이어집니다)
@@ -1278,7 +1305,10 @@ export class Match {
       // ── 사이드 전환: 한쪽에 압박이 몰렸을 때 반대쪽 넓은 공간으로 길게 ──
       // 짧은 패스 축은 '압박을 벗어나는 전환'으로만 씁니다
       const canSwitch = style >= -0.05 || pressure >= 1;
-      if (canSwitch && d >= 28 && lateral >= 20 && open > 6.5 && (c.y - CY) * (m.y - CY) < 0 && Math.abs(c.y - CY) > 8) {
+      // 방금 전환해 온 쪽으로 곧바로 되돌리는 패스는 금지 — 좌우 핑퐁 루프의 직접 원인입니다
+      const reverse = this.lastSwitchFrom != null && this.t - this.lastSwitchT <= 10
+        && Math.abs(m.y - this.lastSwitchFrom) < 12;
+      if (canSwitch && !reverse && d >= 28 && lateral >= 20 && open > 6.5 && (c.y - CY) * (m.y - CY) < 0 && Math.abs(c.y - CY) > 8) {
         score += 0.18 + pressure * 0.16 + Math.max(0, style) * 0.12 + Math.max(0, route) * 0.12;
         kind = 'switch';
       }
@@ -1301,9 +1331,9 @@ export class Match {
         kind = 'cutback';
       }
       // ── 크로스: 측면에서 문전의 머리/발 앞으로 ──
-      if (kind === 'pass' && route > 0.2 && ballP > 55 && Math.abs(c.y - CY) > 10
-        && mProg > 74 && Math.abs(m.y - CY) < 13 && Math.abs(m.y - CY) < Math.abs(c.y - CY)) {
-        score += 0.62 + Math.max(0, route) * 0.25;
+      if (kind === 'pass' && route > 0.15 && ballP > 50 && Math.abs(c.y - CY) > 9
+        && mProg > 70 && Math.abs(m.y - CY) < 15 && Math.abs(m.y - CY) < Math.abs(c.y - CY)) {
+        score += 0.62 + Math.max(0, route) * 0.42;
         kind = 'cross';
       }
       if (inFinal && Math.abs(m.y - CY) > 14 && route > 0.3) score += 0.35;
@@ -1327,6 +1357,8 @@ export class Match {
   passTo(c, m, kind = 'pass', opts = {}) {
     const dir = c.dir;
     const k = typeof kind === 'boolean' ? (kind ? 'cross' : 'pass') : (kind || 'pass');
+    // 사이드 전환을 기억해 두었다가, 곧바로 같은 쪽으로 되돌리는 전환을 막습니다
+    if (k === 'switch') { this.lastSwitchT = this.t; this.lastSwitchFrom = c.y; }
     const ball = this.ball;
     this.clearDives();
     // 오프사이드는 '전진 패스·스루패스가 떠나는 순간'의 위치로 정해집니다.
@@ -1919,6 +1951,9 @@ export class Match {
     const side = this.sides[sideName];
     if (!side) return;
     this.lastSetPieceT = this.t;
+    // 코너·문전 프리킥을 차면 공격팀 수비수들이 상대 진영에 올라가 있습니다 — 찬 직후 복귀 구간을 기억합니다
+    const dGoal0 = Math.hypot((side.dir > 0 ? W : 0) - x, CY - y);
+    if (type === 'corner' || (type === 'freekick' && dGoal0 < 40)) this.recoverT[sideName] = this.t + 26;
     this.sp = { type, side: sideName, x: clamp(x, 1.5, W - 1.5), y: clamp(y, 1.2, H - 1.2), t: 0, spots: null, taker: null };
     this.phase = 'setpiece';
     this.pause = 0;
@@ -1974,21 +2009,24 @@ export class Match {
     const gkDef = opp.players.find((e) => e.onPitch && e.pos === 'GK');
     // 같은 자리에 둘 이상을 놓으면, 가까운 빈 자리로 조금씩 밀어내 겹침을 없앱니다
     // (경기장 가장자리에서는 x 가 고정되므로 원 모양으로 넓게 찾습니다)
+    // 선수 도트 지름이 약 4u 라, 최소 3.4u 를 띄워야 화면에서 겹쳐 보이지 않습니다.
+    const SP_GAP = 3.4;
     const free = (x, y) => {
       const cx0 = clamp(x, 1.5, W - 1.5), cy0 = clamp(y, 1.5, H - 1.5);
-      const clear = (px, py) => !taken.some((q) => Math.hypot(q.x - px, q.y - py) < 2.6);
+      const clear = (px, py) => !taken.some((q) => Math.hypot(q.x - px, q.y - py) < SP_GAP);
       if (clear(cx0, cy0)) { taken.push({ x: cx0, y: cy0 }); return { x: cx0, y: cy0 }; }
       let best = null, bestD = -1;
-      for (let ring = 2.9; ring <= 20.3; ring += 2.9) {
-        for (let k = 0; k < 12; k++) {
-          const ang = (k / 12) * Math.PI * 2;
+      for (let ring = 1.7; ring <= 28.9; ring += 1.7) {
+        for (let k = 0; k < 16; k++) {
+          const ang = (k / 16) * Math.PI * 2;
           const px = clamp(cx0 + Math.cos(ang) * ring, 1.5, W - 1.5);
           const py = clamp(cy0 + Math.sin(ang) * ring, 1.5, H - 1.5);
           let d = 99;
           for (const q of taken) d = Math.min(d, Math.hypot(q.x - px, q.y - py));
-          if (d >= 2.6) { taken.push({ x: px, y: py }); return { x: px, y: py }; }
+          if (d >= SP_GAP) { taken.push({ x: px, y: py }); return { x: px, y: py }; }
           if (d > bestD) { bestD = d; best = { x: px, y: py }; }
         }
+        // 한 바퀴(16방향)를 다 돌았는데 이 반지름에서 빈 자리가 없으면 더 바깥 고리로 넘어갑니다
       }
       taken.push(best);
       return best;
@@ -2035,8 +2073,19 @@ export class Match {
           else put(e, gx - dir * (30 + (i - 8) * 4), CY + (((i - 8) % 3) - 1) * 6);
         });
       } else {
-        atk.forEach((e, i) => put(e, sp.x + dir * (8 + i * 7), CY + ((i % 3) - 1) * 9));
-        def.forEach((e, i) => put(e, sp.x + dir * (4 + i * 5.5), CY + ((i % 3) - 1) * 7));
+        // 원거리 프리킥 — 예전에는 전원이 공 뒤로 세로 한 줄(CY±9)이라 '기차'처럼 서 있었습니다.
+        // 폭 22~30u(측면 루트면 더 넓게)의 지그재그 3열로 펼쳐 줄서기를 풉니다.
+        const route = side.tactic.route || 0;
+        const width = 22 + Math.max(0, route) * 8;
+        atk.forEach((e, i) => {
+          const col = i % 3;
+          put(e, sp.x + dir * (8 + i * 7), clamp(CY + (col - 1) * (width / 2) + (e.ry || 0) * 0.2, 5, H - 5));
+        });
+        // 수비팀도 엇갈린 3열로 폭을 지키며 물러섭니다
+        def.forEach((e, i) => {
+          const col = (i + 1) % 3;
+          put(e, sp.x + dir * (4 + i * 5.5), clamp(CY + (col - 1) * (26 / 2), 5, H - 5));
+        });
       }
     } else {  // goalkick
       const own = dir > 0 ? 0 : W;
@@ -2191,7 +2240,7 @@ export class Match {
       if (side.subsUsed >= 5) continue;
       const hurt = side.players.find((e) => e.onPitch && e.injured && e.injured.sev === 'serious');
       const tired = side.players
-        .filter((e) => e.onPitch && e.pos !== 'GK' && e.stamina < 42)
+        .filter((e) => e.onPitch && e.pos !== 'GK' && e.stamina < 52)
         .sort((a, b) => a.stamina - b.stamina)[0];
       const out = hurt || tired;
       if (!out) continue;
