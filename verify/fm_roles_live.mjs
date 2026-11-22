@@ -261,6 +261,7 @@ console.log('\n[4] 모바일 390×844');
   await sleep(350);
   await page.screenshot({ path: `${SHOT_DIR}/fm-tactics-mobile.png` });
   // 경기 화면 모바일
+  await sleep(2200);   // 취임 토스트가 사라진 뒤에 담습니다
   await page.getByRole('button', { name: /일정|경기/ }).first().click().catch(() => {});
   await page.getByRole('button', { name: /경기 시작/ }).first().click();
   await page.waitForSelector('#pitch', { timeout: 15000 });
