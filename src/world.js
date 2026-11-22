@@ -423,22 +423,27 @@ export function autoLineup(w, teamId, formationId = null) {
   return out;
 }
 
-export function setFormation(w, fid) {
-  const l = w.myLineup;
-  if (!FORMATIONS[fid]) return;
-  const players = l.starters.filter(Boolean).map((id) => w.players[id]).filter(Boolean);
-  const slots = FORMATIONS[fid].slots;
-  // 역할은 슬롯 라벨을 따라 옮깁니다 (LB 역할은 새 포메이션의 LB 자리로)
-  const oldSlots = FORMATIONS[l.formation].slots;
-  const oldRoles = resolveRoles(l.roles, oldSlots);
-  const pool = oldSlots.map((s, i) => ({ label: s.label, role: oldRoles[i], used: false }));
-  const fallback = defaultRoles(slots);
-  l.roles = slots.map((s, i) => {
+/* 역할 배열을 다른 포메이션으로 옮깁니다 — 같은 라벨 자리(LB→LB)로 따라갑니다. */
+export function remapRoles(roles, fromId, toId) {
+  const from = FORMATIONS[fromId]?.slots || [];
+  const to = FORMATIONS[toId]?.slots || [];
+  const cur = resolveRoles(roles, from);
+  const pool = from.map((s, i) => ({ label: s.label, role: cur[i], used: false }));
+  const fallback = defaultRoles(to);
+  return to.map((s, i) => {
     const hit = pool.find((o) => !o.used && o.label === s.label);
     if (!hit) return fallback[i];
     hit.used = true;
     return roleFor(s.label, hit.role);
   });
+}
+
+export function setFormation(w, fid) {
+  const l = w.myLineup;
+  if (!FORMATIONS[fid]) return;
+  const players = l.starters.filter(Boolean).map((id) => w.players[id]).filter(Boolean);
+  const slots = FORMATIONS[fid].slots;
+  l.roles = remapRoles(l.roles, l.formation, fid);
   const used = new Set();
   const starters = slots.map((slot) => {
     const cands = players.filter((p) => !used.has(p.id));

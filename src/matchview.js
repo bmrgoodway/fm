@@ -784,8 +784,11 @@ export function mountMatch(app, m, meta) {
         app.save(); renderDrawer();
       }));
       el.querySelectorAll('[data-mform]').forEach((b) => b.addEventListener('click', () => {
+        const prev = app.world.myLineup.formation;
         m.setFormation(b.dataset.mform);
         app.world.myLineup.formation = b.dataset.mform;
+        // 커리어 저장에도 역할을 새 포메이션 자리로 옮겨 둡니다
+        app.world.myLineup.roles = X.remapRoles(app.world.myLineup.roles, prev, b.dataset.mform);
         app.save(); renderDrawer(); draw(1);
       }));
     }
