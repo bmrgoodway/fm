@@ -918,20 +918,20 @@ html[data-theme="night"] .tfeed .tf-offer .tf-t { color: var(--yellow); }
 .tbl.market tr.loan td { background: color-mix(in srgb, var(--purple) 10%, transparent); }
 
 .ov-growth:empty { display: none; }
-.ov-growth { border-top: 1.5px dashed color-mix(in srgb, var(--line) 30%, transparent); margin-top: 6px; padding-top: 6px; }
-.ovg-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.ov-growth { border-top: 1.5px dashed color-mix(in srgb, var(--line) 30%, transparent); margin-top: 6px; padding-top: 6px; text-align: left; }
+.ovg-head { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 4px; }
 .ovg-head b { font-size: 12px; font-weight: 900; }
-.ovg-head span { font-size: 9.5px; font-weight: 800; color: var(--soft); }
-.ovg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 132px; overflow-y: auto; }
-.ovg-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: baseline; font-size: 11px; font-weight: 800; }
-.ovg-list li b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ovg-num { font-weight: 900; }
+.ovg-head span { font-size: 9.5px; font-weight: 800; color: var(--soft); white-space: nowrap; }
+.ovg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; max-height: 128px; overflow-y: auto; }
+.ovg-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 6px; align-items: baseline; font-size: 11px; font-weight: 800; }
+.ovg-list li b { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ovg-num { grid-column: 2; text-align: right; font-weight: 900; font-variant-numeric: tabular-nums; }
 .ovg-num.up { color: #0a7a33; }
 .ovg-num.down { color: #c23a24; }
 html[data-theme="night"] .ovg-num.up { color: #37e07a; }
 html[data-theme="night"] .ovg-num.down { color: #ff8a76; }
-.ovg-list small { font-size: 9.5px; font-weight: 700; color: var(--soft); grid-column: 1 / -1; margin-top: -1px; }
-.ovg-pot { font-size: 9px; font-style: normal; font-weight: 800; color: var(--soft); }
+.ovg-list small { grid-column: 1 / -1; font-size: 9.5px; font-weight: 700; color: var(--soft); margin-top: -1px; }
+.ovg-more { font-size: 9.5px; font-weight: 700; color: var(--soft); margin: 3px 0 0; }
 @media (max-width: 520px) {
   .train-row { grid-template-columns: 1fr 1fr; }
   .of-acts .btn { flex: 1 1 30%; }

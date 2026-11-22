@@ -1118,10 +1118,11 @@ export function mountMatch(app, m, meta) {
     const moved = grow.filter((g) => g.d !== 0 || g.plus.length || g.minus.length);
     $('ov-growth').innerHTML = moved.length
       ? `<div class="ovg-head"><b>선수 성장</b><span>출전·평점·득점 반영</span></div>
-        <ul class="ovg-list">${moved.slice(0, 6).map((g) => {
+        <ul class="ovg-list">${moved.slice(0, 5).map((g) => {
           const words = [...new Set([...g.plus.map((k) => '+' + (STAT_LABEL[k] || k)), ...g.minus.map((k) => '-' + (STAT_LABEL[k] || k))])].join(' · ');
-          return `<li><b>${esc(g.name)}</b><span class="ovg-num ${g.d < 0 ? 'down' : 'up'}">${g.d ? `${g.from}→${g.to}` : g.to}</span><small>${esc(words || '변화 없음')}</small><em class="ovg-pot">잠재 ${g.pot}</em></li>`;
-        }).join('')}</ul>`
+          return `<li><b>${esc(g.name)}</b><span class="ovg-num ${g.d < 0 ? 'down' : 'up'}">${g.d ? `${g.from}→${g.to}` : g.to}</span><small>${esc(words || '변화 없음')} · 잠재 ${g.pot}</small></li>`;
+        }).join('')}</ul>
+        ${moved.length > 5 ? `<p class="ovg-more">외 ${moved.length - 5}명은 선수단 표에서 볼 수 있습니다</p>` : ''}`
       : '';
     $('m-overlay').hidden = false;
     if (lastClip) $('ov-replay').hidden = false;
