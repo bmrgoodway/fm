@@ -2113,7 +2113,7 @@ export class Match {
         .sort((a, b) => this.eff(b, 'sho') + (b.pos === 'FW' ? 12 : 0) - this.eff(a, 'sho') - (a.pos === 'FW' ? 12 : 0));
       const short = this.rng() < 0.12 && box.length > 1;
       if (short) {
-        this.passTo(taker, box[0], false);
+        this.passTo(taker, box[0], false, { safe: true });   // 코너킥은 오프사이드 예외
         return;
       }
       const rec = box[0];
