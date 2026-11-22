@@ -1625,5 +1625,86 @@ console.log('\n[25] 4단계 이전 세이브 호환');
   globalThis.localStorage = bak;
 }
 
+/* ── 26. 포지셔닝 — 파이널 서드 지원 · 수비 두 줄 블록 · 한 구역 몰림 ──
+   사용자가 경기 화면에서 찍어 보낸 두 장면(공을 잡고 올라가도 동료가 안 올라옴 /
+   20명이 한 구역에 몰림)의 회귀를 막는 점검입니다. 전술 축이 아니라 '대형' 자체를 셉니다. */
+console.log('\n[26] 포지셔닝 — 공격 지원 · 수비 블록 · 몰림');
+{
+  const pv = (x, dir) => (dir > 0 ? x : 100 - x);
+  const zoneMax = (ps, cw, ch) => {
+    const g = new Map();
+    for (const e of ps) { const k = `${Math.floor(e.x / cw)},${Math.floor(e.y / ch)}`; g.set(k, (g.get(k) || 0) + 1); }
+    let best = 0;
+    for (const k of g.keys()) {
+      const [gx, gy] = k.split(',').map(Number);
+      let c = 0;
+      for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) c += g.get(`${gx + dx},${gy + dy}`) || 0;
+      if (c > best) best = c;
+    }
+    return best;
+  };
+  const w26 = createWorld('gs', 20261122);
+  const ids26 = Object.keys(w26.teams).sort();
+  const acc = { atkN: 0, near22: 0, ownHalf: 0, defN: 0, defBox: 0, defSix: 0, lineGap: 0, gapN: 0, frames: 0, crowd: 0, crowd6: 0 };
+  for (let i = 0; i < 12; i++) {
+    const home = ids26[i % ids26.length], away = ids26[(i * 3 + 1) % ids26.length];
+    const m = new Match({ world: w26, homeId: home, awayId: away, homeLineup: lineupFor(w26, home), awayLineup: lineupFor(w26, away), seed: `pos-${i}`, cup: false, userSide: 'home' });
+    m.holdHalf = false;
+    let g = 0, streak = { home: 0, away: 0 };
+    while (!m.done && g < 6000) {
+      m.tick(); g++;
+      if (m.phase !== 'play') { streak = { home: 0, away: 0 }; continue; }
+      const b = m.ball;
+      // 세트피스·킥오프 직후(자리로 모이는 중)는 대형 점검에서 뻗니다
+      if (m.t - (m.lastSetPieceT ?? -99) <= 8 || m.t - (m.lastKickoffT ?? -99) <= 8) continue;
+      // 한 구역 몰림 — 8x6 격자의 3x3(24x18u) 안에 10명 이상
+      const all = [];
+      for (const s of ['home', 'away']) for (const e of m.sides[s].players) if (e.onPitch) all.push(e);
+      acc.frames += 1;
+      if (zoneMax(all, 8, 6) >= 10) acc.crowd += 1;
+      if (zoneMax(all, 5, 3.6) >= 6) acc.crowd6 += 1;
+      const owner = b.owner;
+      if (!owner) continue;
+      streak[owner.side] += 1; streak[owner.side === 'home' ? 'away' : 'home'] = 0;
+      if (streak[owner.side] < 8) continue;
+      const atk = m.sides[owner.side], def = m.sides[m.opposing[owner.side]];
+      const bp = pv(b.x, atk.dir);
+      if (bp > 66) {
+        acc.atkN += 1;
+        const mates = atk.players.filter((e) => e.onPitch && e !== owner && e.pos !== 'GK');
+        acc.near22 += mates.filter((e) => Math.hypot(e.x - b.x, e.y - b.y) < 22).length;
+        acc.ownHalf += mates.filter((e) => pv(e.x, atk.dir) < 45).length;
+      }
+      if (bp > 70) {
+        acc.defN += 1;
+        const outs = def.players.filter((e) => e.onPitch && e.pos !== 'GK');
+        const own = (e) => pv(e.x, def.dir);
+        acc.defBox += outs.filter((e) => own(e) < 17 && Math.abs(e.y - CY) < 20).length;
+        acc.defSix += outs.filter((e) => own(e) < 8 && Math.abs(e.y - CY) < 12).length;
+        const dfs = outs.filter((e) => e.pos === 'DF').map(own);
+        const mfs = outs.filter((e) => e.pos === 'MF').map(own);
+        if (dfs.length && mfs.length) {
+          acc.lineGap += (mfs.reduce((a, v) => a + v, 0) / mfs.length) - (dfs.reduce((a, v) => a + v, 0) / dfs.length);
+          acc.gapN += 1;
+        }
+      }
+    }
+  }
+  const near22 = acc.near22 / Math.max(1, acc.atkN);
+  const ownHalf = acc.ownHalf / Math.max(1, acc.atkN);
+  const defBox = acc.defBox / Math.max(1, acc.defN);
+  const defSix = acc.defSix / Math.max(1, acc.defN);
+  const lineGap = acc.lineGap / Math.max(1, acc.gapN);
+  const crowd = (acc.crowd / Math.max(1, acc.frames)) * 100;
+  const crowd6 = (acc.crowd6 / Math.max(1, acc.frames)) * 100;
+  ok(near22 >= 1.8, '공을 잡고 올라가면 동료가 22u 안에 붙어 있습니다', `평균 ${near22.toFixed(2)}명 (개선 전 1.5)`);
+  ok(ownHalf <= 3.6, '파이널 서드 공격 때 우리 진영에 남는 선수가 적습니다', `평균 ${ownHalf.toFixed(2)}명 (개선 전 4.2)`);
+  ok(defBox <= 1.8, '상대가 전방에 있어도 수비수가 우리 박스에 다 몰리지 않습니다', `박스 안 ${defBox.toFixed(2)}명 (개선 전 2.1)`);
+  ok(defSix <= 1.6, '6야드 박스 안에 수비수가 겹쳐 서지 않습니다', `평균 ${defSix.toFixed(2)}명`);
+  ok(lineGap >= 8, '수비 라인과 2선 사이에 간격이 있습니다(두 줄 블록)', `간격 ${lineGap.toFixed(1)}u (개선 전 6.6)`);
+  ok(crowd < 45, '한 구역(24x18u)에 10명 이상 몰리는 시간이 절반 아래입니다', `전체 틱의 ${crowd.toFixed(1)}% (개선 전 53%)`);
+  ok(crowd6 < 45, '좁은 구역(15x11u)에 6명 이상 몰리지 않습니다', `${crowd6.toFixed(1)}%`);
+}
+
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);
 process.exit(fails ? 1 : 0);
