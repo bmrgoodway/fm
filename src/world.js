@@ -2,6 +2,7 @@
 import { local } from './store.js';
 import { makeRng, rint, pick, clamp, gauss, shuffle } from './rng.js';
 import { TEAM_DEFS, FORMATIONS, FORMATION_IDS, overall, valueOf, wageOf, buildSquad, freshSeasonStats, STAT_KEYS } from './data.js';
+import { defaultRoles, resolveRoles, roleFor } from './tactics.js';
 
 export const SAVE_KEY = 'career';
 export const SAVE_VERSION = 1;
@@ -49,13 +50,15 @@ export function posFactor(slotPos, playerPos) {
 
 export function lineupInfo(w) {
   const l = w.myLineup;
-  const stat = { slots: [], valid: true, missing: 0 };
+  const slots = FORMATIONS[l.formation].slots;
+  const roles = resolveRoles(l.roles, slots);
+  const stat = { slots: [], valid: true, missing: 0, roles };
   l.starters.forEach((pid, i) => {
     const p = pid ? w.players[pid] : null;
-    const slot = FORMATIONS[l.formation].slots[i];
-    if (!p) { stat.missing += 1; stat.valid = false; stat.slots.push({ slot, p: null, factor: 0 }); return; }
+    const slot = slots[i];
+    if (!p) { stat.missing += 1; stat.valid = false; stat.slots.push({ slot, p: null, factor: 0, role: roles[i] }); return; }
     const f = posFactor(slot.pos, p.pos);
-    stat.slots.push({ slot, p, factor: f });
+    stat.slots.push({ slot, p, factor: f, role: roles[i] });
   });
   stat.bench = l.bench.map((id) => w.players[id]).filter(Boolean);
   stat.attack = Math.round(sum(stat.slots.filter((s) => s.p).map((s) => (s.p.stats.sho * 0.4 + s.p.stats.dri * 0.3 + s.p.stats.pas * 0.3) * s.factor)) / 11);
@@ -408,7 +411,14 @@ export function autoLineup(w, teamId, formationId = null) {
   const benchGk = rest.find((p) => p.pos === 'GK');
   const bench = rest.filter((p) => p !== benchGk).slice(0, 6);
   if (benchGk) bench.unshift(benchGk);
-  const out = { formation: fid, starters, bench: bench.map((p) => p.id), tactic: { ...t.tactic } };
+  // 역할은 '자리'에 붙습니다 — 같은 포메이션이면 감독이 정해 둔 역할을 그대로 지킵니다.
+  const keepRoles = teamId === w.myTeamId && w.myLineup && w.myLineup.formation === fid && w.myLineup.roles
+    ? w.myLineup.roles : null;
+  const out = {
+    formation: fid, starters, bench: bench.map((p) => p.id),
+    tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...t.tactic },
+    roles: keepRoles ? resolveRoles(keepRoles, slots) : defaultRoles(slots),
+  };
   if (teamId === w.myTeamId) return out;
   return out;
 }
@@ -418,6 +428,17 @@ export function setFormation(w, fid) {
   if (!FORMATIONS[fid]) return;
   const players = l.starters.filter(Boolean).map((id) => w.players[id]).filter(Boolean);
   const slots = FORMATIONS[fid].slots;
+  // 역할은 슬롯 라벨을 따라 옮깁니다 (LB 역할은 새 포메이션의 LB 자리로)
+  const oldSlots = FORMATIONS[l.formation].slots;
+  const oldRoles = resolveRoles(l.roles, oldSlots);
+  const pool = oldSlots.map((s, i) => ({ label: s.label, role: oldRoles[i], used: false }));
+  const fallback = defaultRoles(slots);
+  l.roles = slots.map((s, i) => {
+    const hit = pool.find((o) => !o.used && o.label === s.label);
+    if (!hit) return fallback[i];
+    hit.used = true;
+    return roleFor(s.label, hit.role);
+  });
   const used = new Set();
   const starters = slots.map((slot) => {
     const cands = players.filter((p) => !used.has(p.id));
@@ -450,6 +471,18 @@ export function swapPlayers(w, starterIdx, playerId) {
     if (!id || seen.has(id)) return null;
     seen.add(id); return id;
   });
+}
+
+/* 슬롯(자리)의 역할을 바꿉니다 — 역할은 선수가 아니라 자리에 붙습니다. */
+export function setRole(w, slotIdx, role) {
+  const l = w.myLineup;
+  if (!l) return null;
+  const slots = FORMATIONS[l.formation].slots;
+  if (slotIdx < 0 || slotIdx >= slots.length) return null;
+  const roles = resolveRoles(l.roles, slots);
+  roles[slotIdx] = roleFor(slots[slotIdx].label, role);
+  l.roles = roles;
+  return roles[slotIdx];
 }
 
 /* ─────────────────────────── 이적 시장 ─────────────────────────── */
@@ -679,6 +712,13 @@ export function loadWorld() {
   // 구버전 필드 보정
   for (const t of Object.values(w.teams)) if (!t.recent) t.recent = [];
   for (const p of Object.values(w.players)) if (!p.season) p.season = freshSeasonStats();
+  // 역할·팀 성향이 없는 세이브(역할 도입 전)는 포지션 기본값으로 채웁니다.
+  const slots = (FORMATIONS[w.myLineup?.formation] || FORMATIONS['4-3-3']).slots;
+  if (!w.myLineup) w.myLineup = autoLineup(w, w.myTeamId, w.teams[w.myTeamId].formation);
+  w.myLineup.roles = resolveRoles(w.myLineup.roles, slots);
+  w.myLineup.tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(w.myLineup.tactic || {}) };
+  w.myLineup.tactic.mentality = Number(w.myLineup.tactic.mentality) || 0;
+  for (const t of Object.values(w.teams)) t.tactic = { mentality: 0, ...(t.tactic || {}) };
   return w;
 }
 export function wipeWorld() { local.remove(SAVE_KEY); }

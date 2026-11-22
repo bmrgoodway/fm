@@ -1,7 +1,7 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
 import { FORMATIONS } from './data.js';
 import * as W from './world.js';
-import { AXES, STEPS, stepLabel, tacticWords } from './tactics.js';
+import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole } from './tactics.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -233,15 +233,46 @@ function scheduleTab(app, w) {
 /* ── 전술/선수단 탭 ── */
 function chipFor(slot, entry, idx, selected, myId) {
   if (!entry || !entry.p) {
-    return `<button class="chip empty ${selected ? 'sel' : ''}" data-act="slot" data-slot="${idx}" type="button" data-px="${slot.x}" data-py="${slot.y}"><span class="chip-num">+</span><span class="chip-name">비어 있음</span></button>`;
+    return `<div class="chip empty ${selected ? 'sel' : ''}" data-px="${slot.x}" data-py="${slot.y}">
+      <button class="chip-main" data-act="slot" data-slot="${idx}" type="button" aria-label="${esc(slot.label)} 자리 · 비어 있음">
+        <span class="chip-num">+</span><span class="chip-name">비어 있음</span>
+      </button>
+      <span class="chip-pos">${esc(slot.label)}</span>
+    </div>`;
   }
   const p = entry.p;
   const bad = entry.factor < 0.99;
-  return `<button class="chip ${selected ? 'sel' : ''} ${bad ? 'bad-pos' : ''}" data-act="slot" data-slot="${idx}" type="button" data-px="${slot.x}" data-py="${slot.y}" data-team="${myId}">
-    <span class="chip-num">${p.num}</span>
-    <span class="chip-name">${esc(p.name)}</span>
-    <span class="chip-pos">${esc(slot.label)}${bad ? `<em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}</span>
-  </button>`;
+  const role = entry.role || defaultRole(slot.label);
+  const gk = slot.pos === 'GK';
+  return `<div class="chip ${selected ? 'sel' : ''} ${bad ? 'bad-pos' : ''}" data-px="${slot.x}" data-py="${slot.y}" data-team="${myId}">
+    <button class="chip-main" data-act="slot" data-slot="${idx}" type="button" aria-label="${esc(p.name)} ${esc(slot.label)} 선택">
+      <span class="chip-num">${p.num}</span>
+      <span class="chip-name">${esc(p.name)}</span>
+    </button>
+    ${gk
+      ? `<span class="chip-pos">GK${bad ? ` <em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}</span>`
+      : `<button class="chip-pos" data-act="role-cycle" data-slot="${idx}" type="button" title="눌러서 역할 바꾸기 — ${esc(roleEffect(role))}" aria-label="${esc(slot.label)} 역할 ${esc(roleLabel(role))} · 눌러서 바꾸기">${esc(slot.label)} · ${esc(roleShort(role))}${bad ? ` <em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}</button>`}
+  </div>`;
+}
+
+/* 선택한 포지션의 역할 2~3종 + 1줄 효과 */
+function roleBar(info, selSlot, slots) {
+  let idx = selSlot != null && slots[selSlot] && slots[selSlot].pos !== 'GK' ? selSlot : -1;
+  if (idx < 0) idx = slots.findIndex((s) => s.pos !== 'GK');
+  if (idx < 0) return '';
+  const slot = slots[idx];
+  const cur = info.roles[idx];
+  const opts = rolesForLabel(slot.label);
+  return `<div class="role-bar">
+    <div class="rb-head">
+      <b>${esc(slot.label)} 역할</b>
+      <span class="rb-now">${esc(roleLabel(cur))}</span>
+    </div>
+    <div class="rb-opts" role="group" aria-label="${esc(slot.label)} 선수 역할">
+      ${opts.map((k) => `<button type="button" class="role-btn ${k === cur ? 'on' : ''}" data-act="role" data-slot="${idx}" data-role="${k}" aria-pressed="${k === cur}">${esc(roleLabel(k))}</button>`).join('')}
+    </div>
+    <p class="rb-eff"><b>${esc(roleLabel(cur))}</b> — ${esc(roleEffect(cur))}</p>
+  </div>`;
 }
 
 function pitchBoard(app, w, info) {
@@ -286,7 +317,13 @@ function squadTab(app, w) {
   const selPid = app.state.selPid;
   const selP = selPid ? w.players[selPid] : (info.slots[app.state.selSlot ?? 0]?.p || null);
   const bench = l.bench.map((id) => w.players[id]).filter(Boolean);
+  const selIdx = selP ? info.slots.findIndex((s) => s.p && s.p.id === selP.id) : -1;
+  const selNote = selIdx >= 0 && info.slots[selIdx].slot.pos !== 'GK'
+    ? `역할 · <b>${esc(roleLabel(info.roles[selIdx]))}</b> — ${esc(roleEffect(info.roles[selIdx]))}` : '';
   const mismatch = info.slots.filter((s) => s.p && s.factor < 0.99).length;
+  const slices = FORMATIONS[l.formation].slots;
+  const ment = Number(l.tactic.mentality) || 0;
+  const mentNow = mentalityOf(ment);
   const axes = AXES.map((a) => {
     const v = l.tactic[a.key] || 0;
     return `<li class="axis">
@@ -308,12 +345,21 @@ function squadTab(app, w) {
         <button type="button" class="btn small ghost right" data-act="auto-lineup">자동 선발</button>
       </div>
       ${pitchBoard(app, w, info)}
-      <p class="hint">선발을 누른 뒤 후보 선수를 누르면 자리가 바뀝니다. <b>↯</b> 는 포지션 불일치 보정입니다.</p>
+      ${roleBar(info, app.state.roleSlot ?? app.state.selSlot, slices)}
+      <p class="hint">선발을 누른 뒤 후보 선수를 누르면 자리가 바뀝니다. <b>↯</b> 는 포지션 불일치 보정입니다. 포지션 이름(<b>LB · 풀백</b>)을 누르면 역할이 바로 바뀝니다.</p>
       <h4 class="sub">후보 7명</h4>
       <ul class="bench">${bench.map((p) => `<li><button type="button" class="bench-btn ${app.state.selBench === p.id ? 'sel' : ''}" data-act="bench" data-pid="${p.id}"><span class="bn">${p.num}</span><span>${esc(p.name)}</span><small>${p.pos} · ${p.ovr}</small></button></li>`).join('') || '<li class="muted sm">후보가 없습니다.</li>'}</ul>
     </article>
     <div class="stack">
-      <article class="card">${playerCard(w, selP)}</article>
+      <article class="card">${playerCard(w, selP, selNote)}</article>
+      <article class="card">
+        <div class="card-head"><h3>팀 성향</h3><span class="pill">${esc(mentNow.name)}</span></div>
+        <div class="ment-row" role="group" aria-label="팀 성향(멘탈리티)">
+          ${MENTALITY.map((m) => `<button type="button" class="ment-btn ${Math.abs(m.v - ment) < 0.01 ? 'on' : ''}" data-act="mentality" data-val="${m.v}" aria-pressed="${Math.abs(m.v - ment) < 0.01}">
+            <b>${esc(m.name)}</b><small>${esc(m.tag)}</small></button>`).join('')}
+        </div>
+        <p class="axis-eff">${esc(mentalityEffect(ment, true))} · 수비 시 ${esc(mentalityEffect(ment, false))}</p>
+      </article>
       <article class="card">
         <div class="card-head"><h3>전술 4축</h3><span class="pill">경기 중에도 변경</span></div>
         <ul class="axes">${axes}</ul>

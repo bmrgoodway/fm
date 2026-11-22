@@ -2,7 +2,7 @@
 // · 엔진은 틱(경기 15초)마다 상태를 만들고, 화면은 매 프레임 이전 좌표→현재 좌표를 보간(lerp)합니다.
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
 import { W as PW, H as PH, CY, GOAL_HALF, diveProgress } from './match.js';
-import { AXES, STEPS, stepLabel } from './tactics.js';
+import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect } from './tactics.js';
 import { FORMATIONS } from './data.js';
 import * as X from './world.js';
 import { esc } from './views.js';
@@ -756,7 +756,14 @@ export function mountMatch(app, m, meta) {
     el.hidden = false;
     if (drawer === 'tactics') {
       const side = m.sides[m.userSide];
+      const ment = Number(side.tactic.mentality) || 0;
       el.innerHTML = `<div class="drawer-head"><h3>전술 즉시 변경</h3><button class="btn small" data-mact="close">닫기</button></div>
+      <div class="drawer-sec"><h4>팀 성향 <span class="pill">${esc(mentalityOf(ment).name)}</span></h4>
+        <div class="ment-row in-game" role="group" aria-label="팀 성향">
+          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - ment) < 0.01 ? 'on' : ''}" data-mment="${mt.v}">${esc(mt.name)}</button>`).join('')}
+        </div>
+        <p class="axis-eff">${esc(mentalityEffect(ment, true))}</p>
+      </div>
       <div class="form-row">${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-mform="${f}">${f}</button>`).join('')}</div>
       <ul class="axes compact">${AXES.map((a) => {
         const v = side.tactic[a.key] || 0;
@@ -764,6 +771,13 @@ export function mountMatch(app, m, meta) {
         <div class="axis-ctl"><span class="axis-end">${a.left}</span><span class="seg">${STEPS.map((s) => `<button type="button" class="${Math.abs(s - v) < 0.01 ? 'on' : ''}" data-mtactic="${a.key}" data-val="${s}" aria-label="${a.name}">${s > 0 ? '▲' : s < 0 ? '▼' : '●'}</button>`).join('')}</span><span class="axis-end">${a.right}</span></div>
         <p class="axis-eff">${a.effect(v)}</p></li>`;
       }).join('')}</ul>`;
+      el.querySelectorAll('[data-mment]').forEach((b) => b.addEventListener('click', () => {
+        const v = Number(b.dataset.mment);
+        m.setTactic({ mentality: v });
+        app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
+        app.save(); renderDrawer();
+        app.toast?.(`팀 성향 · ${mentalityOf(v).name}`, 'ok');
+      }));
       el.querySelectorAll('[data-mtactic]').forEach((b) => b.addEventListener('click', () => {
         m.setTactic({ [b.dataset.mtactic]: Number(b.dataset.val) });
         app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
@@ -822,7 +836,12 @@ export function mountMatch(app, m, meta) {
           <small>${e.pos} · 체력 ${Math.round(e.stamina)}%${e.injured ? ' · 🚑' : ''}</small>
         </button></li>`).join('');
     $('ht-body').innerHTML = `<div class="ht-cols">
-      <div><h4>전술 정비</h4><ul class="axes compact">${axes}</ul></div>
+      <div><h4>전술 정비</h4>
+        <div class="ment-row in-game" role="group" aria-label="팀 성향">
+          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - (Number(side.tactic.mentality) || 0)) < 0.01 ? 'on' : ''}" data-htment="${mt.v}">${esc(mt.name)}</button>`).join('')}
+        </div>
+        <p class="axis-eff">${esc(mentalityEffect(Number(side.tactic.mentality) || 0, true))}</p>
+        <ul class="axes compact">${axes}</ul></div>
       <div><h4>선수 교체 <span class="pill">${5 - side.subsUsed}명 남음</span></h4>
         <p class="hint">나갈 선수를 고른 뒤 들어올 후보를 누르세요.</p>
         <div class="sub-cols ht-subcols">
@@ -831,6 +850,12 @@ export function mountMatch(app, m, meta) {
         </div>
       </div>
     </div>`;
+    $('ht-body').querySelectorAll('[data-htment]').forEach((b) => b.addEventListener('click', () => {
+      const v = Number(b.dataset.htment);
+      m.setTactic({ mentality: v });
+      app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
+      app.save(); renderHalftime();
+    }));
     $('ht-body').querySelectorAll('[data-ht]').forEach((b) => b.addEventListener('click', () => {
       m.setTactic({ [b.dataset.ht]: Number(b.dataset.val) });
       app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };

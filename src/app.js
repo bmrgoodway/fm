@@ -5,13 +5,14 @@ import { local } from './store.js';
 import { renderSelect, renderHub, renderSeason, renderModal, applyTeamColors } from './views.js';
 import { mountMatch } from './matchview.js';
 import { Match, applyResult, lineupFor } from './match.js';
+import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect } from './tactics.js';
 
 const defs = {};
 for (const t of TEAM_DEFS) defs[t.id] = t;
 
 const state = {
   world: null, savedGame: null, view: 'select', tab: 'schedule',
-  selSlot: 0, selPid: null, selBench: null, modal: null,
+  selSlot: 0, selPid: null, selBench: null, modal: null, roleSlot: null,
   seasonResult: null, seasonPhase: 'preview', pending: null,
 };
 
@@ -132,8 +133,41 @@ function onClick(e) {
     case 'slot':
       if (!w) break;
       state.selSlot = Number(el.dataset.slot);
+      state.roleSlot = state.selSlot;
       state.selPid = w.myLineup.starters[state.selSlot] || null;
       keepScroll(); render(); break;
+    case 'role': {
+      if (!w) break;
+      const idx = Number(el.dataset.slot);
+      const got = W.setRole(w, idx, el.dataset.role);
+      if (!got) break;
+      state.roleSlot = idx;
+      api.save(); keepScroll(); render();
+      toast(`역할 · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+      break;
+    }
+    case 'role-cycle': {
+      if (!w) break;
+      const idx = Number(el.dataset.slot);
+      const slots = FORMATIONS[w.myLineup.formation].slots;
+      const label = slots[idx]?.label;
+      if (!label || slots[idx].pos === 'GK') break;
+      const cur = W.lineupInfo(w).roles[idx];
+      const got = W.setRole(w, idx, nextRole(label, cur));
+      if (!got) break;
+      state.roleSlot = idx;
+      api.save(); keepScroll(); render();
+      toast(`역할 · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+      break;
+    }
+    case 'mentality': {
+      if (!w) break;
+      const v = Number(el.dataset.val);
+      w.myLineup.tactic.mentality = v;
+      api.save(); keepScroll(); render();
+      toast(`팀 성향 · ${mentalityOf(v).name} — ${mentalityEffect(v, true)}`, 'ok');
+      break;
+    }
     case 'bench': {
       if (!w || state.selSlot == null) break;
       W.swapPlayers(w, state.selSlot, el.dataset.pid);

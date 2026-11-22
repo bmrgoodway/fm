@@ -95,6 +95,8 @@ const PRESETS = [
   ['롱볼·측면', { pass: 1, route: 1 }],
   ['높은라인·강압박', { line: 1, press: 1 }],
   ['낮은라인·대기', { line: -1, press: -1 }],
+  ['잠그기', { mentality: -1 }],
+  ['총공세', { mentality: 1 }],
 ];
 
 console.log(`\n=== 공간·패스 패턴 계측 (전술당 ${N}경기) ===`);
