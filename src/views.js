@@ -27,7 +27,25 @@ const won = (v) => `${W.fmt(v)}억`;
 
 /* 성장·훈련 표시 도우미 */
 const statWords = (keys) => [...new Set(keys || [])].map((k) => STAT_LABEL[k] || k);
+// 성장 기록의 능력치를 부호와 함께 (+1 스피드 / -1 체력)
+const logWords = (l) => {
+  if (!l) return '';
+  if (Array.isArray(l.up) || Array.isArray(l.dn)) {
+    return [...new Set([...(l.up || []).map((k) => '+' + (STAT_LABEL[k] || k)), ...(l.dn || []).map((k) => '-' + (STAT_LABEL[k] || k))])].join(' · ');
+  }
+  return statWords(l.st).join(' · ');
+};
+const statDelta = (l) => (l ? (l.up?.length || 0) - (l.dn?.length || 0) : 0);
 const deltaChip = (d) => (d > 0 ? `<b class="grow-up">+${d}</b>` : d < 0 ? `<b class="grow-down">${d}</b>` : '<span class="muted xs">—</span>');
+// 선수단 '최근' 열 — 종합이 움직였으면 종합 증감, 아니면 능력치 포인트 증감
+const recentCell = (p) => {
+  const d = W.recentDelta(p);
+  if (d) return deltaChip(d);
+  const last = (p.growthLog || []).slice(-1)[0];
+  const n = statDelta(last);
+  if (!n) return '<span class="muted xs">—</span>';
+  return `<b class="${n > 0 ? 'grow-up' : 'grow-down'}" title="능력치 포인트 ${n > 0 ? '+' : ''}${n}">${n > 0 ? '+' : ''}${n}<small class="grow-k">능</small></b>`;
+};
 const statusPill = (p) => {
   const s = W.growthStatus(p);
   return `<span class="pill xs g-${s.key}" title="${esc(s.note)}">${esc(s.label)}</span>`;
@@ -313,7 +331,7 @@ function growthCard(w) {
   return `<article class="card growth-card">
     <div class="card-head"><h3>📈 지난 경기 선수 성장</h3><span class="pill">${up}명 상승 · ${down}명 하락</span></div>
     <ul class="growth">${list.slice(0, 14).map((x) => {
-      const words = [...new Set([...x.plus.map((k) => '+' + (STAT_LABEL[k] || k)), ...x.minus.map((k) => '-' + (STAT_LABEL[k] || k))])].join(' · ');
+      const words = logWords({ up: x.plus, dn: x.minus });
       const p = w.players[x.pid];
       return `<li><b>${esc(x.name)}</b><span class="muted xs">${esc(x.pos)} · ${x.age}세</span><b class="${x.d >= 0 ? 'up' : 'down'}">${x.from === x.to ? `${x.to}` : `${x.from}→${x.to}`}</b><small class="gr-words">${esc(words || '변화 없음')}</small>${p ? statusPill(p) : ''}</li>`;
     }).join('')}</ul>
@@ -469,7 +487,7 @@ function playerCard(w, p, opts = {}) {
       const logs = (p.growthLog || []).slice(-3).reverse();
       return `<div class="grow-box">
         <div class="gb-head"><b>성장</b>${statusPill(p)}<span class="sm">잠재력 <b>${potOf(p)}</b> · ${esc(gs.note)}</span></div>
-        <ul class="grow-log">${logs.map((l) => `<li><span class="muted xs">${l.s}시즌</span>${deltaChip(l.d)}<span>${statWords(l.st).join(' · ') || '능력치 변화 없음'}</span></li>`).join('') || '<li class="muted sm">아직 경기 기록이 없습니다.</li>'}</ul>
+        <ul class="grow-log">${logs.map((l) => `<li><span class="muted xs">${l.s}시즌</span>${l.d ? deltaChip(l.d) : ''}<span>${logWords(l) || '능력치 변화 없음'}</span></li>`).join('') || '<li class="muted sm">아직 경기 기록이 없습니다.</li>'}</ul>
       </div>`;
     })()}
     ${(p.bans > 0 || p.inj > 0) ? `<p class="warn-bar">${p.bans > 0 ? `⛔ 출전 정지 ${p.bans}경기` : ''}${p.bans > 0 && p.inj > 0 ? ' · ' : ''}${p.inj > 0 ? `🚑 부상 ${p.inj}경기 결장` : ''}</p>` : ''}
@@ -554,7 +572,7 @@ function squadTab(app, w) {
     <div class="card-head"><h3>선수단 ${w.teams[w.myTeamId].squad.length}명</h3><span class="pill">주급 합계 ${W.fmt(W.teamWageTotal(w, w.myTeamId))}만/주</span></div>
     <div class="table-wrap"><table class="tbl squad">
       <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>잠재</th><th>최근</th><th>스피드</th><th>슈팅</th><th>패스</th><th>수비</th><th>체력</th><th>몸값</th><th>출전</th></tr></thead>
-      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}${p.loan ? ' <span class="pill xs" title="임대">임대</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td><td>${deltaChip(W.recentDelta(p))}</td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
+      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}${p.loan ? ' <span class="pill xs" title="임대">임대</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td><td>${recentCell(p)}</td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
     </table></div>
   </article>`;
 }

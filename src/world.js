@@ -829,7 +829,7 @@ export function applyGrowth(w, plan, key = 'x') {
   p.wage = wageOf(p);
   const before = plan.from;
   const d = p.ovr - before;
-  p.growthLog = [...(p.growthLog || []), { s: w.season, d, st: [...plan.plus, ...plan.minus], k: key }].slice(-6);
+  p.growthLog = [...(p.growthLog || []), { s: w.season, d, st: [...plan.plus, ...plan.minus], up: plan.plus, dn: plan.minus, k: key }].slice(-6);
   return { ...plan, from: before, to: p.ovr, d };
 }
 

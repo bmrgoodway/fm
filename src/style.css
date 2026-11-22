@@ -882,6 +882,7 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 .gb-head .sm { font-size: 10.5px; color: var(--soft); font-weight: 700; }
 .grow-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .grow-log li { display: flex; align-items: baseline; gap: 6px; font-size: 11px; font-weight: 800; }
+.grow-k { font-size: 7.5px; font-weight: 900; margin-left: 1px; opacity: .75; }
 .grow-up { color: #0a7a33; font-size: 11px; }
 .grow-down { color: #c23a24; font-size: 11px; }
 html[data-theme="night"] .grow-up { color: #37e07a; }

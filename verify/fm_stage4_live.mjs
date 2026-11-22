@@ -143,6 +143,9 @@ console.log('\n[데스크톱 1440×900]');
   ok(grow.words.some((w) => /[+-]/.test(w)), '능력치 변화가 +1 · -1 형태로 보입니다', grow.words.join(' / '));
   const s3 = await saved(page);
   ok(s3.lastGrowth > 0, '성장 결과가 세이브에 남습니다', `${s3.lastGrowth}명`);
+  await prepShot(page, '.growth-card', 140);
+  await page.screenshot({ path: `${SHOT_DIR}/fm-stage4-growth.png` });
+  out.metrics.growthShot = `${SHOT_DIR}/fm-stage4-growth.png`;
 
   // 성장 스크린샷 — 최근 변화가 있는 선수를 골라 카드의 성장 기록을 담습니다
   await page.locator('nav.tabs [data-act="tab"][data-tab="squad"]').click();
@@ -156,8 +159,8 @@ console.log('\n[데스크톱 1440×900]');
   }));
   ok(cardNow.logs > 0, '경기를 치른 선수 카드에 최근 성장 기록이 보입니다', `${cardNow.picked} · ${cardNow.head.slice(0, 40)}`);
   await prepShot(page, '.pcard', 130);
-  await page.screenshot({ path: `${SHOT_DIR}/fm-stage4-growth.png` });
-  out.metrics.growthShot = `${SHOT_DIR}/fm-stage4-growth.png`;
+  await page.screenshot({ path: `${SHOT_DIR}/fm-stage4-player.png` });
+  out.metrics.playerShot = `${SHOT_DIR}/fm-stage4-player.png`;
 
   // ⑦ 이적 시장 — 오퍼·협상·FA·임대·피드
   await page.locator('nav.tabs [data-act="tab"][data-tab="market"]').click();
