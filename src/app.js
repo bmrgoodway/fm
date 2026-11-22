@@ -5,7 +5,7 @@ import { local } from './store.js';
 import { renderSelect, renderHub, renderSeason, renderModal, applyTeamColors } from './views.js';
 import { mountMatch } from './matchview.js';
 import { Match, applyResult, lineupFor } from './match.js';
-import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect } from './tactics.js';
+import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect, setPieceLabel } from './tactics.js';
 
 const defs = {};
 for (const t of TEAM_DEFS) defs[t.id] = t;
@@ -158,6 +158,14 @@ function onClick(e) {
       state.roleSlot = idx;
       api.save(); keepScroll(); render();
       toast(`역할 · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+      break;
+    }
+    case 'setpiece': {
+      if (!w) break;
+      const got = W.setSetPiece(w, el.dataset.type, el.dataset.key);
+      if (!got) break;
+      api.save(); keepScroll(); render();
+      toast(`세트피스 · ${el.dataset.type === 'corner' ? '코너킥' : '프리킥'} ${setPieceLabel(el.dataset.type, got[el.dataset.type])}`, 'ok');
       break;
     }
     case 'mentality': {

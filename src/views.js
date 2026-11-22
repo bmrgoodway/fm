@@ -1,7 +1,7 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
 import { FORMATIONS } from './data.js';
 import * as W from './world.js';
-import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING } from './tactics.js';
+import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING, SET_PIECES, SET_PIECE_TYPES, resolveSetPiece, setPieceKey, setPieceLabel, setPieceEffect } from './tactics.js';
 import { scoutReport } from './scout.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -201,6 +201,7 @@ function scoutCard(w) {
       <div class="scout-right">
         <div class="sa-head"><b>주 전술 스타일</b><span class="pill xs">${esc(rep.words)}</span></div>
         <ul class="scout-axes">${rep.axes.map((a) => `<li class="${a.value > 0.2 ? 'hi' : a.value < -0.2 ? 'lo' : ''}"><span>${esc(a.name)}</span><b>${esc(a.word)}</b><small>${esc(a.note)}</small></li>`).join('')}</ul>
+        <p class="sp-note"><b>세트피스</b> 코너 <em>${esc(setPieceLabel('corner', rep.setpiece.corner))}</em> · 프리킥 <em>${esc(setPieceLabel('freekick', rep.setpiece.freekick))}</em></p>
         <h4 class="sub">핵심 경계 선수</h4>
         <ul class="key-list">${rep.keyPlayers.map((k) => `<li class="key-card">
           <div class="kc-top"><span class="kc-num">${k.num}</span><div><b>${esc(k.name)}</b><small>${esc(k.slot)} · ${esc(k.roleLabel)} · 종합 ${k.ovr}</small></div></div>
@@ -318,6 +319,21 @@ function scheduleTab(app, w) {
       }).join('')}</tbody>
     </table></div>
   </article>`;
+}
+
+/* ── 세트피스 지시 줄 ──────────────────────────────────────────
+   전술 탭·경기 중 시트(전술 변경)·하프타임 라커룸이 같은 줄을 씁니다.
+   attr(type, key) 로 화면마다 다른 클릭 속성(data-act / data-msp / data-htsp)을 붙입니다. */
+export function setPieceRows(sp, attr, opts = {}) {
+  const cur = resolveSetPiece(sp);
+  return SET_PIECE_TYPES.map((t) => {
+    const now = cur[t];
+    return `<li class="axis sp-row">
+      <div class="axis-head"><b>${SET_PIECES[t].icon} ${esc(SET_PIECES[t].name)}</b><span class="axis-val">${esc(setPieceLabel(t, now))}</span></div>
+      <div class="axis-ctl"><span class="seg">${SET_PIECES[t].opts.map((o) => `<button type="button" class="${o.key === now ? 'on' : ''}" ${attr(t, o.key)} aria-pressed="${o.key === now}">${esc(o.label)}</button>`).join('')}</span></div>
+      ${opts.compact ? '' : `<p class="axis-eff">${esc(setPieceEffect(t, now))}</p>`}
+    </li>`;
+  }).join('');
 }
 
 /* ── 전술/선수단 탭 ── */
@@ -457,7 +473,7 @@ function squadTab(app, w) {
     <article class="card">
       <div class="card-head"><h3>전술 보드</h3><span class="pill">${esc(l.formation)}${mismatch ? ` · 위치 보정 ${mismatch}` : ' · 최적 배치'}</span></div>
       <div class="form-row" role="group" aria-label="포메이션">
-        ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${l.formation === f ? 'on' : ''}" data-act="formation" data-formation="${f}">${f}</button>`).join('')}
+        ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${l.formation === f ? 'on' : ''}" data-act="formation" data-formation="${f}" title="${esc(FORMATIONS[f].shape)}" aria-pressed="${l.formation === f}">${f}</button>`).join('')}
         <button type="button" class="btn small ghost right" data-act="auto-lineup">자동 선발</button>
       </div>
       ${outMen.length ? `<p class="warn-bar">🚑 선발 중 뛸 수 없는 선수 ${outMen.length}명 — ${outMen.map((s) => esc(s.p.name)).join(', ')}. 경기를 시작하면 자동으로 교체됩니다.</p>` : ''}
@@ -476,6 +492,10 @@ function squadTab(app, w) {
             <b>${esc(m.name)}</b><small>${esc(m.tag)}</small></button>`).join('')}
         </div>
         <p class="axis-eff">${esc(mentalityEffect(ment, true))} · 수비 시 ${esc(mentalityEffect(ment, false))}</p>
+      </article>
+      <article class="card">
+        <div class="card-head"><h3>세트피스 지시</h3><span class="pill">경기 중에도 변경</span></div>
+        <ul class="axes sp-axes">${setPieceRows(l.setpiece, (t, k) => `data-act="setpiece" data-type="${t}" data-key="${k}"`)}</ul>
       </article>
       <article class="card">
         <div class="card-head"><h3>전술 4축</h3><span class="pill">경기 중에도 변경</span></div>

@@ -3,7 +3,7 @@
 // 화면(views.js)과 자체 점검(scripts/fm-selftest.mjs)이 같은 값을 읽으므로,
 // 화면에 적힌 내용과 경기에 실제로 들어가는 값이 어긋나지 않습니다.
 import { FORMATIONS, POS_LABEL, STAT_LABEL } from './data.js';
-import { AXES, stepLabel, tacticWords, mentalityOf, roleLabel, defaultRole, roleShort } from './tactics.js';
+import { AXES, stepLabel, tacticWords, mentalityOf, roleLabel, defaultRole, roleShort, resolveSetPiece, setPieceLabel } from './tactics.js';
 import { lineupFor } from './match.js';
 import { standings, teamPower } from './world.js';
 
@@ -91,7 +91,22 @@ const FORMATION_HINT = {
   '4-4-2': '두 줄 4-4-2입니다. 중원을 3명으로 채워 숫자 우위를 만들고, 측면에서 2대1로 풀백을 끌어내세요.',
   '3-5-2': '윙백이 터치라인 끝까지 올라옵니다. 그 뒤 측면 공간이 비니, 윙어를 넓게 두고 반대쪽 전환으로 노리세요.',
   '4-2-3-1': '수비형 미드필더 두 명 앞, CAM 자리(라인 사이)가 열려 있습니다. 플레이메이커를 그 자리에 두고 킬패스를 받게 하세요.',
+  '4-1-4-1': '홀딩 한 명이 수비 앞을 덮는 4-4 두 줄입니다. 그 홀딩을 공 쪽으로 끌어낸 뒤 2선 사이 공간으로 침투하세요.',
+  '3-4-3': '3백만 남기고 윙백이 끝까지 올라갑니다. 윙어를 넓게 두고 윙백 뒤 공간으로 역습하되, 중원 4명 사이가 넓어 전환 패스도 통합니다.',
+  '4-3-1-2': '중앙에 다이아몬드로 모여 측면 폭이 비어 있습니다. 윙어를 터치라인에 붙이고 풀백 오버랩·측면 크로스로 파고드세요.',
 };
+
+/* 상대의 세트피스 지시 — 코너·프리킥을 어떻게 차는지에 맞춰 문전 대비를 적습니다. */
+function setPieceHint(sp) {
+  const notes = [];
+  if (sp.corner === 'near') notes.push('코너는 니어 포스트로 낮게 — 가까운 골대 앞에 수비수를 붙이고 첫 공을 먼저 치우세요.');
+  else if (sp.corner === 'short') notes.push('코너는 짧게 연결합니다 — 코너 근처 2대1을 막고 볼을 뺏긴 직후 역습을 조심하세요.');
+  else notes.push('코너는 박스 중앙으로 정면 크로스 — 중앙 수비의 헤더 경합에서 몸을 앞에 두세요.');
+  if (sp.freekick === 'direct') notes.push('프리킥은 직접 슈팅 — 벽을 4명으로 세우고 골키퍼가 각도를 좁히게 하세요.');
+  else if (sp.freekick === 'box') notes.push('프리킥은 박스로 크로스 — 문전 제공권 경합에 수비수를 미리 붙이세요.');
+  else notes.push('프리킥은 짧게 넘깁니다 — 공 근처에서 압박을 걸어 전개를 막으세요.');
+  return { tag: '세트피스', text: `코너 '${setPieceLabel('corner', sp.corner)}' · 프리킥 '${setPieceLabel('freekick', sp.freekick)}'. ${notes.join(' ')}` };
+}
 
 /* 지금 이 상대에게 준비해 둘 대응 — 축과 성향에서 바로 뽑습니다. */
 function recommendHint(tactic, ment) {
@@ -117,6 +132,7 @@ export function scoutReport(w, teamId) {
   const slots = FORMATIONS[lineup.formation]?.slots || [];
   const tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic || {}) };
   const ment = mentalityOf(tactic.mentality);
+  const sp = resolveSetPiece(lineup.setpiece || team.setpiece);
   const xi = lineup.starters.map((pid, i) => {
     const p = w.players[pid];
     if (!p) return null;
@@ -144,6 +160,7 @@ export function scoutReport(w, teamId) {
             : []),
     ...squadHints(xi),
     ...(FORMATION_HINT[lineup.formation] ? [{ tag: '포메이션', text: FORMATION_HINT[lineup.formation] }] : []),
+    ...(sp.corner !== 'central' || sp.freekick !== 'direct' ? [setPieceHint(sp)] : []),
     recommendHint(tactic, ment),
     ...(keyPlayers[0] ? [{ tag: '경계', text: `${keyPlayers[0].name}(${keyPlayers[0].slot}·${keyPlayers[0].roleLabel}) — ${keyPlayers[0].mark}` }] : []),
   ];
@@ -159,7 +176,7 @@ export function scoutReport(w, teamId) {
     teamId, name: team.name, short: team.short, nick: team.nick, stadium: team.stadium,
     formation: lineup.formation, formationName: FORMATIONS[lineup.formation]?.name || lineup.formation,
     shape: FORMATIONS[lineup.formation]?.shape || '',
-    tactic, mentality: ment, words: tacticWords(tactic),
+    tactic, mentality: ment, words: tacticWords(tactic), setpiece: sp,
     axes: AXES.map((a) => {
       const val = Number(tactic[a.key]) || 0;
       return {

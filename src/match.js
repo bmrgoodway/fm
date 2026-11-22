@@ -6,7 +6,7 @@
 import { makeRng, clamp, rint, pick } from './rng.js';
 import { FORMATIONS } from './data.js';
 import { posFactor, autoLineup, squadOf, available } from './world.js';
-import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING, mentalityOf, stepLabel } from './tactics.js';
+import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING, mentalityOf, stepLabel, resolveSetPiece, setPieceOpt, setPieceLabel, SET_PIECES } from './tactics.js';
 
 export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
 const TPM = 4;            // 1분 = 4틱 (한 틱 = 경기 15초)
@@ -255,6 +255,31 @@ const SAY = {
     '후반전 킥오프 — 공격 방향이 바뀌었습니다.',
   ],
   aet: ['연장전에 돌입합니다!'],
+  /* 세트피스 지시별 멘트 — 고른 지시가 중계에 그대로 드러납니다 */
+  spCornerNear: [
+    '코너킥 — 니어 포스트로 낮게! {p}의 공이 가까운 골대 앞으로 흐릅니다.',
+    '짧고 날카로운 니어 포스트 코너 — {p}가 첫 번째 선수를 노립니다.',
+  ],
+  spCornerCentral: [
+    '코너킥 — 중앙으로 힘있게! {p}가 박스 한가운데로 올립니다.',
+    '{p}의 코너킥이 문전 중앙으로 향합니다. 머리 싸움이 붙습니다.',
+  ],
+  spCornerShort: [
+    '짧은 코너킥 — {p}가 가까운 동료에게 연결합니다.',
+    '{p}, 코너를 짧게 넘겨 수비를 끌어냅니다.',
+  ],
+  spFreeDirect: [
+    '프리킥 — {p}가 직접 노립니다! 벽 위로 감아 찹니다.',
+    '{p}가 프리킥을 직접 슈팅으로 가져갑니다!',
+  ],
+  spFreeBox: [
+    '프리킥 — {p}가 박스로 크로스를 올립니다!',
+    '{p}의 프리킥, 박스로 힘있게 배달합니다!',
+  ],
+  spFreeShort: [
+    '프리킥 — {p}가 짧게 넘겨 점유를 이어 갑니다.',
+    '{p}, 프리킥을 옆 동료에게 짧게 — 재공격을 준비합니다.',
+  ],
 };
 
 function makeEntity(world, pid, slot, dir, side, role = null) {
@@ -362,6 +387,8 @@ export class Match {
     return {
       name: side, teamId, dir, team, formation: lineup.formation || '4-3-3',
       tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic) },
+      // 코너킥·프리킥 지시 — 라인업(감독) 값이 있으면 그것, 없으면 팀 성향 값, 그것도 없으면 기본값
+      setpiece: resolveSetPiece(lineup.setpiece || team.setpiece),
       // 감독이 성향을 바꿨다가 균형으로 돌아올 때 되돌릴 '원래 전술'
       baseTactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic) },
       players: starters, bench, subsUsed: 0, appeared: [...starters], reds: 0,
@@ -400,11 +427,11 @@ export class Match {
     if (m <= 90) return `${String(m).padStart(2, '0')}'`;
     return `90+${m - 90}'`;
   }
-  phrase(kind, sideName, vars = {}) {
-    const pool = SAY[kind] || SAY.build;
+  /* 멘트 틀에 선수·팀 이름과 조사를 채웁니다 */
+  fillPhrase(raw, sideName, vars = {}) {
     const team = sideName ? (this.sides[sideName]?.team?.short || '') : '';
     const names = { p: vars.p || '', p2: vars.p2 || '', t: team };
-    return pick(this.rng, pool)
+    return raw
       .replace(/\{(p|p2|t)\}([가는를와])?/g, (mm, k, j) => {
         const name = names[k] ?? '';
         if (!j) return name;
@@ -413,8 +440,20 @@ export class Match {
       })
       .replace(/\{n\}/g, String(vars.n ?? ''));
   }
+  phrase(kind, sideName, vars = {}) {
+    const pool = SAY[kind] || SAY.build;
+    return this.fillPhrase(pick(this.rng, pool), sideName, vars);
+  }
   say(kind, sideName, vars = {}, type = null) {
     const text = this.phrase(kind, sideName, vars);
+    this.pushEvent({ type: type || kind, side: sideName || null, text });
+    return text;
+  }
+  /* 난수를 쓰지 않는 멘트 — 세트피스 지시처럼 '고른 값'을 그대로 알리는 줄에 씁니다.
+     (멘트 선택이 경기 난수 순서를 바꿔 결과에 영향을 주지 않게 합니다) */
+  sayFixed(kind, sideName, vars = {}, type = null) {
+    const pool = SAY[kind] || SAY.build;
+    const text = this.fillPhrase(pool[Math.abs(this.t) % pool.length], sideName, vars);
     this.pushEvent({ type: type || kind, side: sideName || null, text });
     return text;
   }
@@ -1586,6 +1625,7 @@ export class Match {
     ball.t = 0;
     ball.kind = k;
     ball.lead = k === 'through';
+    ball.spKey = null;
     // dur = 날아가는 틱 수(정수). 짧은 패스 1틱, 긴 패스·전환 2~3틱
     ball.dur = clamp(Math.round(1 + d / 42), 1, k === 'switch' ? 3 : 2);
     ball.passer = c;
@@ -1964,6 +2004,9 @@ export class Match {
     const rec = b.receiver;
     const passer = b.passer;
     const kind = b.kind || 'pass';
+    // 세트피스 지시 태그 — 이 공이 어느 지시로 나왔는지 (헤더 확률에 반영하고 바로 지웁니다)
+    const spKey = b.spKey || null;
+    b.spKey = null;
     const at = { x: b.x, y: b.y };
     // 패스가 떠날 때 오프사이드 위치였고, 그 공이 동료에게 닿았다 — 깃발이 올라갑니다
     if (b.offside) {
@@ -2069,7 +2112,8 @@ export class Match {
       return;
     }
     // 크로스·컷백은 수비가 걷어내는 경우가 있습니다 (컷백은 낮고 빨라 걷어내기 어렵습니다)
-    const clearP = kind === 'cross' ? 0.19 : kind === 'cutback' ? 0.12 : 0;
+    // 니어 포스트로 빠르게 깔리는 공은 수비가 먼저 걷어내기 어렵습니다
+    const clearP = kind === 'cross' ? (spKey === 'near' ? 0.16 : 0.19) : kind === 'cutback' ? 0.12 : 0;
     if (clearP && this.rng() < clearP) {
       const clears = this.sides[this.opposing[rec.side]].players
         .filter((e) => e.onPitch && e.pos !== 'GK')
@@ -2103,7 +2147,9 @@ export class Match {
       const dGoal = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
       // 타깃맨은 머리로 때리는 확률이 더 높습니다
       const routeUp = Math.max(0, Number(this.sides[rec.side].tactic.route) || 0);
-      const headerP = kind === 'cutback' ? 0.46 : 0.36 + routeUp * 0.12 + (this.roleOf(rec) === 'target' ? 0.16 : 0);
+      // 니어 포스트·박스 투입 지시는 공이 정확히 그 자리로 배달되므로 첫 접촉 헤더 확률이 높습니다
+      const spBoost = spKey === 'near' ? 0.1 : spKey === 'box' ? 0.08 : 0;
+      const headerP = kind === 'cutback' ? 0.46 : 0.36 + routeUp * 0.12 + (this.roleOf(rec) === 'target' ? 0.16 : 0) + spBoost;
       if (this.rng() < headerP) { this.shoot(rec, dGoal, this.pressureOn(rec), true); return; }
     }
     b.cross = false;
@@ -2290,6 +2336,7 @@ export class Match {
     this.ball.offside = null;
     this.ball.cross = false;
     this.ball.kind = 'pass';
+    this.ball.spKey = null;
     this.ball.lead = false;
     this.ball.receiver = null;
     this.ball.passer = null;
@@ -2311,11 +2358,17 @@ export class Match {
     if (!opts.quiet) this.say(type, sideName, { p: this.sp.taker?.name || '', t: side.team.short }, type);
   }
 
+  /* 지금 이 세트피스에서 쓸 지시 키 (모르는 값이면 기본값) */
+  spDirective(type, sideName) {
+    const side = this.sides[sideName];
+    return setPieceOpt(type, (side?.setpiece || {})[type]).key;
+  }
   pickTaker(type, side) {
     const out = side.players.filter((e) => e.onPitch && e.pos !== 'GK');
     if (!out.length) return side.players.find((e) => e.onPitch) || null;
     if (type === 'goalkick') return side.players.find((e) => e.onPitch && e.pos === 'GK') || out[0];
-    const key = type === 'corner' ? 'pas' : 'sho';
+    // 직접 슈팅은 슈팅 좋은 선수, 박스 투입·짧게 연결·코너는 패스(크로스) 좋은 선수가 찹니다
+    const key = type === 'freekick' && this.spDirective(type, side.name) === 'direct' ? 'sho' : 'pas';
     return out.slice().sort((a, b) => this.eff(b, key) - this.eff(a, key))[0];
   }
 
@@ -2365,26 +2418,110 @@ export class Match {
     if (gkDef) put(gkDef, dir > 0 ? W - 2.4 : 2.4, CY + (sp.y > CY ? -1.8 : 1.5));
     put(sp.taker, sp.x - dir * 1.6, sp.y + (sp.y > CY ? -1.4 : 1.4));
 
+    const spKey = this.spDirective(sp.type, sp.side);
+    // 머리·마무리에 강한 순서 — 니어 포스트·박스 투입의 타겟을 정합니다
+    const headerRank = (e) => this.eff(e, 'sho') + (e.p.stats.sta || 0) * 0.35
+      + (this.roleOf(e) === 'target' ? 10 : 0) + (e.pos === 'FW' ? 12 : e.pos === 'MF' ? 4 : 0);
     if (sp.type === 'corner') {
-      const box = [
-        [gx - dir * 6.5, CY - 5.5], [gx - dir * 11, CY + 2.5], [gx - dir * 8, CY + 7.5],
-        [gx - dir * 15, CY - 7], [gx - dir * 18, CY + 4],
-      ];
-      atk.forEach((e, i) => {
-        if (i < box.length) put(e, ...box[i]);
-        else put(e, gx - dir * (22 + (i - box.length) * 4.5), CY + (((i - box.length) % 3) - 1) * 7);
-      });
-      const mark = [
+      const sign = sp.y > CY ? 1 : -1;               // 코너가 있는 쪽 = 니어 포스트 방향
+      const nearY = CY + sign * 4.4;
+      const nearSpot = { x: gx - dir * 4.6, y: nearY };
+      const centralMark = [
         [gx - dir * 3, CY - 7], [gx - dir * 3, CY + 7], [gx - dir * 6.5, CY - 2.5],
         [gx - dir * 6.5, CY + 5], [gx - dir * 10, CY - 6.5], [gx - dir * 10, CY + 3],
       ];
-      def.forEach((e, i) => {
-        if (i < mark.length) put(e, ...mark[i]);
-        else put(e, gx - dir * (18 + (i - mark.length) * 4.5), CY + (((i - mark.length) % 3) - 1) * 8);
-      });
+      if (spKey === 'short') {
+        // 짧게 연결 — 코너 옆 동료 한 명만 붙고, 나머지는 박스 밖 2선에서 대기합니다
+        const shortMan = atk.slice().sort((a, b) =>
+          (a.pos === 'MF' ? 0 : a.pos === 'DF' ? 1 : 2) - (b.pos === 'MF' ? 0 : b.pos === 'DF' ? 1 : 2)
+          || dist(a, sp) - dist(b, sp))[0];
+        atk.forEach((e, i) => {
+          if (e === shortMan) { put(e, sp.x - dir * 6.5, clamp(sp.y - sign * 4.8, 3, H - 3)); return; }
+          const row = i % 3;
+          put(e, gx - dir * (20 + Math.floor(i / 3) * 5.5), clamp(CY + (row - 1) * 9, 6, H - 6));
+        });
+        def.forEach((e, i) => {
+          // 첫 수비수는 짧은 옵션을 따라 나가고, 나머지는 문전을 지킵니다
+          if (i === 0) put(e, sp.x - dir * 10, clamp(sp.y - sign * 3.2, 3, H - 3));
+          else if (i <= centralMark.length) put(e, ...centralMark[i - 1]);
+          else put(e, gx - dir * (18 + (i - 1 - centralMark.length) * 4.5), CY + (((i - 1 - centralMark.length) % 3) - 1) * 8);
+        });
+      } else {
+        if (spKey === 'near') {
+          // 니어 포스트 — 마무리 좋은 선수를 가까운 골대 앞에, 두 번째를 반대 골대로
+          const order = atk.slice().sort((a, b) => headerRank(b) - headerRank(a));
+          atk.forEach((e) => {
+            const i = order.indexOf(e);
+            if (i === 0) put(e, nearSpot.x, clamp(nearY, 3, H - 3));
+            else if (i === 1) put(e, gx - dir * 6.4, clamp(CY - sign * 3.2, 3, H - 3));
+            else if (i === 2) put(e, gx - dir * 11, CY);
+            else put(e, gx - dir * (19 + (i - 3) * 4.5), clamp(CY + (((i - 3) % 3) - 1) * 7, 6, H - 6));
+          });
+        } else {
+          // 중앙 집중 — 기존 코너 배치 그대로(문전에 마무리 좋은 선수를 모읍니다)
+          const box = [
+            [gx - dir * 6.5, CY - 5.5], [gx - dir * 11, CY + 2.5], [gx - dir * 8, CY + 7.5],
+            [gx - dir * 15, CY - 7], [gx - dir * 18, CY + 4],
+          ];
+          atk.forEach((e, i) => {
+            if (i < box.length) put(e, ...box[i]);
+            else put(e, gx - dir * (22 + (i - box.length) * 4.5), CY + (((i - box.length) % 3) - 1) * 7);
+          });
+        }
+        const mark = spKey === 'near'
+          ? [
+            [gx - dir * 1.8, clamp(nearY, 2.5, H - 2.5)],
+            [gx - dir * 4, clamp(nearY + sign * 3.4, 2.5, H - 2.5)],
+            [gx - dir * 3, clamp(CY - sign * 7, 2.5, H - 2.5)],
+            [gx - dir * 6.5, clamp(CY - sign * 2.5, 2.5, H - 2.5)],
+            [gx - dir * 6.5, clamp(CY + sign * 5, 2.5, H - 2.5)],
+            [gx - dir * 10, clamp(CY - sign * 6.5, 2.5, H - 2.5)],
+          ]
+          : centralMark;
+        def.forEach((e, i) => {
+          if (i < mark.length) put(e, ...mark[i]);
+          else put(e, gx - dir * (18 + (i - mark.length) * 4.5), CY + (((i - mark.length) % 3) - 1) * 8);
+        });
+      }
     } else if (sp.type === 'freekick') {
       const dGoal = Math.hypot(gx - sp.x, CY - sp.y);
-      if (dGoal < 34) {
+      const ownHalf = prog(sp.x, dir) < 55;
+      // 배치는 지시 그대로 — '직접 슈팅'은 기존 배치(벽·문전), '박스'는 문전 집중, '짧게'는 옆 동료와 재개
+      const aim = spKey;
+      const wall = (n = 4) => {
+        const ang = Math.atan2(CY - sp.y, gx - sp.x);
+        return Array.from({ length: n }, (_, i) => [
+          sp.x + Math.cos(ang) * (9 + i * 0.9),
+          clamp(sp.y + Math.sin(ang) * (9 + i * 0.9) + (i - (n - 1) / 2) * 1.3, 2, H - 2),
+        ]);
+      };
+      if (aim === 'short') {
+        // 짧게 패스 — 가까운 동료 한 명과 주고받을 자리만 만듭니다
+        const mate = atk.slice().sort((a, b) => dist(a, sp) - dist(b, sp))[0];
+        atk.forEach((e, i) => {
+          if (e === mate) { put(e, sp.x - dir * 5.2, clamp(sp.y + (sp.y > CY ? -3.4 : 3.4), 3, H - 3)); return; }
+          put(e, sp.x + dir * (10 + i * 7), clamp(CY + ((i % 3) - 1) * 12, 6, H - 6));
+        });
+        def.forEach((e, i) => {
+          if (i < 3) put(e, sp.x + dir * (5.5 + i * 4), clamp(sp.y + (i - 1) * 6, 4, H - 4));
+          else put(e, sp.x + dir * (16 + (i - 3) * 6), clamp(CY + (((i - 3) % 3) - 1) * 12, 5, H - 5));
+        });
+      } else if (aim === 'box') {
+        // 박스 투입 — 문전에 마무리 좋은 선수를 세우고 벽은 그대로 세웁니다
+        const box = [[gx - dir * 7, CY - 5], [gx - dir * 9, CY + 4.5], [gx - dir * 12, CY - 1.5], [gx - dir * 16, CY + 7]];
+        const order = atk.slice().sort((a, b) => headerRank(b) - headerRank(a));
+        atk.forEach((e) => {
+          const j = order.indexOf(e);
+          if (j < box.length) put(e, ...box[j]);
+          else put(e, gx - dir * (22 + (j - box.length) * 5), clamp(CY + (((j - box.length) % 3) - 1) * 7, 5, H - 5));
+        });
+        const wallPos = dGoal < 34 ? wall(4) : [];
+        def.forEach((e, i) => {
+          if (i < wallPos.length) put(e, ...wallPos[i]);
+          else if (i < 8) put(e, gx - dir * (2.6 + (i - wallPos.length) * 3), CY + (i % 2 ? 6 : -6));
+          else put(e, gx - dir * (28 + (i - 8) * 4), CY + (((i - 8) % 3) - 1) * 6);
+        });
+      } else if (dGoal < 34) {
         const box = [[gx - dir * 9, CY - 4], [gx - dir * 13, CY + 2], [gx - dir * 10, CY + 7], [gx - dir * 18, CY - 5]];
         atk.forEach((e, i) => {
           if (i < box.length) put(e, ...box[i]);
@@ -2485,66 +2622,143 @@ export class Match {
     }
 
     if (sp.type === 'corner') {
-      const box = side.players
-        .filter((e) => e.onPitch && e !== taker && e.pos !== 'GK')
+      const key = this.spDirective('corner', sp.side);
+      const sign = sp.y > CY ? 1 : -1;
+      const gx2 = side.dir > 0 ? W : 0;
+      const mates = side.players.filter((e) => e.onPitch && e !== taker && e.pos !== 'GK');
+      if (key === 'short') {
+        // 짧게 연결 — 코너 옆 동료에게 (코너킥은 오프사이드 예외)
+        const mate = mates.slice().sort((a, b) => dist(a, taker) - dist(b, taker))[0];
+        if (mate) {
+          this.sayFixed('spCornerShort', sp.side, { p: taker.name }, 'corner');
+          this.passTo(taker, mate, false, { safe: true });
+          this.ball.spKey = 'short';
+          return;
+        }
+      }
+      if (key === 'near') {
+        // 니어 포스트 — 가까운 골대 앞 선수에게 짧고 낮게 (1틱)
+        const nearSpot = { x: gx2 - side.dir * 4.6, y: CY + sign * 4.4 };
+        const rec = mates.slice().sort((a, b) =>
+          Math.hypot(a.x - nearSpot.x, a.y - nearSpot.y) - Math.hypot(b.x - nearSpot.x, b.y - nearSpot.y))[0];
+        if (rec) {
+          this.sayFixed('spCornerNear', sp.side, { p: taker.name }, 'corner');
+          this.crossBall(taker, rec, 'near', 1);
+          this.countCross(taker, side, rec);
+          return;
+        }
+      }
+      // 중앙 집중 — 기존 배포본과 같은 전개(가끔 짧은 코너로 바꿔 차는 것까지 그대로)
+      const box = mates.slice()
         .sort((a, b) => this.eff(b, 'sho') + (b.pos === 'FW' ? 12 : 0) - this.eff(a, 'sho') - (a.pos === 'FW' ? 12 : 0));
-      const short = this.rng() < 0.12 && box.length > 1;
-      if (short) {
-        this.passTo(taker, box[0], false, { safe: true });   // 코너킥은 오프사이드 예외
+      const shortRoll = this.rng() < 0.12 && box.length > 1;
+      if (shortRoll) {
+        this.sayFixed('spCornerShort', sp.side, { p: taker.name }, 'corner');
+        this.passTo(taker, box[0], false, { safe: true });
+        this.ball.spKey = 'short';
         return;
       }
       const rec = box[0];
       if (!rec) { this.ball.mode = 'loose'; return; }
-      this.ball.mode = 'pass';
-      this.ball.from = { x: taker.x, y: taker.y };
-      this.ball.to = { x: rec.x, y: rec.y };
-      this.ball.t = 0;
-      this.ball.dur = 2;        // 크로스는 화면에서 궤적이 보이게 2틱
-      this.ball.passer = taker;
-      this.ball.receiver = rec;
-      this.ball.cross = true;
-      this.ball.kind = 'cross';
-      this.ball.lead = false;
-      this.ball.owner = null;
-      this.ball.trail = [{ x: taker.x, y: taker.y }];
-      taker.st.passes += 1;
-      side.stats.passes += 1;
-      side.stats.crossN += 1;
-      side.stats.passDist += dist(taker, rec);
-      side.stats.passN += 1;
+      this.sayFixed('spCornerCentral', sp.side, { p: taker.name }, 'corner');
+      this.crossBall(taker, rec, key || 'central', 2);
+      this.countCross(taker, side, rec);
       return;
     }
 
     if (sp.type === 'freekick') {
       const gx = side.dir > 0 ? W : 0;
       const dGoal = Math.hypot(gx - sp.x, CY - sp.y);
-      if (dGoal < 26 && this.rng() < clamp(0.52 - dGoal / 60, 0.06, 0.36)) {
-        this.shoot(taker, dGoal, 0);
-        return;
-      }
+      const ownHalf = prog(sp.x, side.dir) < 55;
+      const key = this.spDirective('freekick', sp.side);
       const mates = side.players.filter((e) => e.onPitch && e !== taker && e.pos !== 'GK');
+      // ① 짧게 패스 — 옆 동료에게 넘겨 점유를 지킵니다
+      if (key === 'short') {
+        const rec = mates.slice().sort((a, b) => dist(a, taker) - dist(b, taker))[0];
+        if (rec) {
+          this.sayFixed('spFreeShort', sp.side, { p: taker.name }, 'freekick');
+          this.passTo(taker, rec, false, { safe: true });
+          this.ball.spKey = 'short';
+          return;
+        }
+      }
+      // ② 박스 투입 — 문전으로 크로스를 올려 제공권을 노립니다 (우리 진영이면 짧게 넘깁니다)
+      if (key === 'box' && ownHalf) {
+        const rec = mates.slice().sort((a, b) => dist(a, taker) - dist(b, taker))[0];
+        if (rec) {
+          this.sayFixed('spFreeShort', sp.side, { p: taker.name }, 'freekick');
+          this.passTo(taker, rec, false, { safe: true });
+          this.ball.spKey = 'short';
+          return;
+        }
+      }
+      if (key === 'box') {
+        const box = mates.filter((e) => prog(e.x, side.dir) > 74 && Math.abs(e.y - CY) < 17);
+        const target = (box.length ? box : mates).slice()
+          .sort((a, b) => this.eff(b, 'sho') + (b.pos === 'FW' ? 10 : 0) - this.eff(a, 'sho') - (a.pos === 'FW' ? 10 : 0))[0];
+        if (target) {
+          this.sayFixed('spFreeBox', sp.side, { p: taker.name }, 'freekick');
+          this.crossBall(taker, target, 'box', 2);
+          this.countCross(taker, side, target);
+          return;
+        }
+      }
+      // ③ 직접 슈팅 — 골문에 가까울 때만 노립니다 (먼 프리킥은 아래 전개로)
+      if (key === 'direct') {
+        // 직접 슈팅 — 골문에 가까울수록 확률이 높고, 26u 밖에서는 노리지 않습니다
+        // (확률·조건은 기존 배포본 그대로 — 기본 지시에서는 게임 밸런스가 바뀌지 않게)
+        const chance = clamp(0.52 - dGoal / 60, 0.06, 0.36);
+        if (dGoal < 26 && this.rng() < chance) {
+          this.sayFixed('spFreeDirect', sp.side, { p: taker.name }, 'freekick');
+          this.shoot(taker, dGoal, 0);
+          return;
+        }
+      }
+      // ④ 각이 서지 않으면 기존 전개 — 가까운 앞선에게 30% 크로스, 아니면 패스로 재개
       const forward = mates.filter((e) => prog(e.x, side.dir) > prog(sp.x, side.dir) + 6);
       const rec = (forward.length ? forward : mates).sort((a, b) => dist(a, taker) - dist(b, taker))[0];
       if (rec && dGoal < 38 && this.rng() < 0.3) {
         const box = mates.filter((e) => prog(e.x, side.dir) > 75 && Math.abs(e.y - CY) < 16);
         const target = box[0] || rec;
-        this.ball.mode = 'pass';
-        this.ball.from = { x: taker.x, y: taker.y };
-        this.ball.to = { x: target.x, y: target.y };
-        this.ball.t = 0;
-        this.ball.dur = 2;
-        this.ball.passer = taker;
-        this.ball.receiver = target;
-        this.ball.cross = true;
-        this.ball.kind = 'cross';
-        this.ball.lead = false;
-        this.ball.owner = null;
-        this.ball.trail = [{ x: taker.x, y: taker.y }];
+        this.sayFixed('spFreeBox', sp.side, { p: taker.name }, 'freekick');
+        this.crossBall(taker, target, 'box', 2);
+        this.countCross(taker, side, target);
         return;
       }
-      if (rec) { this.passTo(taker, rec, false); return; }
+      if (rec) {
+        this.sayFixed('spFreeShort', sp.side, { p: taker.name }, 'freekick');
+        this.passTo(taker, rec, false);
+        return;
+      }
       this.ball.mode = 'loose';
     }
+  }
+
+  /* 세트피스 크로스 집계 — 패스·크로스 수를 선수/팀 기록에 남깁니다 */
+  countCross(taker, side, rec) {
+    taker.st.passes += 1;
+    side.stats.passes += 1;
+    side.stats.crossN += 1;
+    side.stats.passDist += dist(taker, rec);
+    side.stats.passN += 1;
+  }
+
+  /* 크로스 공 세팅 — 코너·프리킥이 같은 모양(궤적·타겟·지시 태그)을 쓰게 합니다 */
+  crossBall(taker, target, key = null, dur = 2) {
+    const b = this.ball;
+    b.mode = 'pass';
+    b.from = { x: taker.x, y: taker.y };
+    b.to = { x: target.x, y: target.y };
+    b.t = 0;
+    b.dur = clamp(dur, 1, 3);
+    b.passer = taker;
+    b.receiver = target;
+    b.cross = true;
+    b.kind = 'cross';
+    b.lead = false;
+    b.owner = null;
+    b.spKey = key;
+    b.trail = [{ x: taker.x, y: taker.y }];
   }
 
   /* ───────────── AI 전술 조정 · 교체 ───────────── */
@@ -2606,6 +2820,13 @@ export class Match {
   setTactic(tactic) {
     const side = this.sides[this.userSide];
     side.tactic = { ...side.tactic, ...tactic };
+  }
+  /* 경기 중 세트피스 지시 변경 — 코너킥·프리킥을 다음 세트피스부터 그대로 씁니다 */
+  setSetPiece(directive) {
+    const side = this.sides[this.userSide];
+    if (!side) return null;
+    side.setpiece = resolveSetPiece({ ...side.setpiece, ...(directive || {}) });
+    return side.setpiece;
   }
   /* 경기 중 역할 변경 — 자리에 붙은 역할을 바꿉니다 (선수는 그대로) */
   setRoleAt(e, role) {

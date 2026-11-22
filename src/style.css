@@ -321,6 +321,9 @@ html[data-theme="night"] .axis-chip.lo b { color: #37e07a; }
 html[data-theme="night"] .scout-axes li.hi b { color: #ff8a76; }
 html[data-theme="night"] .scout-axes li.lo b { color: #37e07a; }
 .scout-axes li small { grid-column: 1 / -1; font-size: 10.5px; color: var(--muted); font-weight: 700; line-height: 1.4; }
+.sp-note { font-size: 11px; font-weight: 800; color: var(--soft); border: 1.5px solid var(--line); background: var(--paper2); padding: 4px 7px; }
+.sp-note b { color: var(--ink); margin-right: 6px; }
+.sp-note em { font-style: normal; color: var(--ink); font-weight: 900; background: var(--yellow); padding: 0 3px; }
 .key-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .key-card { border: 1.5px solid var(--line); background: var(--paper2); padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
 .kc-top { display: flex; align-items: center; gap: 7px; }
@@ -468,6 +471,14 @@ button.chip-pos:hover { background: var(--ink); color: var(--yellow); }
 .seg button:hover:not(.on) { background: var(--paper2); }
 .axis-eff { font-size: 10.5px; color: var(--soft); font-weight: 700; line-height: 1.4; }
 .axes.compact { gap: 8px; }
+/* 세트피스 지시 — 세 칸짜리 선택줄이라 글자를 조금 키우고, 좁은 화면에서도 한 줄에 유지합니다 */
+.sp-axes .axis-head b { font-size: 12.5px; }
+.sp-row .seg button { font-size: 10px; padding: 5px 0; white-space: nowrap; }
+.sp-row .seg button.on { background: var(--yellow); color: #101014; }
+@media (max-width: 430px) {
+  .sp-row .seg button { font-size: 9.5px; }
+  .sp-axes .axis-eff { font-size: 10px; }
+}
 
 /* ── 이적 시장 ─────────────────────────────────────────────────── */
 .warn-bar { background: var(--coral); color: #2a0a04; border: var(--bw) solid var(--line); padding: 6px 10px; font-size: 12px; font-weight: 900; }

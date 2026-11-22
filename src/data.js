@@ -51,6 +51,41 @@ export const FORMATIONS = {
       { pos: 'FW', label: 'ST', x: 0.74, y: 0.50 },
     ],
   },
+  '4-1-4-1': {
+    name: '4-1-4-1', shape: '한 줄 두 줄',
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.05, y: 0.50 },
+      { pos: 'DF', label: 'LB', x: 0.20, y: 0.13 }, { pos: 'DF', label: 'CB', x: 0.17, y: 0.37 },
+      { pos: 'DF', label: 'CB', x: 0.17, y: 0.63 }, { pos: 'DF', label: 'RB', x: 0.20, y: 0.87 },
+      { pos: 'MF', label: 'DM', x: 0.33, y: 0.50 },
+      { pos: 'MF', label: 'LM', x: 0.47, y: 0.11 }, { pos: 'MF', label: 'CM', x: 0.43, y: 0.38 },
+      { pos: 'MF', label: 'CM', x: 0.43, y: 0.62 }, { pos: 'MF', label: 'RM', x: 0.47, y: 0.89 },
+      { pos: 'FW', label: 'ST', x: 0.73, y: 0.50 },
+    ],
+  },
+  '3-4-3': {
+    name: '3-4-3', shape: '전방 압박·폭',
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.05, y: 0.50 },
+      { pos: 'DF', label: 'CB', x: 0.18, y: 0.26 }, { pos: 'DF', label: 'CB', x: 0.16, y: 0.50 },
+      { pos: 'DF', label: 'CB', x: 0.18, y: 0.74 },
+      { pos: 'MF', label: 'LWB', x: 0.44, y: 0.08 }, { pos: 'MF', label: 'CM', x: 0.39, y: 0.36 },
+      { pos: 'MF', label: 'CM', x: 0.36, y: 0.64 }, { pos: 'MF', label: 'RWB', x: 0.44, y: 0.92 },
+      { pos: 'FW', label: 'LW', x: 0.70, y: 0.17 }, { pos: 'FW', label: 'ST', x: 0.75, y: 0.50 },
+      { pos: 'FW', label: 'RW', x: 0.70, y: 0.83 },
+    ],
+  },
+  '4-3-1-2': {
+    name: '4-3-1-2', shape: '중원 다이아몬드',
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.05, y: 0.50 },
+      { pos: 'DF', label: 'LB', x: 0.20, y: 0.13 }, { pos: 'DF', label: 'CB', x: 0.17, y: 0.37 },
+      { pos: 'DF', label: 'CB', x: 0.17, y: 0.63 }, { pos: 'DF', label: 'RB', x: 0.20, y: 0.87 },
+      { pos: 'MF', label: 'CM', x: 0.41, y: 0.28 }, { pos: 'MF', label: 'DM', x: 0.34, y: 0.50 },
+      { pos: 'MF', label: 'CM', x: 0.41, y: 0.72 }, { pos: 'MF', label: 'CAM', x: 0.58, y: 0.50 },
+      { pos: 'FW', label: 'ST', x: 0.75, y: 0.40 }, { pos: 'FW', label: 'ST', x: 0.75, y: 0.60 },
+    ],
+  },
 };
 export const FORMATION_IDS = Object.keys(FORMATIONS);
 export const POS_LABEL = { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' };

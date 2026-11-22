@@ -2,7 +2,7 @@
 import { local } from './store.js';
 import { makeRng, rint, pick, clamp, gauss, shuffle } from './rng.js';
 import { TEAM_DEFS, FORMATIONS, FORMATION_IDS, overall, valueOf, wageOf, buildSquad, freshSeasonStats, STAT_KEYS } from './data.js';
-import { defaultRoles, resolveRoles, roleFor } from './tactics.js';
+import { defaultRoles, resolveRoles, roleFor, resolveSetPiece } from './tactics.js';
 
 export const SAVE_KEY = 'career';
 export const SAVE_VERSION = 1;
@@ -19,6 +19,7 @@ export function mySetup(w) {
     formation: l.formation || myTeam(w).formation,
     tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(l.tactic || {}) },
     roles: Array.isArray(l.roles) ? l.roles : [],
+    setpiece: resolveSetPiece(l.setpiece),
   };
 }
 export function player(w, id) { return w.players[id]; }
@@ -427,6 +428,8 @@ export function autoLineup(w, teamId, formationId = null) {
     formation: fid, starters, bench: bench.map((p) => p.id),
     tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...t.tactic },
     roles: keepRoles ? resolveRoles(keepRoles, slots) : defaultRoles(slots),
+    // 세트피스 지시 — 내 팀은 감독이 고른 값, AI 팀은 팀 성향 값
+    setpiece: resolveSetPiece(teamId === w.myTeamId && w.myLineup?.setpiece ? w.myLineup.setpiece : t.setpiece),
   };
   if (teamId === w.myTeamId) return out;
   return out;
@@ -517,6 +520,14 @@ export function swapPlayers(w, starterIdx, playerId) {
 }
 
 /* 슬롯(자리)의 역할을 바꿉니다 — 역할은 선수가 아니라 자리에 붙습니다. */
+/* 세트피스 지시 — 코너킥·프리킥을 어떻게 찰지 고릅니다 (모르는 값은 기본값으로). */
+export function setSetPiece(w, type, key) {
+  const l = w.myLineup;
+  if (!l) return null;
+  l.setpiece = resolveSetPiece({ ...(l.setpiece || {}), [type]: key });
+  return l.setpiece;
+}
+
 export function setRole(w, slotIdx, role) {
   const l = w.myLineup;
   if (!l) return null;
@@ -761,7 +772,12 @@ export function loadWorld() {
   w.myLineup.roles = resolveRoles(w.myLineup.roles, slots);
   w.myLineup.tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(w.myLineup.tactic || {}) };
   w.myLineup.tactic.mentality = Number(w.myLineup.tactic.mentality) || 0;
-  for (const t of Object.values(w.teams)) t.tactic = { mentality: 0, ...(t.tactic || {}) };
+  // 세트피스 지시가 없던 세이브(3단계 이전)는 기본값(중앙 집중·직접 슈팅)으로 이어집니다.
+  w.myLineup.setpiece = resolveSetPiece(w.myLineup.setpiece);
+  for (const t of Object.values(w.teams)) {
+    t.tactic = { mentality: 0, ...(t.tactic || {}) };
+    t.setpiece = resolveSetPiece(t.setpiece);
+  }
   return w;
 }
 export function wipeWorld() { local.remove(SAVE_KEY); }

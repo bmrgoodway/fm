@@ -10,12 +10,17 @@
 //   11) 팀 성향(멘탈리티) 5단계 — 평균 라인·가담 인원·슈팅·득점/실점
 //   12) 포지션별 역할(Role) — 좌표·크로스/스루패스 선택·압박 반경·개인 슈팅/침투
 //   13) 역할·팀 성향이 없는 기존 세이브 호환
+//   17) 새 포메이션 3종(4-1-4-1·3-4-3·4-3-1-2) — 배치·역할·보드·경기 중 변경·스카우팅
+//   18) 세트피스 지시(코너 3종·프리킥 3종) — 배치·타겟·슛/크로스·중계·저장
+//   19) 세트피스 필드가 없는 구버전 세이브 호환
+//   20) 피치 위 미니 체력 바 색 기준(70%/45%)
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, lineupInfo, fillLineup, mySetup } from '../src/world.js';
-import { Match, lineupFor, applyResult, CY, W, aiMentalityPlan } from '../src/match.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup } from '../src/world.js';
+import { Match, lineupFor, applyResult, CY, W, H, aiMentalityPlan } from '../src/match.js';
 import { FORMATIONS } from '../src/data.js';
-import { roleFor, resolveRoles, defaultRole, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf } from '../src/tactics.js';
+import { roleFor, resolveRoles, defaultRole, rolesForLabel, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf, SET_PIECES, resolveSetPiece, setPieceLabel } from '../src/tactics.js';
 import { boardPos } from '../src/views.js';
+import { staminaColor, STAMINA_COLORS } from '../src/matchview.js';
 import { scoutReport, threatOf } from '../src/scout.js';
 
 const N = Number(process.argv[2] || 24);
@@ -1047,6 +1052,283 @@ console.log('\n[16] AI 감독 맞대응 — 후반 열세면 올리고, 리드�
   let g2 = 0;
   while (!lm.done && g2 < 6000) { lm.tick(); g2++; }
   ok(lm.done && lm.coachLog.every((c) => Number.isFinite(c.to)), '구버전 세이브 경기에서도 AI 맞대응·호환성 유지', `변경 ${lm.coachLog.length}회 · ${lm.score.home}-${lm.score.away}`);
+}
+
+/* ── 17. 새 포메이션 3종 ── */
+console.log('\n[17] 새 포메이션 3종 — 배치·역할·전술 보드·스카우팅');
+{
+  const NEW_F = ['4-1-4-1', '3-4-3', '4-3-1-2'];
+  ok(NEW_F.every((f) => !!FORMATIONS[f]), '포메이션 3종이 데이터에 등록됩니다', NEW_F.join(' · '));
+  ok(Object.keys(FORMATIONS).length === 7, '기존 4종 + 신규 3종 = 7종', Object.keys(FORMATIONS).join(' · '));
+  const slotsOf = (f) => FORMATIONS[f].slots;
+  ok(NEW_F.every((f) => slotsOf(f).length === 11 && slotsOf(f).filter((s) => s.pos === 'GK').length === 1),
+    '각 포메이션 11명(골키퍼 1명)', NEW_F.map((f) => `${f}:${slotsOf(f).length}`).join(' '));
+  ok(NEW_F.every((f) => slotsOf(f).every((s) => defaultRole(s.label) && rolesForLabel(s.label).length >= 1)),
+    '모든 자리 라벨에 기본 역할과 역할 선택지가 있습니다',
+    NEW_F.map((f) => `${f} ${slotsOf(f).map((s) => `${s.label}:${defaultRole(s.label)}`).slice(0, 3).join(',')}`).join(' | '));
+  ok(NEW_F.every((f) => slotsOf(f).every((s) => {
+    const p = boardPos(s, defaultRole(s.label), { mentality: 0 });
+    return p.x >= 0.05 && p.x <= 0.96 && p.y >= 0.05 && p.y <= 0.95;
+  })), '전술 보드 미리보기 좌표가 피치 안에 들어옵니다');
+  // 역할 선택지가 실제로 2개 이상인자리 (윙백↔풀백, 커버↔스토퍼 …)
+  const roleChoices = (f) => slotsOf(f).filter((s) => rolesForLabel(s.label).length >= 2).length;
+  ok(NEW_F.every((f) => roleChoices(f) >= 7), '자리별 역할 선택지가 그대로 붙습니다',
+    NEW_F.map((f) => `${f}:${roleChoices(f)}자리`).join(' '));
+
+  // 전역 최적 자동 배치 — 빈 자리·포지션 역전 없음
+  for (const f of NEW_F) {
+    const w = createWorld('gs', 991);
+    setFormation(w, f);
+    const info = lineupInfo(w);
+    const empty = info.slots.filter((s) => !s.p).length;
+    const bad = info.slots.filter((s) => s.p && s.factor < 0.99).length;
+    const dfAtFw = info.slots.filter((s) => s.slot.pos === 'FW' && s.p && s.p.pos === 'DF').length;
+    const fwAtDf = info.slots.filter((s) => s.slot.pos === 'DF' && s.p && s.p.pos === 'FW').length;
+    ok(empty === 0 && bad <= 2 && dfAtFw === 0 && fwAtDf === 0, `${f} 자동 배치 — 빈 자리 0, 포지션 불일치 ${bad}명`,
+      info.slots.map((s) => `${s.slot.label}:${s.p ? s.p.pos : '-'}`).join(' '));
+  }
+  // 경기 엔진 — 새 포메이션으로 11명이 서고 경기 중에도 바꿀 수 있음
+  for (const f of NEW_F) {
+    const l = { ...lineupFor(world, 'gs'), formation: f };
+    const m = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: l, awayLineup: lineupFor(world, 'dj'), seed: `nf-${f}`, cup: false, userSide: 'home' });
+    const on = m.sides.home.players.filter((e) => e.onPitch);
+    const labels = on.map((e) => e.label);
+    ok(on.length === 11 && on.every((e) => e.label && e.role),
+      `${f} — 11명이 자리·역할을 받고 경기를 시작합니다`, labels.join(','));
+    const next = f === '3-4-3' ? '4-1-4-1' : '3-4-3';
+    m.setFormation(next);
+    const after = m.sides.home.players.filter((e) => e.onPitch);
+    const nextLabels = after.map((e) => e.label).sort().join(',');
+    const wantLabels = FORMATIONS[next].slots.map((s) => s.label).sort().join(',');
+    ok(after.length === 11 && nextLabels === wantLabels && after.every((e) => e.role),
+      `경기 중 ${f} → ${next} 변경 — 11명이 새 자리로 재배치`, nextLabels);
+    m.holdHalf = false;
+    let g = 0;
+    while (!m.done && g < 6000) { m.tick(); g++; }
+    ok(m.done, `${f} 포메이션으로 90분 경기가 끝까지 진행됩니다`, `${m.score.home}-${m.score.away}`);
+  }
+  // 상대 스카우팅 — 새 포메이션의 예상 배치·공략이 나옴
+  const prevForm = world.teams.dj.formation;
+  for (const f of NEW_F) {
+    world.teams.dj.formation = f;
+    const rep = scoutReport(world, 'dj');
+    const slots = FORMATIONS[f].slots;
+    ok(rep.formation === f && !!rep.shape && rep.xi.length === 11
+      && rep.xi.map((x) => x.slot).join(',') === slots.map((s) => s.label).join(','),
+      `스카우팅 — ${f} 예상 배치(11명·자리) 일치`, `${rep.shape} · ${rep.xi.slice(0, 3).map((x) => `${x.slot}/${x.name}`).join(' ')}`);
+    const hint = rep.hints.find((h) => h.tag === '포메이션');
+    ok(!!hint && hint.text.length > 20, `스카우팅 — ${f} 포메이션 공략 힌트`, hint ? hint.text.slice(0, 34) + '…' : '없음');
+    ok(rep.hints.length >= 3 && rep.setpiece && rep.setpiece.corner && rep.setpiece.freekick,
+      `스카우팅 — ${f} 공략 3개 이상 · 세트피스 지시 포함`, rep.hints.map((h) => h.tag).join('·'));
+  }
+  world.teams.dj.formation = prevForm;
+
+  // 포메이션을 바꿔도 같은 라벨 자리의 역할이 따라갑니다 (신규 포메이션 포함)
+  const w7 = createWorld('gs', 4242);
+  setFormation(w7, '4-1-4-1');
+  const dmIdx = FORMATIONS['4-1-4-1'].slots.findIndex((s) => s.label === 'DM');
+  setRole(w7, dmIdx, 'b2b');
+  setFormation(w7, '4-3-1-2');
+  const dm2 = FORMATIONS['4-3-1-2'].slots.findIndex((s) => s.label === 'DM');
+  ok(w7.myLineup.roles[dm2] === 'b2b', '신규 포메이션 사이에서도 DM 역할이 자리를 따라갑니다', w7.myLineup.roles.join(','));
+}
+
+/* ── 18. 세트피스 지시 ── */
+console.log('\n[18] 세트피스 지시 — 코너 3종 · 프리킥 3종이 엔진에 반영');
+{
+  const prog1 = (x, dir) => (dir > 0 ? x : 100 - x);
+  ok(resolveSetPiece(undefined).corner === 'central' && resolveSetPiece(undefined).freekick === 'direct',
+    '지시가 없는 세이브·라인업은 기본값(중앙 집중 · 직접 슈팅)으로 이어집니다', JSON.stringify(resolveSetPiece(null)));
+  ok(resolveSetPiece({ corner: '??', freekick: 'x' }).corner === 'central', '모르는 지시 값은 기본값으로 보정', JSON.stringify(resolveSetPiece({ corner: '??' })));
+  ok(SET_PIECES.corner.opts.length === 3 && SET_PIECES.freekick.opts.length === 3, '코너킥·프리킥 각 3가지 지시',
+    SET_PIECES.corner.opts.map((o) => o.label).join('/') + ' · ' + SET_PIECES.freekick.opts.map((o) => o.label).join('/'));
+
+  // 세트피스를 바로 세팅하고, 찬 직후의 공 상태를 잽니다
+  function spProbe(type, key, seed, x, y) {
+    const l = lineupFor(world, 'gs');
+    l.setpiece = type === 'corner' ? { corner: key, freekick: 'direct' } : { corner: 'central', freekick: key };
+    const m = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: l, awayLineup: lineupFor(world, 'dj'), seed, cup: false, userSide: 'home' });
+    m.holdHalf = true; m.pause = 0; m.phase = 'setpiece';
+    m.setPiece(type, 'home', x, y);
+    m.pause = 0;
+    const before = { shots: m.sides.home.stats.shots, cross: m.sides.home.stats.crossN, pass: m.sides.home.stats.passes };
+    let g = 0;
+    while (m.phase === 'setpiece' && g < 10) { m.tick(); g++; }
+    const ev = m.events.filter((e) => e.type === type).slice(-1)[0];
+    return {
+      m, before, ev,
+      after: { shots: m.sides.home.stats.shots, cross: m.sides.home.stats.crossN, pass: m.sides.home.stats.passes },
+      kind: m.ball.kind, cross: !!m.ball.cross, spKey: m.ball.spKey, dur: m.ball.dur,
+      rec: m.ball.receiver && m.ball.receiver.onPitch ? m.ball.receiver : null,
+      recX: m.ball.receiver ? prog1(m.ball.receiver.x, 1) : 0,
+      recY: m.ball.receiver ? m.ball.receiver.y : 0,
+      text: ev ? ev.text : '',
+    };
+  }
+  // ① 코너 — 니어 포스트는 가까운 골대 쪽으로, 중앙 집중은 문전 가운데로
+  for (const [cy, sideName, sign] of [[1.1, '위쪽', -1], [H - 1.1, '아래쪽', 1]]) {
+    const near = spProbe('corner', 'near', `cn-${cy}`, W - 0.9, cy);
+    const cen = spProbe('corner', 'central', `cc-${cy}`, W - 0.9, cy);
+    const sh = spProbe('corner', 'short', `cs-${cy}`, W - 0.9, cy);
+    ok(near.kind === 'cross' && near.spKey === 'near' && near.dur === 1 && near.rec
+      && Math.sign(near.recY - CY) === sign && Math.abs(near.recY - CY) >= 3,
+      `코너 니어 포스트(${sideName}) — 가까운 골대 앞으로 낮게(1틱) 배달`,
+      near.rec ? `x ${near.recX.toFixed(1)} · y ${near.recY.toFixed(1)} · ${near.text.slice(0, 22)}…` : '리시버 없음');
+    ok(cen.kind === 'cross' && cen.spKey === 'central' && cen.dur === 2 && cen.rec && Math.abs(cen.recY - CY) <= 8,
+      `코너 중앙 집중(${sideName}) — 문전 가운데로 2틱 크로스`,
+      cen.rec ? `x ${cen.recX.toFixed(1)} · y ${cen.recY.toFixed(1)} · ${cen.text.slice(0, 22)}…` : '리시버 없음');
+    ok(near.recX > cen.recX, `니어 포스트 타겟이 중앙 집중보다 골문에 가깝습니다`, `${cen.recX.toFixed(1)} → ${near.recX.toFixed(1)}`);
+    ok(sh.kind === 'pass' && !sh.cross && sh.spKey === 'short' && sh.rec
+      && Math.hypot(sh.rec.x - (W - 0.9), sh.rec.y - cy) < 14 && sh.after.cross === sh.before.cross,
+      `코너 짧게 연결(${sideName}) — 코너 옆 동료에게 패스, 크로스 집계 없음`,
+      sh.rec ? `거리 ${Math.hypot(sh.rec.x - (W - 0.9), sh.rec.y - cy).toFixed(1)}u · ${sh.text.slice(0, 22)}…` : '리시버 없음');
+    ok(/니어|가까운 골대/.test(near.text) && /중앙|한가운데/.test(cen.text) && /짧/.test(sh.text),
+      '중계 멘트가 고른 지시를 그대로 말합니다', `${near.text.slice(0, 18)} / ${cen.text.slice(0, 18)} / ${sh.text.slice(0, 18)}`);
+  }
+  // 배치 — 니어 포스트는 문전 6야드 앞에 한 명이 서고, 짧게는 박스가 비워집니다
+  const nearSet = spProbe('corner', 'near', 'cn-spots', W - 0.9, H - 1.1);
+  const shortSet = spProbe('corner', 'short', 'cs-spots', W - 0.9, H - 1.1);
+  const inSix = (m) => m.sides.home.players.filter((e) => e.onPitch && e.pos !== 'GK' && prog1(e.x, 1) > 94 && Math.abs(e.y - CY) < 8).length;
+  const inBox = (m) => m.sides.home.players.filter((e) => e.onPitch && e.pos !== 'GK' && prog1(e.x, 1) > 84 && Math.abs(e.y - CY) < 18).length;
+  ok(inSix(nearSet.m) >= 1, '니어 포스트 배치 — 6야드 앞에 쇄도하는 선수가 있습니다', `${inSix(nearSet.m)}명`);
+  ok(inBox(shortSet.m) < inBox(nearSet.m), '짧게 연결 배치 — 박스를 비우고 2선에서 기다립니다', `${inBox(shortSet.m)}명 ↔ ${inBox(nearSet.m)}명`);
+
+  // ② 프리킥 — 22u 지점
+  const fkAt = { x: W - 18, y: CY };
+  const d = spProbe('freekick', 'direct', 'fk-d', fkAt.x, fkAt.y);
+  const b = spProbe('freekick', 'box', 'fk-b', fkAt.x, fkAt.y);
+  const sh2 = spProbe('freekick', 'short', 'fk-s', fkAt.x, fkAt.y);
+  ok(b.kind === 'cross' && b.spKey === 'box' && b.rec && prog1(b.rec.x, 1) > 74 && /박스|크로스/.test(b.text),
+    '프리킥 박스 투입 — 문전으로 크로스, 타겟은 박스 안', b.rec ? `타겟 x ${b.recX.toFixed(1)} · ${b.text.slice(0, 20)}…` : '없음');
+  ok(sh2.kind === 'pass' && !sh2.cross && sh2.spKey === 'short' && sh2.rec && Math.hypot(sh2.rec.x - fkAt.x, sh2.rec.y - fkAt.y) < 16 && /짧/.test(sh2.text),
+    '프리킥 짧게 패스 — 가까운 동료에게 넘겨 점유 유지', sh2.rec ? `거리 ${Math.hypot(sh2.rec.x - fkAt.x, sh2.rec.y - fkAt.y).toFixed(1)}u` : '없음');
+  // 직접 슈팅은 확률이 있어 여러 판본에서 한 번 이상 슛이 나와야 합니다
+  let shotHit = null, attempts = 0;
+  for (let i = 0; i < 20 && !shotHit; i++) {
+    const p = spProbe('freekick', 'direct', `fk-dir-${i}`, fkAt.x, fkAt.y);
+    if (p.after.shots > p.before.shots) shotHit = p;
+    if (p.kind === 'cross') attempts += 1;
+  }
+  ok(!!shotHit && /직접/.test(shotHit.text), '프리킥 직접 슈팅 — 직접 슈팅 멘트와 함께 슛이 나옵니다',
+    shotHit ? `${shotHit.text.slice(0, 30)}…` : '20번 모두 슛 없음');
+  ok(attempts <= 20, '직접 슈팅이 각이 안 서면 크로스·패스로 전환됩니다', `20판 중 크로스 ${attempts}회`);
+
+  // ③ 지시별 차이 — 20번씩 반복해 '세트피스 그 순간' 무엇을 했는지 셉니다
+  function fkHarvest(key, n = 40) {
+    const acc = { shots: 0, cross: 0, pass: 0 };
+    for (let i = 0; i < n; i++) {
+      const p = spProbe('freekick', key, `fkh-${key}-${i}`, fkAt.x, fkAt.y);
+      acc.shots += p.after.shots - p.before.shots;
+      acc.cross += p.after.cross - p.before.cross;
+      acc.pass += p.after.pass - p.before.pass;
+    }
+    return acc;
+  }
+  const hd = fkHarvest('direct'), hb = fkHarvest('box'), hs = fkHarvest('short');
+  ok(hd.shots >= 3 && hd.shots > hs.shots, '직접 슈팅은 세트피스 순간 곧바로 슛으로 이어집니다', `슛 직접 ${hd.shots} · 박스 ${hb.shots} · 짧게 ${hs.shots} (40회 기준)`);
+  ok(hb.cross > hd.cross && hb.cross >= 18, '박스 투입은 거의 매번 크로스를 올립니다', `크로스 직접 ${hd.cross} · 박스 ${hb.cross} · 짧게 ${hs.cross}`);
+  ok(hs.pass >= 18 && hs.cross === 0, '짧게 패스는 크로스 없이 패스로만 재개합니다', `패스 박스 ${hb.pass} · 짧게 ${hs.pass} · 크로스 ${hs.cross}`);
+
+  // ④ 경기 중 시트에서 바꾸면 다음 세트피스부터 적용
+  const l = lineupFor(world, 'gs');
+  const m2 = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: l, awayLineup: lineupFor(world, 'dj'), seed: 'sp-set', cup: false, userSide: 'home' });
+  m2.holdHalf = true; m2.pause = 0;
+  const got = m2.setSetPiece({ corner: 'near', freekick: 'short' });
+  ok(got.corner === 'near' && got.freekick === 'short' && m2.sides.home.setpiece.corner === 'near',
+    '경기 중 세트피스 지시 변경 — 엔진이 즉시 받습니다', JSON.stringify(got));
+  const spNear = (() => {
+    m2.phase = 'setpiece'; m2.pause = 0; m2.setPiece('corner', 'home', W - 0.9, H - 1.1); m2.pause = 0;
+    let g = 0;
+    while (m2.phase === 'setpiece' && g < 10) { m2.tick(); g++; }
+    return { key: m2.ball.spKey, y: m2.ball.receiver ? m2.ball.receiver.y : 0 };
+  })();
+  ok(spNear.key === 'near' && spNear.y > CY, '바꾼 지시가 다음 코너킥에 그대로 쓰입니다', `spKey ${spNear.key} · 타겟 y ${spNear.y.toFixed(1)}`);
+  ok(m2.setSetPiece({ corner: '???' }).corner === 'central', '경기 중 잘못된 값은 기본값(중앙 집중)으로 보정', JSON.stringify(m2.sides.home.setpiece));
+
+  // ⑤ 내 라인업에 저장되고, 다음 경기 라인업으로 이어짐
+  const w8 = createWorld('gs', 2026);
+  setSetPiece(w8, 'corner', 'short');
+  setSetPiece(w8, 'freekick', 'box');
+  ok(w8.myLineup.setpiece.corner === 'short' && w8.myLineup.setpiece.freekick === 'box', '전술 탭에서 고른 지시가 내 라인업에 저장됩니다', JSON.stringify(w8.myLineup.setpiece));
+  ok(mySetup(w8).setpiece.corner === 'short' && mySetup(w8).setpiece.freekick === 'box', '다음 경기 카드도 같은 지시를 읽습니다');
+  const l8 = lineupFor(w8, 'gs');
+  ok(l8.setpiece.corner === 'short' && l8.setpiece.freekick === 'box', '다음 경기 라인업이 저장된 지시를 그대로 씁니다');
+  const m8 = new Match({ world: w8, homeId: 'gs', awayId: 'dj', homeLineup: l8, awayLineup: lineupFor(w8, 'dj'), seed: 'sp-save', cup: false, userSide: 'home' });
+  ok(m8.sides.home.setpiece.corner === 'short' && m8.sides.home.setpiece.freekick === 'box',
+    '경기 엔진이 저장된 지시를 받아 시작합니다', JSON.stringify(m8.sides.home.setpiece));
+}
+
+/* ── 19. 세트피스 필드가 없는 구버전 세이브 ── */
+console.log('\n[19] 세트피스·새 포메이션 이전 세이브 호환');
+{
+  const bak = globalThis.localStorage;
+  globalThis.localStorage = {
+    s: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this.s, k) ? this.s[k] : null; },
+    setItem(k, v) { this.s[k] = String(v); },
+    removeItem(k) { delete this.s[k]; },
+    key(i) { return Object.keys(this.s)[i] ?? null; },
+    get length() { return Object.keys(this.s).length; },
+  };
+  const w = createWorld('bm', 808);
+  const legacy = JSON.parse(JSON.stringify(w));
+  delete legacy.myLineup.setpiece;
+  for (const t of Object.values(legacy.teams)) delete t.setpiece;
+  saveWorld(legacy);
+  const back = loadWorld();
+  ok(!!back && back.myLineup.setpiece.corner === 'central' && back.myLineup.setpiece.freekick === 'direct',
+    '세트피스 필드가 없는 세이브를 열면 기본 지시가 채워집니다', back ? JSON.stringify(back.myLineup.setpiece) : '불러오기 실패');
+  ok(!!back && Object.values(back.teams).every((t) => t.setpiece && t.setpiece.corner && t.setpiece.freekick),
+    'AI 구단도 기본 지시(중앙 집중·직접 슈팅)로 보정됩니다', back ? Object.values(back.teams).map((t) => t.setpiece.corner).join(',') : '');
+  globalThis.localStorage = bak;
+
+  // 새 필드가 없는 라인업으로 경기를 만들어도 세트피스가 정상 동작
+  const l = { ...lineupFor(world, 'gs') };
+  delete l.setpiece;
+  const m = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: l, awayLineup: lineupFor(world, 'dj'), seed: 'legacy-sp', cup: false, userSide: 'home' });
+  ok(m.sides.home.setpiece.corner === 'central' && m.sides.home.setpiece.freekick === 'direct',
+    '세트피스 필드가 없는 라인업도 기본 지시로 경기를 시작합니다', JSON.stringify(m.sides.home.setpiece));
+  m.holdHalf = false; m.pause = 0; m.phase = 'setpiece';
+  m.setPiece('corner', 'home', W - 0.9, 1.1);
+  m.pause = 0;
+  let g = 0;
+  while (m.phase === 'setpiece' && g < 10) { m.tick(); g++; }
+  ok(m.ball.kind === 'cross' && m.ball.spKey === 'central', '구버전 라인업에서도 코너킥이 정상 전개됩니다', `spKey ${m.ball.spKey}`);
+  let g2 = 0;
+  while (!m.done && g2 < 6000) { m.tick(); g2++; }
+  ok(m.done, '구버전 세이브 경기가 끝까지 진행됩니다', `${m.score.home}-${m.score.away}`);
+
+  // 예전 포메이션 이름만 있던 세이브 — 포메이션 목록이 늘어도 그대로 동작
+  const w2 = createWorld('gs', 5);
+  ok(!!FORMATIONS[w2.myLineup.formation], '세이브의 포메이션 이름이 새 목록에서도 유효합니다', w2.myLineup.formation);
+  const changed = createWorld('gs', 6);
+  changed.myLineup.formation = '4-1-4-1';
+  const changedBack = (() => {
+    const bak2 = globalThis.localStorage;
+    globalThis.localStorage = { s: {}, getItem(k) { return this.s[k] ?? null; }, setItem(k, v) { this.s[k] = String(v); }, removeItem(k) { delete this.s[k]; }, key(i) { return Object.keys(this.s)[i] ?? null; }, get length() { return Object.keys(this.s).length; } };
+    saveWorld(changed);
+    const r = loadWorld();
+    globalThis.localStorage = bak2;
+    return r;
+  })();
+  ok(!!changedBack && changedBack.myLineup.formation === '4-1-4-1' && changedBack.myLineup.roles.length === 11,
+    '새 포메이션을 고른 세이브도 그대로 열립니다', changedBack ? `${changedBack.myLineup.formation} · 역할 ${changedBack.myLineup.roles.length}` : '');
+}
+
+/* ── 20. 피치 위 체력 바 색 기준 ── */
+console.log('\n[20] 피치 위 미니 체력 바 — 색 기준');
+{
+  ok(staminaColor(100) === STAMINA_COLORS.good && staminaColor(70) === STAMINA_COLORS.good,
+    '체력 70% 이상은 초록', `100 → ${staminaColor(100)} · 70 → ${staminaColor(70)}`);
+  ok(staminaColor(69) === STAMINA_COLORS.warn && staminaColor(45) === STAMINA_COLORS.warn,
+    '체력 45~70%는 노랑', `69 → ${staminaColor(69)} · 45 → ${staminaColor(45)}`);
+  ok(staminaColor(44) === STAMINA_COLORS.low && staminaColor(12) === STAMINA_COLORS.low,
+    '체력 45% 미만은 빨강', `44 → ${staminaColor(44)} · 12 → ${staminaColor(12)}`);
+  // 화면·리플레이가 읽는 값 — 모든 선수가 체력과 카드 수를 들고 있습니다
+  const m = newMatch('gs', 'dj', 'stam');
+  const all = ['home', 'away'].every((s) => m.sides[s].players.every((e) => Number.isFinite(e.stamina) && Number.isFinite(e.st.yellow)));
+  ok(all, '피치에 그릴 체력·옐로카드 값이 모든 선수에게 있습니다',
+    m.sides.home.players.slice(0, 3).map((e) => `${e.num}:${Math.round(e.stamina)}%`).join(' '));
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

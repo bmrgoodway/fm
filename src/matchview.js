@@ -2,12 +2,20 @@
 // · 엔진은 틱(경기 15초)마다 상태를 만들고, 화면은 매 프레임 이전 좌표→현재 좌표를 보간(lerp)합니다.
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
 import { W as PW, H as PH, CY, GOAL_HALF, diveProgress } from './match.js';
-import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, nextRole, defaultRole } from './tactics.js';
+import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, nextRole, defaultRole, setPieceLabel, SET_PIECES } from './tactics.js';
 import { FORMATIONS } from './data.js';
 import * as X from './world.js';
-import { esc } from './views.js';
+import { esc, setPieceRows } from './views.js';
 
 const SPEEDS = [{ v: 1, label: '1x' }, { v: 2, label: '2x' }, { v: 4, label: '4x' }, { v: 0, label: '즉시' }];
+
+/* 미니 체력 바 색 — 70% 이상 초록, 45~70% 노랑, 45% 미만 빨강.
+   화면과 자체 점검이 같은 기준을 쓰도록 한곳에 둡니다. */
+export const STAMINA_COLORS = { good: '#2fe36b', warn: '#ffdc1a', low: '#ff614a' };
+export function staminaColor(stamina) {
+  const v = Number.isFinite(stamina) ? stamina : 100;
+  return v >= 70 ? STAMINA_COLORS.good : v >= 45 ? STAMINA_COLORS.warn : STAMINA_COLORS.low;
+}
 const BASE_MS = 230;          // 1x 에서 한 틱(경기 15초)에 걸리는 실제 시간
 const lerp = (a, b, t) => a + (b - a) * t;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -54,6 +62,27 @@ export function mountMatch(app, m, meta) {
     return out;
   };
   diag.ballAt = () => ({ x: Math.round(m.ball.x * 10) / 10, y: Math.round(m.ball.y * 10) / 10, mode: m.ball.mode, owner: m.ball.owner ? m.ball.owner.name : null, ownerPos: m.ball.owner ? m.ball.owner.pos : null });
+  /* 체력 바·카드 배지의 '화면 좌표와 색' — 자동 점검이 캔버스 픽셀과 대조합니다 */
+  diag.bars = () => {
+    const pad = 2.0;
+    const scale = Math.min(cssW / (PW + pad * 2), cssH / (PH + pad * 2));
+    const ox = (cssW - (PW + pad * 2) * scale) / 2 + pad * scale;
+    const oy = (cssH - (PH + pad * 2) * scale) / 2 + pad * scale;
+    const r = Math.max(6, scale * 2.05);
+    const barW = Math.max(10, r * 1.9), barH = Math.max(2.4, r * 0.3);
+    const list = [];
+    for (const s of ['home', 'away']) {
+      for (const e of m.sides[s].players) {
+        if (!e.onPitch) continue;
+        list.push({
+          side: s, num: e.num, stamina: Math.round(e.stamina), color: staminaColor(e.stamina), yellow: e.st.yellow,
+          x: ox + e.x * scale, y: oy + e.y * scale - r - barH - Math.max(2.4, r * 0.44),
+          w: barW, h: barH,
+        });
+      }
+    }
+    return { dpr, cssW, cssH, scale, list };
+  };
   diag.mentality = () => ({
     home: Number(m.sides.home.tactic.mentality) || 0, away: Number(m.sides.away.tactic.mentality) || 0,
     log: (m.coachLog || []).map((c) => ({ minute: c.minute, side: c.side, from: c.from, to: c.to })),
@@ -215,7 +244,7 @@ export function mountMatch(app, m, meta) {
     const b = m.ball;
     const f = {
       t: now, tick: m.t, phase: m.phase,
-      sp: m.sp ? { x: m.sp.x, y: m.sp.y } : null,
+      sp: m.sp ? { x: m.sp.x, y: m.sp.y, type: m.sp.type, key: m.spDirective(m.sp.type, m.sp.side) } : null,
       netShake: !!(m.goalFlash && (m.t - m.goalFlash.at) < 14 && m.phase === 'goal'),
       goalFlash: m.goalFlash && (m.t - m.goalFlash.at) < 20 ? { name: m.goalFlash.name, side: m.goalFlash.side } : null,
       score: { ...m.score },
@@ -482,11 +511,22 @@ export function mountMatch(app, m, meta) {
       ctx.restore();
     }
 
-    // 세트피스 표시 (코너·프리킥 지점)
+    // 세트피스 표시 (코너·프리킥 지점) + 지금 지시(니어 포스트·박스 투입…)를 함께
     if (S.sp) {
       const sx = CX(S.sp.x), sy = CYp(S.sp.y);
       ctx.beginPath(); ctx.arc(sx, sy, Math.max(8, scale * 1.6), 0, Math.PI * 2);
       ctx.strokeStyle = '#ffdc1a'; ctx.lineWidth = 2.4; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
+      if (S.sp.type && S.sp.key) {
+        const label = `${SET_PIECES[S.sp.type]?.name || ''} · ${setPieceLabel(S.sp.type, S.sp.key)}`;
+        ctx.font = `900 ${Math.max(9, Math.round(scale * 1.15))}px "Pretendard Variable", Pretendard, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(label).width + 10, th = Math.max(15, scale * 1.9);
+        const lx = Math.min(cssW - tw / 2 - 2, Math.max(tw / 2 + 2, sx)), ly = Math.max(th / 2 + 2, sy - Math.max(16, scale * 2.4));
+        ctx.fillStyle = 'rgba(16,16,20,.82)';
+        ctx.fillRect(lx - tw / 2, ly - th / 2, tw, th);
+        ctx.fillStyle = '#ffdc1a';
+        ctx.fillText(label, lx, ly + 0.5);
+      }
     }
 
     // 공의 '지금 화면 위치' — 선수 링·궤적도 이 위치에 맞춰 그립니다
@@ -551,28 +591,33 @@ export function mountMatch(app, m, meta) {
           ctx.beginPath(); ctx.arc(px, py, (r + 4.4) * pulse, 0, Math.PI * 2);
           ctx.strokeStyle = '#ffdc1a'; ctx.lineWidth = 2.4; ctx.setLineDash([5, 4]); ctx.stroke(); ctx.setLineDash([]);
         }
-        // 체력 30% 이하
-        if (e.stamina < 32) {
-          ctx.beginPath(); ctx.arc(px, py, r + 6, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * (e.stamina / 100));
-          ctx.strokeStyle = '#ff614a'; ctx.lineWidth = 2; ctx.stroke();
-        }
-        // 카드·부상 배지
-        let bx = px + r * 0.85, by = py - r * 1.15;
+        // ── 미니 체력 바 ──────────────────────────────────────────
+        // 바둑알 바로 위에 얇게 — 등번호(원 안)와 공(발밑)을 가리지 않는 자리입니다.
+        // 70%+ 초록 · 45~70% 노랑 · 45% 미만 빨강: 교체 타이밍을 피치에서 바로 읽습니다.
+        const stv = clamp01((Number.isFinite(e.stamina) ? e.stamina : 100) / 100);
+        const barW = Math.max(10, r * 1.9), barH = Math.max(2.4, r * 0.3);
+        const barX = px - barW / 2, barY = py - r - barH - Math.max(2.4, r * 0.44);
+        ctx.fillStyle = 'rgba(16,16,20,.85)';
+        ctx.fillRect(barX - 0.9, barY - 0.9, barW + 1.8, barH + 1.8);
+        ctx.fillStyle = staminaColor(e.stamina);
+        ctx.fillRect(barX, barY, Math.max(0.9, barW * stv), barH);
+        // 카드·부상 배지 — 체력 바와 같은 줄의 양 끝에 붙여 도트 위를 깔끔하게 유지합니다
+        const cardW = Math.max(2.8, r * 0.44), cardH = Math.max(4, r * 0.62);
         if (e.st.yellow > 0 && e.st.red === 0) {
+          const cxx = barX + barW + 1.6, cyy = barY - (cardH - barH) / 2;
           ctx.fillStyle = '#ffdc1a'; ctx.strokeStyle = '#101014'; ctx.lineWidth = 1;
-          ctx.fillRect(bx, by, r * 0.52, r * 0.72); ctx.strokeRect(bx, by, r * 0.52, r * 0.72);
-          bx -= r * 0.62;
+          ctx.fillRect(cxx, cyy, cardW, cardH); ctx.strokeRect(cxx, cyy, cardW, cardH);
         }
         if (e.st.red > 0) {
-          ctx.fillStyle = '#ff614a';
-          ctx.fillRect(px + r * 0.85, py - r * 1.15, r * 0.52, r * 0.72);
-          ctx.strokeStyle = '#101014'; ctx.strokeRect(px + r * 0.85, py - r * 1.15, r * 0.52, r * 0.72);
+          const cxx = barX + barW + 1.6, cyy = barY - (cardH - barH) / 2;
+          ctx.fillStyle = '#ff614a'; ctx.strokeStyle = '#101014'; ctx.lineWidth = 1;
+          ctx.fillRect(cxx, cyy, cardW, cardH); ctx.strokeRect(cxx, cyy, cardW, cardH);
         }
         if (e.injured) {
-          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(2, r * 0.28);
-          const ix = px - r * 1.1, iy = py - r * 1.2, s2 = r * 0.42;
+          const s2 = Math.max(1.8, r * 0.28), ix = barX - cardW - 2.2, iy = barY + barH / 2;
+          ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(2, r * 0.24);
           ctx.beginPath(); ctx.moveTo(ix - s2, iy); ctx.lineTo(ix + s2, iy); ctx.moveTo(ix, iy - s2); ctx.lineTo(ix, iy + s2); ctx.stroke();
-          ctx.strokeStyle = '#ff614a'; ctx.lineWidth = Math.max(1.2, r * 0.16);
+          ctx.strokeStyle = '#ff614a'; ctx.lineWidth = Math.max(1.1, r * 0.13);
           ctx.beginPath(); ctx.moveTo(ix - s2, iy); ctx.lineTo(ix + s2, iy); ctx.moveTo(ix, iy - s2); ctx.lineTo(ix, iy + s2); ctx.stroke();
         }
         // 득점자 강조
@@ -865,6 +910,9 @@ export function mountMatch(app, m, meta) {
       <div class="drawer-sec"><h4>포지션별 역할 <span class="hint-inline">자리를 누르면 역할이 바뀝니다</span></h4>
         ${roleGridHtml()}
       </div>
+      <div class="drawer-sec"><h4>세트피스 지시 <span class="hint-inline">다음 세트피스부터</span></h4>
+        <ul class="axes compact sp-axes">${setPieceRows(side.setpiece, (t, k) => `data-msp="${t}" data-key="${k}"`, { compact: true })}</ul>
+      </div>
       <div class="drawer-sec"><h4>전술 4축</h4>
         <ul class="axes compact">${AXES.map((a) => {
           const v = side.tactic[a.key] || 0;
@@ -892,6 +940,13 @@ export function mountMatch(app, m, meta) {
         app.world.myLineup.roles = X.remapRoles(app.world.myLineup.roles, prev, b.dataset.mform);
         syncRoles();
         renderDrawer(); draw(1);
+      }));
+      el.querySelectorAll('[data-msp]').forEach((b) => b.addEventListener('click', () => {
+        const got = m.setSetPiece({ [b.dataset.msp]: b.dataset.key });
+        if (!got) return;
+        app.world.myLineup.setpiece = { ...got };
+        app.save(); renderDrawer();
+        app.toast?.(`세트피스 · ${setPieceLabel(b.dataset.msp, got[b.dataset.msp])}`, 'ok');
       }));
       el.querySelectorAll('[data-mrole]').forEach((b) => b.addEventListener('click', () => {
         const e = m.sides[m.userSide].players.find((p) => p.id === b.dataset.mrole && p.onPitch);
@@ -960,6 +1015,12 @@ export function mountMatch(app, m, meta) {
         <ul class="axes compact">${axes}</ul>
         <h4 class="ht-sub">포지션별 역할 <span class="hint-inline">자리를 누르면 역할이 바뀝니다</span></h4>
         ${roleGridHtml()}
+        <h4 class="ht-sub">포메이션 <span class="hint-inline">후반 시작부터</span></h4>
+        <div class="form-row" role="group" aria-label="포메이션">
+          ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-htform="${f}" aria-pressed="${side.formation === f}" title="${esc(FORMATIONS[f].shape)}">${f}</button>`).join('')}
+        </div>
+        <h4 class="ht-sub">세트피스 지시</h4>
+        <ul class="axes compact sp-axes">${setPieceRows(side.setpiece, (t, k) => `data-htsp="${t}" data-key="${k}"`, { compact: true })}</ul>
       </div>
       <div><h4>선수 교체 <span class="pill">${5 - side.subsUsed}명 남음</span></h4>
         <p class="hint">나갈 선수를 고른 뒤 들어올 후보를 누르세요.</p>
@@ -989,6 +1050,23 @@ export function mountMatch(app, m, meta) {
       if (!got) return;
       syncRoles();
       app.toast?.(`${label} · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+      renderHalftime();
+    }));
+    $('ht-body').querySelectorAll('[data-htform]').forEach((b) => b.addEventListener('click', () => {
+      const prev = app.world.myLineup.formation || side.formation;
+      m.setFormation(b.dataset.htform);
+      app.world.myLineup.formation = b.dataset.htform;
+      app.world.myLineup.roles = X.remapRoles(app.world.myLineup.roles, prev, b.dataset.htform);
+      syncRoles();
+      app.toast?.(`포메이션 · ${b.dataset.htform} — 후반부터 이 모양으로 섭니다`, 'ok');
+      renderHalftime();
+    }));
+    $('ht-body').querySelectorAll('[data-htsp]').forEach((b) => b.addEventListener('click', () => {
+      const got = m.setSetPiece({ [b.dataset.htsp]: b.dataset.key });
+      if (!got) return;
+      app.world.myLineup.setpiece = { ...got };
+      app.save();
+      app.toast?.(`세트피스 · ${setPieceLabel(b.dataset.htsp, got[b.dataset.htsp])}`, 'ok');
       renderHalftime();
     }));
     $('ht-body').querySelectorAll('[data-htout]').forEach((b) => b.addEventListener('click', () => { outPid = b.dataset.htout; renderHalftime(); }));

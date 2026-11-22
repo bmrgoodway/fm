@@ -154,6 +154,53 @@ export function resolveRoles(roles, slots) {
   return slots.map((s, i) => roleFor(s.label, Array.isArray(roles) ? roles[i] : null));
 }
 
+/* ─────────────────────────── 세트피스 지시 ───────────────────────────
+   코너킥·프리킥마다 '어떻게 차는지'를 하나씩 고릅니다.
+   화면(전술 탭·경기 중 시트·하프타임 라커룸)과 경기 엔진(arrangeSetPiece·executeSetPiece)이
+   같은 키를 읽으므로, 고른 지시가 배치·타겟·슛/크로스·중계에 그대로 드러납니다. */
+export const SET_PIECES = {
+  corner: {
+    name: '코너킥', icon: '🚩', def: 'central',
+    opts: [
+      { key: 'near', label: '니어 포스트', short: '니어', effect: '가까운 골대 앞으로 낮게 — 첫 선수가 흘려 주고 문전이 혼전이 됩니다' },
+      { key: 'central', label: '중앙 집중', short: '중앙', effect: '박스 한가운데에 머리 좋은 선수를 모아 정면 크로스로 밀어붙입니다' },
+      { key: 'short', label: '짧게 연결', short: '짧게', effect: '가까운 동료에게 짧게 — 수비를 끌어내 점유를 이어 갑니다' },
+    ],
+  },
+  freekick: {
+    name: '프리킥', icon: '🎯', def: 'direct',
+    opts: [
+      { key: 'direct', label: '직접 슈팅', short: '슛', effect: '슈팅 좋은 선수가 직접 감아 찹니다 — 골문에 가까울수록 위험합니다' },
+      { key: 'box', label: '박스 투입', short: '박스', effect: '박스로 크로스를 올려 제공권 좋은 선수의 머리를 노립니다' },
+      { key: 'short', label: '짧게 패스', short: '짧게', effect: '옆 동료에게 짧게 넘겨 점유를 지키고 재공격을 준비합니다' },
+    ],
+  },
+};
+export const SET_PIECE_TYPES = Object.keys(SET_PIECES);
+export const DEFAULT_SET_PIECE = { corner: 'central', freekick: 'direct' };
+export function setPieceDef(type) { return SET_PIECES[type] || SET_PIECES.corner; }
+export function setPieceOpts(type) { return setPieceDef(type).opts; }
+export function setPieceDefault(type) { return setPieceDef(type).def; }
+/* 지시 키를 확인하고, 모르는 값(구버전 세이브·오타)이면 기본값으로 돌립니다. */
+export function setPieceOpt(type, key) {
+  const opts = setPieceOpts(type);
+  return opts.find((o) => o.key === key) || opts.find((o) => o.key === setPieceDefault(type)) || opts[0];
+}
+export const setPieceKey = (type, key) => setPieceOpt(type, key).key;
+export const setPieceLabel = (type, key) => setPieceOpt(type, key).label;
+export const setPieceEffect = (type, key) => setPieceOpt(type, key).effect;
+/* { corner, freekick } 를 항상 온전한 형태로 맞춥니다. */
+export function resolveSetPiece(sp) {
+  const src = sp && typeof sp === 'object' ? sp : {};
+  const out = {};
+  for (const t of SET_PIECE_TYPES) out[t] = setPieceKey(t, src[t]);
+  return out;
+}
+export const setPieceWords = (sp) => {
+  const s = resolveSetPiece(sp);
+  return `${SET_PIECES.corner.name} ${setPieceLabel('corner', s.corner)} · ${SET_PIECES.freekick.name} ${setPieceLabel('freekick', s.freekick)}`;
+};
+
 export const tacticWords = (t) => {
   const w = [];
   if ((t.press || 0) > 0.35) w.push('게겐프레싱');
