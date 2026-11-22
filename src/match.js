@@ -6,7 +6,7 @@
 import { makeRng, clamp, rint, pick } from './rng.js';
 import { FORMATIONS } from './data.js';
 import { posFactor, autoLineup, squadOf, available } from './world.js';
-import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING } from './tactics.js';
+import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING, mentalityOf, stepLabel } from './tactics.js';
 
 export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
 const TPM = 4;            // 1분 = 4틱 (한 틱 = 경기 15초)
@@ -60,6 +60,39 @@ const hasJong = (word) => {
 const JOSA = { '가': ['이', '가'], '는': ['은', '는'], '를': ['을', '를'], '와': ['과', '와'] };
 // 골문 쪽으로 얼마나 전진했는지 (0=자기 골문, 100=상대 골문)
 const prog = (x, dir) => (dir > 0 ? x : W - x);
+
+/* ─────────────────────────── AI 감독 맞대응 ───────────────────────────
+   득실차와 경기 시간으로 AI 감독이 노리는 성향을 정합니다 (null = 손대지 않음).
+   후반 지고 있으면 공격적 → 총공세, 이기고 있으면 수비적 → 잠그기,
+   동점으로 돌아오면 균형. 화면·자체 점검·엔진이 같은 함수를 씁니다. */
+export function aiMentalityPlan(diff, minute) {
+  if (minute >= 82 && diff > 0) return -1;      // 이기고 있음 · 종반 → 잠그기
+  if (minute >= 70 && diff > 0) return -0.5;    // 이기고 있음 · 후반 → 수비적
+  if (minute >= 72 && diff < 0) return 1;       // 지고 있음 · 종반 → 총공세
+  if (minute >= 62 && diff <= -2) return 1;     // 두 골 차 열세는 더 일찍 총공세
+  if (minute >= 55 && diff < 0) return 0.5;     // 지고 있음 · 후반 → 공격적
+  if (minute >= 60 && diff === 0) return 0;     // 동점 복귀 → 균형
+  return null;
+}
+
+/* 전술을 바꾼 순간의 중계 문장 — 무엇을 왜 바꿨는지 한 줄로 남깁니다.
+   분은 이미 event.label·티커가 달고 있으므로 문장 안에는 넣지 않습니다. */
+export function coachLine(side, from, to) {
+  const name = side?.team?.short || '상대';
+  const a = mentalityOf(from).name, b = mentalityOf(to).name;
+  const ax = `라인 ${stepLabel(side?.tactic?.line)} · 압박 ${stepLabel(side?.tactic?.press)}`;
+  if (to > from) {
+    return to >= 1
+      ? `🔧 ${name} 감독, 승부수 — ${a} → ${b}. 수비수까지 올려 문전을 채웁니다 (${ax}).`
+      : `🔧 ${name} 감독, 승부수 — ${a} → ${b}. 라인을 올리고 압박을 강화합니다 (${ax}).`;
+  }
+  if (to < from) {
+    return to <= -1
+      ? `🔧 ${name} 감독 — ${a} → ${b}. 두 줄로 내려앉아 골문을 닫습니다 (${ax}).`
+      : `🔧 ${name} 감독 — ${a} → ${b}. 라인을 내리고 압박을 줄여 리드를 지킵니다 (${ax}).`;
+  }
+  return `🔧 ${name} 감독 — ${a} → ${b}. 동점이 되자 라인과 압박을 원래대로 돌립니다.`;
+}
 
 /* ─────────────────────────── 중계 멘트 풀 ───────────────────────────
    {p}=주인공, {p2}=두 번째 선수, {t}=팀 약칭, {n}=숫자 */
@@ -245,10 +278,12 @@ function makeEntity(world, pid, slot, dir, side, role = null) {
 }
 
 export class Match {
-  constructor({ world, homeId, awayId, homeLineup, awayLineup, seed, cup = false, userSide = 'home' }) {
+  constructor({ world, homeId, awayId, homeLineup, awayLineup, seed, cup = false, userSide = 'home', opponentCoach = true }) {
     this.world = world;
     this.cup = cup;
     this.userSide = userSide;
+    // 상대 AI 감독의 맞대응을 끄고 축 하나만 재고 싶을 때(밸런스 계측) false 로 넘깁니다.
+    this.opponentCoach = opponentCoach !== false;
     this.rng = makeRng(String(seed));
     this.homeId = homeId;
     this.awayId = awayId;
@@ -273,6 +308,7 @@ export class Match {
     this.offsideFlash = null;   // 피치에 잠깐 띄우는 🚩 오프사이드 표시
     this.offsideGoals = 0;      // 오프사이드 위치에서 나온 득점(항상 0이어야 합니다) — 회귀 점검용
     this.offsideCd = { home: 0, away: 0 };   // 방금 깃발이 올라간 팀은 잠시 라인을 확인합니다
+    this.coachLog = [];         // AI 감독의 전술 변경 기록(틱·분·성향) — 화면·점검이 함께 읽습니다
     this.lastSetPieceT = -99;   // 마지막 세트피스 시각(틱) — 화면·점검에서 흐름 판단용
     this.lastSwitchT = -99;     // 마지막 사이드 전환 시각(틱) — 바로 되돌리는 패스를 막는 데 씁니다
     this.lastSwitchFrom = null; // 그 전환이 출발한 쪽(y) — 되돌림 판정 기준
@@ -326,6 +362,8 @@ export class Match {
     return {
       name: side, teamId, dir, team, formation: lineup.formation || '4-3-3',
       tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic) },
+      // 감독이 성향을 바꿨다가 균형으로 돌아올 때 되돌릴 '원래 전술'
+      baseTactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic) },
       players: starters, bench, subsUsed: 0, appeared: [...starters], reds: 0,
       stats: {
         shots: 0, onTarget: 0, xg: 0, possTicks: 0, passes: 0, passOk: 0, tackles: 0, saves: 0,
@@ -535,7 +573,7 @@ export class Match {
     this.expireDives();
     if (this.phase === 'play') this.sampleSpace();
     if (this.t % 30 === 1) this.aiManage();
-    this.aiAdjust();
+    this.aiCoach();
     this.checkClock();
   }
 
@@ -2510,19 +2548,43 @@ export class Match {
   }
 
   /* ───────────── AI 전술 조정 · 교체 ───────────── */
-  aiAdjust() {
-    if (this.t % 60 !== 0) return;
+  /* AI 감독이 노리는 성향 — 득실차와 시간으로 정합니다.
+     후반 지고 있으면 공격적(55'~)·총공세(72'~, 두 골 차면 62'~),
+     후반 이기고 있으면 수비적(70'~)·잠그기(82'~), 동점이면 균형으로 돌아옵니다. */
+  aiCoach() {
+    if (this.done || !this.opponentCoach) return;
     for (const s of ['home', 'away']) {
-      const side = this.sides[s];
       if (s === this.userSide) continue;
+      const side = this.sides[s];
+      if (!side) continue;
       const diff = this.score[s] - this.score[this.opposing[s]];
-      const t = side.tactic;
-      if (diff < 0) { t.line = clamp(t.line + 0.15, -1, 1); t.press = clamp(t.press + 0.15, -1, 1); }
-      else if (diff > 0) { t.line = clamp(t.line - 0.1, -1, 1); t.press = clamp(t.press - 0.1, -1, 1); }
-      if (this.t > 300 && diff < 0) t.route = 0.5;
+      const minute = this.minute();
+      const target = aiMentalityPlan(diff, minute);
+      if (target == null) continue;
+      const cur = Number(side.tactic.mentality) || 0;
+      if (Math.abs(cur - target) < 0.01) continue;
+      side.tactic.mentality = target;
+      this.applyCoachAxes(side, target);
+      const text = coachLine(side, cur, target);
+      this.coachLog.push({ tick: this.t, minute, side: s, diff, from: cur, to: target, text });
+      this.pushEvent({ type: 'ai-tactic', side: s, text, from: cur, to: target, minute: this.minute() });
     }
   }
-
+  /* 성향에 맞춰 라인·압박을 함께 움직입니다 — 성향 배지와 피치 모양이 어긋나지 않게. */
+  applyCoachAxes(side, v) {
+    const t = side.tactic;
+    if (v > 0) {
+      t.line = clamp(Math.max(Number(t.line) || 0, v >= 1 ? 0.7 : 0.4), -1, 1);
+      t.press = clamp(Math.max(Number(t.press) || 0, v >= 1 ? 0.7 : 0.4), -1, 1);
+    } else if (v < 0) {
+      t.line = clamp(Math.min(Number(t.line) || 0, v <= -1 ? -0.6 : -0.3), -1, 1);
+      t.press = clamp(Math.min(Number(t.press) || 0, v <= -1 ? -0.4 : -0.2), -1, 1);
+    } else {
+      const base = side.baseTactic || { line: 0, press: 0 };
+      t.line = Number(base.line) || 0;
+      t.press = Number(base.press) || 0;
+    }
+  }
   aiManage() {
     for (const s of ['home', 'away']) {
       if (s === this.userSide) continue;

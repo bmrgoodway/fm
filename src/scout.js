@@ -1,0 +1,128 @@
+// 상대 스카우팅 — 다음 상대의 '실제' 라인업·전술·선수 데이터에서
+// 예상 포메이션 · 주 전술 성향 · 핵심 경계 선수 · 맞춤 공략 힌트를 뽑습니다.
+// 화면(views.js)과 자체 점검(scripts/fm-selftest.mjs)이 같은 값을 읽으므로,
+// 화면에 적힌 내용과 경기에 실제로 들어가는 값이 어긋나지 않습니다.
+import { FORMATIONS, POS_LABEL, STAT_LABEL } from './data.js';
+import { AXES, stepLabel, tacticWords, mentalityOf, roleLabel, defaultRole, roleShort } from './tactics.js';
+import { lineupFor } from './match.js';
+import { standings, teamPower } from './world.js';
+
+const STAT_ORDER = ['spd', 'sho', 'pas', 'dri', 'def', 'vis', 'sta'];
+
+/* 선수의 가장 강한 능력치 두 개 — 경계 카드에 그대로 적습니다. */
+function topStats(p, n = 2) {
+  return STAT_ORDER
+    .map((k) => ({ key: k, label: STAT_LABEL[k], value: p.stats[k] || 0 }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n);
+}
+
+/* 공격 위협 지수 — 슈팅·드리블·스피드를 중심으로 보고, 공격 포지션에 가산합니다.
+   (수비수도 세트피스·오버래핑 위협이 있으니 0으로 두지 않습니다) */
+export function threatOf(p) {
+  const s = p.stats || {};
+  const posBonus = p.pos === 'FW' ? 5 : p.pos === 'MF' ? 2 : p.pos === 'DF' ? 0.5 : 0;
+  return (s.sho || 0) * 0.34 + (s.dri || 0) * 0.24 + (s.spd || 0) * 0.18
+    + (s.pas || 0) * 0.1 + (s.vis || 0) * 0.08 + posBonus;
+}
+
+/* 경계 선수 한 명의 '막는 법' — 그 선수의 최고 능력치에 맞춰 문장을 고릅니다. */
+function markHint(p, stat) {
+  const pos = POS_LABEL[p.pos] || '선수';
+  switch (stat.key) {
+    case 'sho': return `${pos} · 슈팅 ${stat.value} — 박스 안에서 방아쇠가 빠릅니다. 문전에서 몸을 붙여 슈팅 각을 지우세요.`;
+    case 'dri': return `${pos} · 드리블 ${stat.value} — 개인기로 수비를 벗겨냅니다. 태클보다 지연 수비로 2선 지원을 기다리세요.`;
+    case 'spd': return `${pos} · 스피드 ${stat.value} — 뒷공간으로 뛰어넘습니다. 수비 라인 뒤 공간 관리를 늦추지 마세요.`;
+    case 'pas': return `${pos} · 패스 ${stat.value} — 동료를 살리는 패스를 뿌립니다. 패스 길목을 먼저 막으세요.`;
+    case 'vis': return `${pos} · 시야 ${stat.value} — 라인 사이에서 킬패스를 찾습니다. 홀딩으로 그 자리를 덮으세요.`;
+    case 'def': return `${pos} · 수비 ${stat.value} — 이 선수를 뚫으면 상대 전개가 흔들립니다. 그쪽으로 압박을 몰아보세요.`;
+    default: return `${pos} · 체력 ${stat.value} — 경합에서 잘 버팁니다. 템포를 올려 체력을 먼저 쓰게 만드세요.`;
+  }
+}
+
+/* 축(라인·패스·압박·루트)에서 나오는 공략 — 경기 엔진이 실제로 반응하는 방향으로 적습니다. */
+function axisHints(tactic) {
+  const out = [];
+  const v = (k) => Number(tactic[k]) || 0;
+  if (v('line') >= 0.5) {
+    out.push({ tag: '라인', text: '수비 라인이 아주 높습니다. 라인 뒤 공간으로 스루패스·침투 러닝을 노리세요 — 오프사이드 라인만 확인하면 한 번에 결승 찬스가 됩니다.' });
+  } else if (v('line') >= 0.25) {
+    out.push({ tag: '라인', text: '라인을 조금 올려 상대 진영에서 경기합니다. 뒤로 흘리는 스루패스가 통합니다.' });
+  } else if (v('line') <= -0.5) {
+    out.push({ tag: '라인', text: '라인을 깊게 내리고 골문 앞을 지킵니다. 문전이 빽빽하니 중거리 슈팅과 크로스·헤더로 흔드세요.' });
+  }
+  if (v('press') >= 0.5) {
+    out.push({ tag: '압박', text: `전방 압박이 강합니다(압박 ${stepLabel(v('press'))}). 길게 끌지 말고 원투·짧은 패스로 1차 압박을 벗기세요. 압박은 체력을 크게 쓰니 후반 65분 이후가 기회입니다.` });
+  } else if (v('press') <= -0.5) {
+    out.push({ tag: '압박', text: '압박을 아끼고 내려섭니다. 공을 오래 가져도 뺏기지 않으니 조급하게 길게 넘기지 말고, 측면 전환으로 빈 곳을 만드세요.' });
+  }
+  if (v('pass') >= 0.5) {
+    out.push({ tag: '패스', text: '롱볼로 한 번에 뒤로 넘깁니다. 점유율은 우리가 가져오되, 공을 잃은 직후 뒷공간 역습을 조심하세요.' });
+  } else if (v('pass') <= -0.5) {
+    out.push({ tag: '패스', text: '짧은 패스로 점유를 노립니다. 게겐프레싱으로 빌드업을 압박하면 패스 실수를 끌어낼 수 있습니다.' });
+  }
+  if (v('route') >= 0.5) {
+    out.push({ tag: '루트', text: '측면 크로스가 주무기입니다. 풀백이 겹쳐 올라오므로 측면 2대1을 막고, 중앙 수비는 헤더 경합에 대비하세요.' });
+  } else if (v('route') <= -0.5) {
+    out.push({ tag: '루트', text: '중앙 돌파를 노립니다. 홀딩·커버로 중앙을 닫고, 에이스의 개인기는 태클보다 지연 수비로 막으세요.' });
+  }
+  return out;
+}
+
+/* 상대 한 팀의 스카우팅 보고서. */
+export function scoutReport(w, teamId) {
+  const team = w.teams[teamId];
+  if (!team) return null;
+  const lineup = lineupFor(w, teamId);
+  const slots = FORMATIONS[lineup.formation]?.slots || [];
+  const tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lineup.tactic || team.tactic || {}) };
+  const ment = mentalityOf(tactic.mentality);
+  const xi = lineup.starters.map((pid, i) => {
+    const p = w.players[pid];
+    if (!p) return null;
+    const slot = slots[i] || { pos: p.pos, label: p.pos };
+    return { p, slot, role: lineup.roles?.[i] || defaultRole(slot.label), ovr: p.ovr };
+  }).filter(Boolean);
+  const outfield = xi.filter((x) => x.p.pos !== 'GK');
+  const keyPlayers = outfield.slice().sort((a, b) => threatOf(b.p) - threatOf(a.p) || b.ovr - a.ovr).slice(0, 2).map((x) => {
+    const stats = topStats(x.p, 2);
+    return {
+      id: x.p.id, name: x.p.name, num: x.p.num, pos: x.p.pos, posLabel: POS_LABEL[x.p.pos] || x.p.pos,
+      slot: x.slot.label, role: x.role, roleLabel: roleLabel(x.role), ovr: x.ovr,
+      threat: Math.round(threatOf(x.p) * 10) / 10,
+      stats, mark: markHint(x.p, stats[0]),
+    };
+  });
+  const table = standings(w);
+  const row = table.find((r) => r.id === teamId);
+  const hints = [
+    ...axisHints(tactic),
+    ...(ment.v >= 0.75 ? [{ tag: '성향', text: '전원 전진(총공세) 성향입니다. 뒷공간이 크게 열리니 뺏은 직후 빠른 역습 한 방이 가장 좋은 기회입니다.' }]
+      : ment.v <= -0.75 ? [{ tag: '성향', text: '잠그기 성향 — 두 줄로 내려앉아 역시 역습만 노립니다. 세트피스와 측면 크로스로 블록을 흔드세요.' }]
+        : ment.v > 0 ? [{ tag: '성향', text: '공격적 성향으로 라인을 올립니다. 우리가 공을 잡았을 때 뒤에 남는 수비가 적으니, 한 번 넘기면 넓은 공간이 나옵니다.' }]
+          : ment.v < 0 ? [{ tag: '성향', text: '수비적 성향으로 가담을 줄입니다. 문전 수비가 두터우니 무리한 돌파보다 세트피스·중거리가 낫습니다.' }]
+            : []),
+    ...(keyPlayers[0] ? [{ tag: '경계', text: `${keyPlayers[0].name}(${keyPlayers[0].slot}·${keyPlayers[0].roleLabel}) — ${keyPlayers[0].mark}` }] : []),
+  ];
+  return {
+    teamId, name: team.name, short: team.short, nick: team.nick, stadium: team.stadium,
+    formation: lineup.formation, formationName: FORMATIONS[lineup.formation]?.name || lineup.formation,
+    shape: FORMATIONS[lineup.formation]?.shape || '',
+    tactic, mentality: ment, words: tacticWords(tactic),
+    axes: AXES.map((a) => {
+      const val = Number(tactic[a.key]) || 0;
+      return {
+        key: a.key, name: a.name, value: val, step: stepLabel(val),
+        word: val >= 0.75 ? a.right : val >= 0.25 ? a.right : val <= -0.75 ? a.left : val <= -0.25 ? a.left : '균형',
+        note: a.effect(val),
+      };
+    }),
+    xi: xi.map((x) => ({ num: x.p.num, name: x.p.name, pos: x.p.pos, slot: x.slot.label, role: x.role, roleShort: roleShort(x.role), ovr: x.ovr })),
+    keyPlayers,
+    hints: hints.slice(0, 6),
+    power: teamPower(w, teamId),
+    rank: row?.rank ?? null, play: row?.play ?? 0,
+    form: (team.recent || []).slice(-5),
+    lineupDetail: xi,
+  };
+}

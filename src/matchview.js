@@ -54,6 +54,10 @@ export function mountMatch(app, m, meta) {
     return out;
   };
   diag.ballAt = () => ({ x: Math.round(m.ball.x * 10) / 10, y: Math.round(m.ball.y * 10) / 10, mode: m.ball.mode, owner: m.ball.owner ? m.ball.owner.name : null, ownerPos: m.ball.owner ? m.ball.owner.pos : null });
+  diag.mentality = () => ({
+    home: Number(m.sides.home.tactic.mentality) || 0, away: Number(m.sides.away.tactic.mentality) || 0,
+    log: (m.coachLog || []).map((c) => ({ minute: c.minute, side: c.side, from: c.from, to: c.to })),
+  });
 
   // 슛·골 판정은 공이 도착한 틱에 확정되지만, 화면에는 '공이 닿은 다음 틱'에 공개합니다.
   // 그래야 배너·스코어·중계 자막이 공의 실제 도착과 같은 순간에 나옵니다.
@@ -66,7 +70,7 @@ export function mountMatch(app, m, meta) {
     <div class="scorebar">
       <div class="sb-team" data-team="${home.id}">
         <span class="badge mid" data-team="${home.id}">${esc(home.short.slice(0, 2))}</span>
-        <div><b>${esc(home.name)}</b><small>홈</small></div>
+        <div><b>${esc(home.name)}</b><small>홈</small><i class="ment-chip" id="m-ment-home" data-v="bal">균형</i></div>
       </div>
       <div class="sb-mid">
         <span class="sb-score" id="m-score">0 - 0</span>
@@ -74,7 +78,7 @@ export function mountMatch(app, m, meta) {
         <span class="sb-phase"><i class="half-pill" id="m-half">전반</i><i class="dir-pill" id="m-dir">${esc(home.short)} →</i></span>
       </div>
       <div class="sb-team away" data-team="${away.id}">
-        <div><b>${esc(away.name)}</b><small>원정</small></div>
+        <div><b>${esc(away.name)}</b><small>원정</small><i class="ment-chip" id="m-ment-away" data-v="bal">균형</i></div>
         <span class="badge mid" data-team="${away.id}">${esc(away.short.slice(0, 2))}</span>
       </div>
     </div>
@@ -114,6 +118,11 @@ export function mountMatch(app, m, meta) {
     <div class="mpanels">
       <div class="card mstats">
         <div class="card-head"><h3>실시간 기록</h3><span class="pill" id="m-label">${esc(meta.label)}</span></div>
+        <div class="ment-live" aria-live="polite">
+          <span class="ml"><i>우리 ${esc(myTeam.short)}</i><b id="ml-my" data-v="bal">균형</b></span>
+          <span class="ml"><i>상대 ${esc((isHome ? away : home).short)}</i><b id="ml-opp" data-v="bal">균형</b></span>
+          <span class="ml-note" id="m-coach-note">AI 감독 맞대응</span>
+        </div>
         <div class="poss"><div class="poss-bar"><i class="ph" id="poss-h"></i><i class="pa" id="poss-a"></i></div><div class="poss-lab"><b id="poss-hl">50%</b><span>점유율</span><b id="poss-al">50%</b></div></div>
         <table class="tbl stat-rows" id="m-statrows"></table>
       </div>
@@ -682,11 +691,40 @@ export function mountMatch(app, m, meta) {
   }
 
   /* ── 패널 갱신 ── */
-  const statRows = [
-    ['shots', '슈팅'], ['onTarget', '유효슈팅'], ['xg', '기대득점(xG)'], ['saves', '선방'],
+  const statRows = [    ['shots', '슈팅'], ['onTarget', '유효슈팅'], ['xg', '기대득점(xG)'], ['saves', '선방'],
     ['corners', '코너킥'], ['fouls', '파울'], ['offsides', '오프사이드'], ['yellow', '경고'], ['red', '퇴장'],
   ];
+  /* ── 성향 배지 ──
+     상단 스코어바와 실시간 기록에 두 팀의 '지금' 성향을 그립니다.
+     AI 감독이 맞대응으로 성향을 바꾸면 같은 순간 중계·기록과 함께 이 배지가 갱신됩니다. */
+  const mentLevel = (v) => (v >= 0.75 ? 'all' : v >= 0.25 ? 'atk' : v <= -0.75 ? 'lock' : v <= -0.25 ? 'def' : 'bal');
+  function renderMentality() {
+    const hv = Number(m.sides.home.tactic.mentality) || 0;
+    const av = Number(m.sides.away.tactic.mentality) || 0;
+    for (const [id, v] of [['m-ment-home', hv], ['m-ment-away', av]]) {
+      const el = $(id);
+      if (!el) continue;
+      el.textContent = mentalityOf(v).name;
+      el.dataset.v = mentLevel(v);
+      el.title = `현재 팀 성향 · ${mentalityOf(v).name}`;
+    }
+    const myV = Number(m.sides[m.userSide].tactic.mentality) || 0;
+    const oppSide = m.userSide === 'home' ? 'away' : 'home';
+    const oppV = Number(m.sides[oppSide].tactic.mentality) || 0;
+    const my = $('ml-my'), opp = $('ml-opp');
+    if (my) { my.textContent = mentalityOf(myV).name; my.dataset.v = mentLevel(myV); }
+    if (opp) { opp.textContent = mentalityOf(oppV).name; opp.dataset.v = mentLevel(oppV); }
+    const note = $('m-coach-note');
+    if (note) {
+      const log = m.coachLog || [];
+      const last = log.length ? log[log.length - 1] : null;
+      note.textContent = last ? `AI 감독 ${last.minute}' 변경 ×${log.length}` : 'AI 감독 맞대응';
+      note.dataset.on = last ? '1' : '0';
+    }
+  }
+
   function renderStats() {
+    renderMentality();
     const s = m.stats();
     $('poss-h').style.width = s.possession.home + '%';
     $('poss-a').style.width = s.possession.away + '%';

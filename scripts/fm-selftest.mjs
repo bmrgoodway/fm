@@ -12,10 +12,11 @@
 //   13) 역할·팀 성향이 없는 기존 세이브 호환
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, lineupInfo, fillLineup, mySetup } from '../src/world.js';
-import { Match, lineupFor, applyResult, CY, W } from '../src/match.js';
+import { Match, lineupFor, applyResult, CY, W, aiMentalityPlan } from '../src/match.js';
 import { FORMATIONS } from '../src/data.js';
-import { roleFor, resolveRoles, defaultRole, ROLE_TUNING, MENTALITY } from '../src/tactics.js';
+import { roleFor, resolveRoles, defaultRole, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf } from '../src/tactics.js';
 import { boardPos } from '../src/views.js';
+import { scoutReport, threatOf } from '../src/scout.js';
 
 const N = Number(process.argv[2] || 24);
 const prog = (x, dir) => (dir > 0 ? x : 100 - x);   // 공격 방향 기준 진행도
@@ -841,8 +842,8 @@ console.log('\n[13] 역할·팀 성향이 없는 기존 세이브 호환');
 
 
 /* ── 14. 전술 축 밸런스 · 배치/데이터 버그 회귀 ── */
-console.log('\n[14] 전술 축 밸런스 (조합별 16경기) · 자동 배치·데이터');
-function balanceProbe(tactic, n = 16, roles = []) {
+console.log('\n[14] 전술 축 밸런스 (조합별 24경기) · 자동 배치·데이터');
+function balanceProbe(tactic, n = 24, roles = []) {
   const w = createWorld('gs', 20261122);
   const acc = { gf: 0, ga: 0, xg: 0, oxg: 0, shots: 0, oshots: 0, poss: 0, cross: 0, header: 0, stam: 0, passOk: 0, passN: 0, oppPassOk: 0, oppPassN: 0 };
   for (let i = 0; i < n; i++) {
@@ -854,7 +855,8 @@ function balanceProbe(tactic, n = 16, roles = []) {
       const idxs = slots.map((s, k) => [s, k]).filter(([s]) => s.label === label).map(([, k]) => k);
       if (idxs.length) setRole(w, idxs[nth || 0], role);
     }
-    const m = new Match({ world: w, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(w, 'gs'), awayLineup: lineupFor(w, 'dj'), seed: `balx-${i}`, cup: false, userSide: 'home' });
+    // 밸런스 계측에서는 상대 AI의 맞대응(전술 변경)을 끄고, 내가 바꾼 축 하나의 효과만 잽니다.
+    const m = new Match({ world: w, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(w, 'gs'), awayLineup: lineupFor(w, 'dj'), seed: `balx-${i}`, cup: false, userSide: 'home', opponentCoach: false });
     m.holdHalf = false;
     let g = 0;
     while (!m.done && g < 6000) { m.tick(); g++; }
@@ -880,26 +882,26 @@ function balanceProbe(tactic, n = 16, roles = []) {
   };
 }
 {
-  const bal = balanceProbe({}, 16);
-  const lock = balanceProbe({ mentality: -1 }, 16);
-  const all = balanceProbe({ mentality: 1 }, 16);
+  const bal = balanceProbe({});
+  const lock = balanceProbe({ mentality: -1 });
+  const all = balanceProbe({ mentality: 1 });
   ok(lock.xg < bal.xg - 0.1 && lock.oxg < bal.oxg - 0.05, '잠그기 — 득점 기회는 줄고 실점 기회는 확실히 줄어듭니다',
     `xG ${bal.xg.toFixed(2)} → ${lock.xg.toFixed(2)} · 피xG ${bal.oxg.toFixed(2)} → ${lock.oxg.toFixed(2)}`);
   ok(all.xg > bal.xg + 0.1 && all.oxg > bal.oxg + 0.1, '총공세 — 공격은 늘고 뒷공간 실점 위험도 함께 늘어납니다',
     `xG ${bal.xg.toFixed(2)} → ${all.xg.toFixed(2)} · 피xG ${bal.oxg.toFixed(2)} → ${all.oxg.toFixed(2)} · 피슈팅 ${bal.oshots.toFixed(1)} → ${all.oshots.toFixed(1)}`);
-  const gegen = balanceProbe({ press: 1 }, 16);
-  const wait = balanceProbe({ press: -1 }, 16);
+  const gegen = balanceProbe({ press: 1 });
+  const wait = balanceProbe({ press: -1 });
   ok(gegen.shots > bal.shots + 0.3, '게겐프레싱은 슈팅이 더 많습니다 (전방에서 계속 때립니다)',
     `슈팅 보통 ${bal.shots.toFixed(1)} → 게겐 ${gegen.shots.toFixed(1)} · xG ${bal.xg.toFixed(2)} → ${gegen.xg.toFixed(2)}`);
   ok(gegen.trans > wait.trans + 0.3, '게겐프레싱은 뺏은 직후 곧바로 슈팅(전환)으로 이어집니다',
     `전환 슈팅 ${wait.trans.toFixed(1)} → ${gegen.trans.toFixed(1)} (경기당)`);
   ok(gegen.stam < wait.stam - 8, '대신 게겐프레싱은 체력을 훨씬 많이 씁니다', `종료 체력 ${wait.stam.toFixed(0)}% → ${gegen.stam.toFixed(0)}%`);
-  const long = balanceProbe({ pass: 1 }, 16);
-  const short = balanceProbe({ pass: -1 }, 16);
+  const long = balanceProbe({ pass: 1 });
+  const short = balanceProbe({ pass: -1 });
   ok(short.poss - long.poss > 4, '롱볼은 짧은 패스보다 점유율이 실제로 낮습니다',
     `점유 ${long.poss.toFixed(1)}% ↔ ${short.poss.toFixed(1)}% (Δ${(short.poss - long.poss).toFixed(1)}%p) · 패스 성공 ${(long.passPct * 100).toFixed(1)}% ↔ ${(short.passPct * 100).toFixed(1)}%`);
-  const wide = balanceProbe({ route: 1 }, 16);
-  const mid = balanceProbe({ route: -1 }, 16);
+  const wide = balanceProbe({ route: 1 });
+  const mid = balanceProbe({ route: -1 });
   ok(wide.cross > mid.cross * 1.3 && wide.header > mid.header * 1.4 && wide.header > mid.header + 0.3, '측면 루트는 크로스·헤더 기회가 실제로 늘어납니다',
     `크로스 ${mid.cross.toFixed(1)} → ${wide.cross.toFixed(1)} · 헤더슛 ${mid.header.toFixed(1)} → ${wide.header.toFixed(1)}`);
 
@@ -943,6 +945,102 @@ function balanceProbe(tactic, n = 16, roles = []) {
   const setup = mySetup(w6);
   ok(setup.formation === '4-4-2' && setup.tactic.mentality === -1 && setup.tactic.pass === 1, '다음 경기 카드의 예상 포메이션·주 전술은 내 라인업 값입니다',
     `${setup.formation} · mentality ${setup.tactic.mentality} · pass ${setup.tactic.pass}`);
+}
+
+/* ── 15. 경기 전 상대 스카우팅 ── */
+console.log('\n[15] 상대 스카우팅 — 실제 라인업·전술과 일치');
+{
+  const rep = scoutReport(world, 'dj');
+  const lf = lineupFor(world, 'dj');
+  const team = world.teams.dj;
+  const realTac = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(lf.tactic || team.tactic) };
+  ok(rep && rep.formation === lf.formation, '예상 포메이션 = 경기에 실제로 나가는 포메이션', `${rep?.formation} · ${rep?.shape}`);
+  ok(rep.axes.length === 4 && ['line', 'pass', 'press', 'route'].every((k) => rep.tactic[k] === realTac[k]), '주 전술 4축이 상대 팀 전술과 일치', rep.axes.map((a) => `${a.name} ${a.word}`).join(' · '));
+  ok(rep.words === tacticWords(realTac) && rep.mentality.name === mentalityOf(realTac.mentality).name, '성향·전술 문구도 실제 값', rep.words);
+  ok(rep.keyPlayers.length === 2 && rep.keyPlayers.every((k) => lf.starters.includes(k.id)), '핵심 경계 선수는 실제 선발 명단에서 뽑습니다', rep.keyPlayers.map((k) => `${k.name}(${k.slot})`).join(', '));
+  const outfield = lf.starters.map((id) => world.players[id]).filter((p) => p && p.pos !== 'GK');
+  const best = outfield.slice().sort((a, b) => threatOf(b) - threatOf(a))[0];
+  ok(rep.keyPlayers[0].id === best.id, '경계 1순위 = 공격 위협 1위 선발', `${rep.keyPlayers[0].name} · ${rep.keyPlayers[0].slot} · 위협 ${rep.keyPlayers[0].threat}`);
+  ok(rep.keyPlayers.every((k) => k.stats.every((s) => s.value === world.players[k.id].stats[s.key])), '경계 선수 능력치는 실제 스탯 그대로', rep.keyPlayers[0].stats.map((s) => `${s.label} ${s.value}`).join(' · '));
+  ok(rep.xi.length === 11 && rep.xi.every((x) => lf.starters.some((id) => world.players[id]?.name === x.name)), '상세 보고서의 예상 11명이 실제 선발과 같습니다', rep.xi.slice(0, 4).map((x) => `${x.slot}:${x.name}`).join(' '));
+  ok(rep.hints.length >= 3 && rep.hints.every((h) => h.tag && h.text.length > 10), '맞춤 공략 힌트가 나옵니다', rep.hints.map((h) => h.tag).join('·'));
+  // 축에 맞는 공략이 나오는지 — 압박형(군산 0.9)과 내려서는 팀(논산 -0.8)
+  const press = scoutReport(world, 'ks');
+  ok(press.tactic.press >= 0.5 && press.hints.some((h) => h.tag === '압박' && /압박/.test(h.text)), '압박형 상대에게는 압박 공략이 나옵니다', press.hints.find((h) => h.tag === '압박')?.text.slice(0, 34) + '…');
+  const low = scoutReport(world, 'ns');
+  ok(low.tactic.line <= -0.5 && low.hints.some((h) => h.tag === '라인' && /(내리|블록|문전)/.test(h.text)), '내려서는 상대에게는 블록 공략이 나옵니다', low.hints.find((h) => h.tag === '라인')?.text.slice(0, 34) + '…');
+  const wide = scoutReport(world, 'gj');
+  ok(wide.tactic.route >= 0.5 && wide.hints.some((h) => h.tag === '루트' && /측면/.test(h.text)), '측면 크로스 팀에게는 측면 대비가 나옵니다', wide.hints.find((h) => h.tag === '루트')?.text.slice(0, 30) + '…');
+  const mine = scoutReport(world, 'gs');
+  ok(mine.formation === world.myLineup.formation && mine.tactic.mentality === (world.myLineup.tactic.mentality || 0), '내 팀을 스카우팅하면 내가 저장한 라인업·성향이 나옵니다', `${mine.formation} · ${mine.mentality.name}`);
+}
+
+/* ── 16. AI 감독 실시간 맞대응 ── */
+console.log('\n[16] AI 감독 맞대응 — 후반 열세면 올리고, 리드면 내린다');
+{
+  // 계획표 — 시간·득실차
+  ok(aiMentalityPlan(-1, 50) === null && aiMentalityPlan(-1, 55) === 0.5, '후반 55분부터 열세면 공격적', `50' ${aiMentalityPlan(-1, 50)} · 55' ${aiMentalityPlan(-1, 55)}`);
+  ok(aiMentalityPlan(-1, 72) === 1 && aiMentalityPlan(-2, 63) === 1, '종반 열세(72분~·두 골 차 62분~)는 총공세', `72' ${aiMentalityPlan(-1, 72)} · 62' 두 골 차 ${aiMentalityPlan(-2, 62)}`);
+  ok(aiMentalityPlan(1, 70) === -0.5 && aiMentalityPlan(1, 82) === -1, '후반 리드(70분~)는 수비적, 종반(82분~)은 잠그기', `70' ${aiMentalityPlan(1, 70)} · 82' ${aiMentalityPlan(1, 82)}`);
+  ok(aiMentalityPlan(0, 65) === 0 && aiMentalityPlan(0, 30) === null, '동점 복귀는 균형, 전반에는 개입하지 않음', `65 ' ${aiMentalityPlan(0, 65)} · 30' ${aiMentalityPlan(0, 30)}`);
+
+  // 실제 엔진 — AI 쪽 성향·전술 축이 실제로 바뀌는지
+  function coachProbe(diff, minute, userSide = 'home', ticks = 2) {
+    const m = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(world, 'gs'), awayLineup: lineupFor(world, 'dj'), seed: `coach-${diff}-${minute}-${userSide}`, cup: false, userSide });
+    m.holdHalf = false; m.pause = 0; m.phase = 'play'; m.half = 2; m.t = minute * 4 - 1;
+    const ai = userSide === 'home' ? 'away' : 'home';
+    m.score = { home: 0, away: 0 };
+    m.score[ai] = 1 + Math.max(diff, 0);
+    m.score[userSide] = 1 + Math.max(-diff, 0);
+    const before = { ...m.sides[ai].tactic };
+    for (let i = 0; i < ticks; i++) m.tick();
+    const ev = m.events.filter((e) => e.type === 'ai-tactic');
+    return { m, ai, before, after: { ...m.sides[ai].tactic }, ev, minute: m.minute(), log: m.coachLog };
+  }
+  const trail = coachProbe(-1, 58);
+  ok(trail.after.mentality === 0.5 && trail.after.line > 0.2 && trail.after.press > 0.2, '지고 있는 AI가 공격적으로 올립니다 (라인·압박 상향)',
+    `성향 ${trail.before.mentality} → ${trail.after.mentality} · 라인 ${trail.before.line} → ${trail.after.line.toFixed(2)} · 압박 ${trail.before.press} → ${trail.after.press.toFixed(2)}`);
+  ok(trail.ev.length === 1 && /승부수/.test(trail.ev[0].text) && /공격적/.test(trail.ev[0].text), '중계에 전술 변경 멘트가 남습니다', trail.ev[0]?.text);
+  ok(/대전/.test(trail.ev[0]?.text || '') && trail.ev[0]?.minute >= 56 && trail.ev[0]?.minute <= 62, '멘트에 팀 이름과 시각이 들어갑니다', `minute ${trail.ev[0]?.minute}`);
+  ok(trail.m.sides.home.tactic.mentality === 0, '내(감독) 성향은 AI가 건드리지 않습니다', `home ${trail.m.sides.home.tactic.mentality}`);
+  const late = coachProbe(-1, 78);
+  ok(late.after.mentality === 1 && late.after.line >= 0.6 && late.after.press >= 0.6, '종반 열세는 총공세 — 라인·압박을 끝까지 올립니다', `라인 ${late.after.line} · 압박 ${late.after.press}`);
+  const lead = coachProbe(1, 73);
+  ok(lead.after.mentality === -0.5 && lead.after.line < -0.2 && lead.after.press < 0, '이기고 있는 AI가 수비적으로 내립니다 (라인·압박 하향)',
+    `성향 ${lead.before.mentality} → ${lead.after.mentality} · 라인 ${lead.after.line.toFixed(2)} · 압박 ${lead.after.press.toFixed(2)}`);
+  const lock = coachProbe(1, 86);
+  ok(lock.after.mentality === -1 && /잠그기/.test(lock.ev[0]?.text || ''), '종반 리드는 잠그기 — 두 줄로 내려앉습니다', lock.ev[0]?.text);
+  const awaySide = coachProbe(-1, 60, 'away');
+  ok(awaySide.after.mentality === 0.5 && /금산/.test(awaySide.ev[0]?.text || ''), '내가 원정이어도 홈 AI가 맞대응합니다', awaySide.ev[0]?.text);
+
+  // 동점으로 돌아오면 균형 복귀
+  const back = coachProbe(-1, 58);
+  back.m.score.home = back.m.score.away;
+  back.m.t += 2;      // 60분대
+  back.m.tick(); back.m.tick();
+  ok(back.m.sides[back.ai].tactic.mentality === 0 && back.m.coachLog.length >= 2, '동점이 되면 균형으로 돌아옵니다', `성향 ${back.m.sides[back.ai].tactic.mentality} · 기록 ${back.m.coachLog.length}건`);
+
+  // 한 경기 안에서 AI가 바꾼 값은 모두 계획표와 맞아야 합니다
+  let changes = 0;
+  for (const seed of ['ai1', 'ai2']) {
+    const m = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(world, 'gs'), awayLineup: lineupFor(world, 'dj'), seed, cup: false, userSide: 'home' });
+    m.holdHalf = false;
+    let guard = 0;
+    while (!m.done && guard < 6000) { m.tick(); guard++; }
+    const bad = m.coachLog.filter((c) => c.to !== aiMentalityPlan(c.diff, c.minute));
+    changes += m.coachLog.length;
+    ok(bad.length === 0, `경기 ${seed} — AI 변경이 모두 계획표(득실차·시각)와 일치`, m.coachLog.map((c) => `${c.minute}' ${c.from}→${c.to}`).join(' · ') || '변경 없음');
+  }
+  ok(changes > 0, '실제 경기 중에도 AI 전술 변경이 발생합니다', `두 경기 합계 ${changes}회`);
+
+  // 구버전 세이브(역할·성향 없음)에서도 새 AI 로직이 그대로 돌아갑니다
+  const legacy = { ...lineupFor(world, 'gs') };
+  delete legacy.roles;
+  const lm = new Match({ world, homeId: 'gs', awayId: 'dj', homeLineup: legacy, awayLineup: lineupFor(world, 'dj'), seed: 'legacy-coach', cup: false, userSide: 'home' });
+  lm.holdHalf = false;
+  let g2 = 0;
+  while (!lm.done && g2 < 6000) { lm.tick(); g2++; }
+  ok(lm.done && lm.coachLog.every((c) => Number.isFinite(c.to)), '구버전 세이브 경기에서도 AI 맞대응·호환성 유지', `변경 ${lm.coachLog.length}회 · ${lm.score.home}-${lm.score.away}`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

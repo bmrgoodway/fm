@@ -275,6 +275,59 @@ html[data-theme="night"] .tc-words { color: #03210f; }
 .mini-row { align-items: center; }
 .mini-pitch { width: 92px; height: 59px; border: 1.5px solid var(--line); flex: none; background: #2f9e4f; }
 
+/* ── 상대 스카우팅 ─────────────────────────────────────────────── */
+.scout { gap: 12px; }
+.scout-mini { display: flex; flex-direction: column; gap: 7px; border: 1.5px solid var(--line); background: var(--paper2); padding: 8px 9px; }
+.sm-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.sm-head .pill { margin-left: auto; }
+.sm-facts { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.sm-facts > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.sm-facts dt { font-size: 10.5px; font-weight: 800; color: var(--soft); }
+.sm-facts dd { margin: 0; font-size: 12px; font-weight: 800; }
+.sm-facts .sk-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 6px; }
+.sk { display: inline-flex; align-items: baseline; gap: 4px; }
+.sk small { font-size: 9.5px; font-weight: 800; color: var(--soft); }
+.axis-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.axis-chip { display: inline-flex; align-items: baseline; gap: 4px; border: 1.5px solid var(--line); background: var(--paper); padding: 1px 5px; }
+.axis-chip i { font-style: normal; font-size: 9px; font-weight: 800; color: var(--soft); }
+.axis-chip b { font-size: 10.5px; font-weight: 900; }
+.axis-chip.hi b { color: #b0381f; }
+.axis-chip.lo b { color: #0a7a33; }
+html[data-theme="night"] .axis-chip.hi b { color: #ff8a76; }
+html[data-theme="night"] .axis-chip.lo b { color: #37e07a; }
+.sm-hints, .hint-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.sm-hints li, .hint-list li { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 6px; font-size: 11.5px; font-weight: 700; line-height: 1.45; }
+.sm-hints li b, .hint-list li b { font-size: 9.5px; font-weight: 900; color: #101014; background: var(--yellow); padding: 0 4px; text-align: center; align-self: start; }
+.sm-more { align-self: flex-start; text-decoration: none; }
+.scout-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.scout-left, .scout-right { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.scout-pitch { width: 100%; height: auto; border: var(--bw) solid var(--line); background: #2f9e4f; display: block; }
+.scout-pitch.sm { max-width: 190px; }
+.xi-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 3px 8px; }
+.xi-list li { display: flex; align-items: baseline; gap: 5px; font-size: 11px; font-weight: 800; min-width: 0; }
+.xi-list .xnum { flex: none; min-width: 18px; text-align: center; background: var(--ink); color: var(--bg); font-size: 9px; }
+.xi-list .xname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.xi-list small { margin-left: auto; font-size: 9px; color: var(--soft); white-space: nowrap; }
+.sa-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; font-size: 12.5px; }
+.sa-head .pill { margin-left: auto; }
+.scout-axes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.scout-axes li { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 2px 8px; border-bottom: 1.5px dashed color-mix(in srgb, var(--line) 20%, transparent); padding-bottom: 4px; }
+.scout-axes li span { font-size: 10.5px; font-weight: 800; color: var(--soft); }
+.scout-axes li b { font-size: 12.5px; font-weight: 900; }
+.scout-axes li.hi b { color: #b0381f; }
+.scout-axes li.lo b { color: #0a7a33; }
+html[data-theme="night"] .scout-axes li.hi b { color: #ff8a76; }
+html[data-theme="night"] .scout-axes li.lo b { color: #37e07a; }
+.scout-axes li small { grid-column: 1 / -1; font-size: 10.5px; color: var(--muted); font-weight: 700; line-height: 1.4; }
+.key-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.key-card { border: 1.5px solid var(--line); background: var(--paper2); padding: 7px 8px; display: flex; flex-direction: column; gap: 4px; }
+.kc-top { display: flex; align-items: center; gap: 7px; }
+.kc-num { flex: none; display: grid; place-content: center; width: 24px; height: 24px; background: var(--ink); color: var(--bg); font-size: 10px; font-weight: 900; }
+.kc-top small { display: block; font-size: 9.5px; color: var(--soft); font-weight: 800; }
+.kc-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10.5px; font-weight: 800; color: var(--muted); }
+.kc-stats b { color: var(--ink); font-size: 12px; }
+.kc-mark { font-size: 11px; font-weight: 700; line-height: 1.45; margin: 0; }
+
 /* ── 표 ─────────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 420px; }
@@ -635,6 +688,24 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
 
 /* ── 경기 화면: 전/후반·공격 방향·자막 티커·하프타임 ──────────── */
 .sb-phase { display: inline-flex; align-items: center; gap: 4px; }
+/* 팀 성향 배지 — 상단 스코어바·실시간 기록에 '지금' 성향을 보여 줍니다 */
+.sb-team > div { min-width: 0; }
+.ment-chip {
+  display: inline-block; font-style: normal; margin-top: 1px; font-size: 9px; font-weight: 900;
+  letter-spacing: 0.02em; border: 1.5px solid var(--line); padding: 0 4px;
+  background: var(--paper2); color: var(--ink); white-space: nowrap;
+}
+.ment-chip[data-v="atk"], .ment-chip[data-v="all"] { background: var(--coral); color: #2a0a04; }
+.ment-chip[data-v="def"], .ment-chip[data-v="lock"] { background: var(--cyan); color: #04222e; }
+.ment-live { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 10px; font-weight: 800; color: var(--soft); }
+.ment-live .ml { display: inline-flex; align-items: baseline; gap: 4px; min-width: 0; }
+.ment-live .ml i { font-style: normal; font-size: 9.5px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ment-live .ml b { font-size: 11.5px; font-weight: 900; color: var(--ink); border: 1.5px solid var(--line); padding: 0 4px; background: var(--paper2); white-space: nowrap; }
+.ment-live .ml b[data-v="atk"], .ment-live .ml b[data-v="all"] { background: var(--coral); color: #2a0a04; }
+.ment-live .ml b[data-v="def"], .ment-live .ml b[data-v="lock"] { background: var(--cyan); color: #04222e; }
+.ment-live .ml-note { margin-left: auto; font-size: 9px; font-weight: 900; color: var(--soft); }
+.ment-live .ml-note[data-on="1"] { background: var(--yellow); color: #101014; padding: 0 4px; }
+.feed .ev-ai-tactic { background: color-mix(in srgb, var(--cyan) 26%, transparent); box-shadow: inset 3px 0 0 var(--cyan); font-weight: 900; }
 .half-pill, .dir-pill {
   font-style: normal; font-size: 9px; font-weight: 900; letter-spacing: 0.03em;
   border: 1.5px solid var(--line); padding: 0 4px; background: var(--paper2); white-space: nowrap;
@@ -689,8 +760,10 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .mcontrols { grid-area: controls; }
   .drawer { grid-area: drawer; }
   .drawer[hidden] { display: none; }
-  .mpanels { grid-area: panels; display: flex; flex-direction: column; align-items: stretch; gap: 10px; height: var(--pitch-h, 560px); max-height: calc(100vh - 240px); overflow: hidden; }
-  .mfeed { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+  .mpanels { grid-area: panels; display: flex; flex-direction: column; align-items: stretch; gap: 10px; height: var(--pitch-h, 560px); max-height: calc(100vh - 240px); overflow-y: auto; overflow-x: hidden; }
+  /* 중계 로그(문자 중계)는 AI 감독 전술 변경 멘트가 쌓이는 곳이라 최소 높이를 보장합니다.
+     기록·평점까지 한 화면에 다 안 들어가면 이 칸만 스크롤됩니다(예전에는 로그가 24px로 찌그러져 보이지 않았음). */
+  .mfeed { flex: 1 1 auto; min-height: 120px; display: flex; flex-direction: column; overflow: hidden; }
   .mratings { flex: 0 0 auto; overflow: hidden; }
   .mratings .rating-cols li { line-height: 1.3; }
   .mfeed .feed { flex: 1 1 auto; min-height: 80px; overflow-y: auto; }
@@ -710,6 +783,10 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .mstats .poss-bar { height: 12px; }
   .mstats .poss-lab { font-size: 9.5px; }
   .mratings .card-head .pill { display: none; }
+}
+
+@media (max-width: 900px) {
+  .scout-grid { grid-template-columns: 1fr; }
 }
 
 /* ── 반응형 ───────────────────────────────────────────────────── */

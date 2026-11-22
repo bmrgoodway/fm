@@ -2,6 +2,7 @@
 import { FORMATIONS } from './data.js';
 import * as W from './world.js';
 import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING } from './tactics.js';
+import { scoutReport } from './scout.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -135,6 +136,85 @@ export function renderHub(app) {
   <section class="tab-body">${body(app, w)}</section>`;
 }
 
+/* ── 상대 스카우팅 ───────────────────────────────────────────────
+   scout.js 가 뽑은 실제 라인업·전술·선수 데이터를 그대로 그립니다.
+   다음 경기 카드에는 요약, 일정 탭 아래에는 상세 보고서를 둡니다. */
+function scoutPitch(rep, team, big = false) {
+  const dots = rep.lineupDetail.map((x) => {
+    const pos = boardPos(x.slot, x.role, rep.tactic);
+    // 깊게 내려서는 팀은 수비수가 골키퍼와 겹쳐 보이므로, 골키퍼와 최소 간격만 띄웁니다.
+    const gx = x.p.pos === 'GK' ? pos.x : Math.max(pos.x, 0.125);
+    const cx = (gx * 100).toFixed(1), cy = (pos.y * 64).toFixed(1);
+    const r = x.p.pos === 'GK' ? 3.6 : 3.2;
+    const labelY = Number(cy) > 51 ? Number(cy) - 4.4 : Number(cy) + 6.1;
+    return `<g><circle cx="${cx}" cy="${cy}" r="${r}" fill="${esc(team.primary)}" stroke="#101014" stroke-width="1.1"/>
+      <text x="${cx}" y="${Number(cy) + 1.1}" text-anchor="middle" font-size="2.9" font-weight="900" fill="#101014">${x.p.num}</text>
+      ${big ? `<text x="${cx}" y="${labelY}" text-anchor="middle" font-size="2.9" font-weight="900" fill="#ffffff" stroke="#101014" stroke-width=".7" paint-order="stroke">${esc(x.slot.label)}</text>` : ''}</g>`;
+  }).join('');
+  return `<svg class="scout-pitch ${big ? 'big' : 'sm'}" viewBox="0 0 100 64" role="img" aria-label="${esc(team.short)} ${esc(rep.formation)} 예상 배치">
+    <rect x="1" y="1" width="98" height="62" fill="#2f9e4f" stroke="#101014" stroke-width="1.5"/>
+    <path d="M50 1v62" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <circle cx="50" cy="32" r="8" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <rect x="1" y="19" width="12" height="26" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    <rect x="87" y="19" width="12" height="26" fill="none" stroke="#ffffff" stroke-width="1" opacity=".7"/>
+    ${dots}
+  </svg>`;
+}
+
+const axisChips = (rep) => `<div class="axis-chips">${rep.axes.map((a) => `<span class="axis-chip ${a.value > 0.2 ? 'hi' : a.value < -0.2 ? 'lo' : ''}" title="${esc(a.note)}"><i>${esc(a.name)}</i><b>${esc(a.word)}</b></span>`).join('')}</div>`;
+
+function scoutMini(rep, label) {
+  const keys = rep.keyPlayers.map((k) => `<span class="sk"><b>${esc(k.name)}</b><small>${esc(k.slot)} · ${esc(k.roleShort || k.roleLabel)} · ${k.ovr}</small></span>`).join('<span class="vs-sep">·</span>');
+  return `<div class="scout-mini">
+    <div class="sm-head"><b>🔍 상대 스카우팅</b><span class="pill xs">${esc(rep.mentality.name)}</span></div>
+    <dl class="sm-facts">
+      <div><dt>예상 포메이션</dt><dd><b>${esc(rep.formation)}</b> · ${esc(rep.shape)}</dd></div>
+      <div><dt>주 전술 스타일</dt><dd>${esc(rep.words)}</dd></div>
+      <div><dt>핵심 경계</dt><dd class="sk-row">${keys}</dd></div>
+    </dl>
+    ${axisChips(rep)}
+    <ul class="sm-hints">${rep.hints.slice(0, 2).map((h) => `<li><b>${esc(h.tag)}</b><span>${esc(h.text)}</span></li>`).join('')}</ul>
+    <a class="btn small ghost sm-more" href="#scout-report">스카우팅 상세 보고서 ↓</a>
+  </div>`;
+}
+
+function scoutCard(w) {
+  const nx = W.userNextMatch(w);
+  if (!nx) return '';
+  const { round, fixture } = nx;
+  const oppId = fixture.home === w.myTeamId ? fixture.away : fixture.home;
+  const opp = w.teams[oppId];
+  const rep = scoutReport(w, oppId);
+  if (!rep) return '';
+  const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
+  const form = rep.form.length
+    ? `<span class="form">${rep.form.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>`
+    : '<span class="muted sm">경기 없음</span>';
+  return `<article class="card scout" id="scout-report">
+    <div class="card-head"><h3>🔍 상대 스카우팅 · ${esc(opp.name)}</h3><span class="pill">${label} · ${esc(rep.mentality.name)}</span></div>
+    <div class="scout-grid">
+      <div class="scout-left">
+        ${scoutPitch(rep, opp, true)}
+        <p class="hint">${esc(rep.formation)} · ${esc(rep.shape)} — 역할(윙백·인사이드 포워드·홀딩…)까지 반영한 실제 예상 배치입니다.</p>
+        <ul class="xi-list">${rep.xi.map((x) => `<li><span class="xnum">${x.num}</span><span class="xname">${esc(x.name)}</span><small>${esc(x.slot)} · ${esc(x.roleShort)}</small></li>`).join('')}</ul>
+      </div>
+      <div class="scout-right">
+        <div class="sa-head"><b>주 전술 스타일</b><span class="pill xs">${esc(rep.words)}</span></div>
+        <ul class="scout-axes">${rep.axes.map((a) => `<li class="${a.value > 0.2 ? 'hi' : a.value < -0.2 ? 'lo' : ''}"><span>${esc(a.name)}</span><b>${esc(a.word)}</b><small>${esc(a.note)}</small></li>`).join('')}</ul>
+        <h4 class="sub">핵심 경계 선수</h4>
+        <ul class="key-list">${rep.keyPlayers.map((k) => `<li class="key-card">
+          <div class="kc-top"><span class="kc-num">${k.num}</span><div><b>${esc(k.name)}</b><small>${esc(k.slot)} · ${esc(k.roleLabel)} · 종합 ${k.ovr}</small></div></div>
+          <div class="kc-stats">${k.stats.map((s) => `<span>${esc(s.label)} <b>${s.value}</b></span>`).join('')}</div>
+          <p class="kc-mark">${esc(k.mark)}</p>
+        </li>`).join('')}</ul>
+        <p class="hint">상대 전력 <b>${rep.power}</b> · 리그 <b>${rep.rank ?? '—'}위</b> · 최근 ${form}</p>
+      </div>
+    </div>
+    <h4 class="sub">맞춤 공략 힌트</h4>
+    <ul class="hint-list">${rep.hints.map((h) => `<li><b>${esc(h.tag)}</b><span>${esc(h.text)}</span></li>`).join('')}</ul>
+  </article>`;
+}
+
 /* ── 일정 탭 ── */
 function nextMatchCard(app, w) {
   const nx = W.userNextMatch(w);
@@ -150,6 +230,8 @@ function nextMatchCard(app, w) {
   const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
   const oppForm = w.form?.[oppId] || [];
   const myForm = me.recent || [];
+  // 상대 스카우팅 — 상대의 실제 라인업·전술 데이터를 그대로 읽습니다.
+  const rep = scoutReport(w, oppId);
   // 내 팀의 '예상'은 감독이 실제로 저장한 라인업·전술이어야 합니다 (팀 기본값이 아니라)
   const mySetup = W.mySetup(w);
   const myTactic = mySetup.tactic;
@@ -167,11 +249,12 @@ function nextMatchCard(app, w) {
     <dl class="cmp">
       <div><dt>전력</dt><dd>${bar(myP, oppP)}<span>${myP} : ${oppP}</span></dd></div>
       <div><dt>최근 5경기</dt><dd>${formChips(myForm.slice(-5))}<span class="vs-sep">vs</span>${formChips(opp.recent?.slice(-5) || [])}</dd></div>
-      <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(myFormation, me, false)}<span class="vs-sep">vs</span>${miniPitch(opp.formation, opp, true)}</dd></div>
-      <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(myTactic))}</span><span class="vs-sep">vs</span><span>${esc(tacticWords(opp.tactic))}</span></dd></div>
+      <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(myFormation, me, false)}<span class="vs-sep">vs</span>${miniPitch(rep ? rep.formation : opp.formation, opp, true)}</dd></div>
+      <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(myTactic))}</span><span class="vs-sep">vs</span><span>${esc(rep ? rep.words : tacticWords(opp.tactic))}</span></dd></div>
       ${unavailable.length ? `<div><dt>결장</dt><dd class="tac"><span class="pill xs">${unavailable.length}명</span><span class="sm">${unavailable.map((p) => `${esc(p.name)}(${W.ifUnavailable(p)})`).join(', ')}</span></dd></div>` : ''}
     </dl>
     ${inj.length ? `<p class="warn-bar">🚑 선발에 뛸 수 없는 선수가 ${inj.length}명 있습니다 (${inj.map((p) => esc(p.name)).join(', ')}). 경기를 시작하면 자동으로 교체됩니다.</p>` : ''}
+    ${rep ? scoutMini(rep, label) : ''}
     <div class="actions">
       <button class="btn primary" data-act="play" type="button">경기 시작 ▶</button>
       <button class="btn" data-act="instant" type="button">즉시 결과 ⏩</button>
@@ -221,6 +304,7 @@ function scheduleTab(app, w) {
       ${recentList(app, w)}
     </article>
   </div>
+  ${scoutCard(w)}
   <article class="card">
     <div class="card-head"><h3>시즌 일정</h3><span class="pill">${w.season}시즌</span></div>
     <div class="table-wrap"><table class="tbl sched">
