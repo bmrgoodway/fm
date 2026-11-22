@@ -10,6 +10,7 @@
   --coral: #ff614a;
   --purple: #7e65c1;
   --bw: 2px;
+  --head-h: 63px;      /* sticky 헤더 높이 — 탭바가 그 아래에 붙습니다 */
   --font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
 }
 
@@ -109,7 +110,7 @@ small { font-size: 12px; }
 }
 .icon-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--line); background: var(--yellow); color: #101014; }
 
-.foot { border-top: var(--bw) solid var(--line); padding: 16px; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
+.foot { border-top: var(--bw) solid var(--line); padding: 16px 16px 78px; text-align: center; font-size: 12px; font-weight: 700; color: var(--muted); }
 .foot p { margin: 0; }
 .foot a { font-weight: 900; }
 
@@ -222,7 +223,11 @@ html[data-theme="night"] .tc-words { color: #03210f; }
 .club-stats > div { display: flex; flex-direction: column; align-items: flex-end; padding: 0 9px; border-left: 1.5px solid color-mix(in srgb, var(--line) 25%, transparent); }
 .club-stats small { font-size: 10px; font-weight: 800; color: var(--soft); letter-spacing: 0.02em; }
 .club-stats b { font-size: 15px; }
-.tabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: thin; }
+.tabs {
+  position: sticky; top: var(--head-h, 63px); z-index: 80;
+  display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 4px; margin-bottom: 12px; scrollbar-width: thin;
+  background: var(--bg);
+}
 .tab {
   flex: none; padding: 9px 14px; border: var(--bw) solid var(--line); background: var(--paper);
   font-weight: 900; font-size: 13px; cursor: pointer; box-shadow: 2px 2px 0 var(--line);
@@ -307,8 +312,14 @@ html[data-theme="night"] .res-W { color: #37e07a; } html[data-theme="night"] .re
 .pb-lines i:nth-child(2) { top: 16%; left: 26%; right: 26%; height: 34%; border: 2px solid rgba(255, 255, 255, 0.4); background: none; }
 .pb-lines i:nth-child(3) { top: 78%; left: 26%; right: 26%; height: 34%; border: 2px solid rgba(255, 255, 255, 0.4); background: none; }
 .pb-lines i:nth-child(4) { top: 0; left: 50%; right: auto; width: 26%; height: 50%; border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 0 0 50% 50%; background: none; transform: translateX(-50%); }
-.pb-goal { position: absolute; left: 50%; transform: translateX(-50%); font-size: 9px; font-weight: 900; letter-spacing: 0.1em; color: rgba(255, 255, 255, 0.75); }
-.pb-goal.top { top: 4px; } .pb-goal.bottom { bottom: 4px; }
+.pb-goal {
+  position: absolute; left: 6px;   /* 골키퍼 칩과 절대 겹치지 않게 왼쪽 가장자리에 붙입니다 */
+  font-size: 9px; font-weight: 900; letter-spacing: 0.1em; color: #fff;
+  background: rgba(10, 10, 14, 0.55); padding: 0 5px; pointer-events: none; white-space: nowrap;
+}
+.pb-goal.top { top: 3px; } .pb-goal.bottom { bottom: 3px; }
+/* 골키퍼 칩은 골문 라벨 위로 올려 겹침을 없앱니다 */
+.chip.gk { transform: translate(-50%, -50%) translateY(-10px); }
 .chip {
   position: absolute; left: var(--left, 50%); top: var(--top, 50%); transform: translate(-50%, -50%);
   display: flex; flex-direction: column; align-items: center; gap: 1px;
@@ -383,7 +394,9 @@ html[data-theme="night"] .res-W { color: #37e07a; } html[data-theme="night"] .re
 .role-btn.on { background: var(--yellow); color: #101014; border-color: var(--ink); box-shadow: 2px 2px 0 var(--line); }
 .rb-eff { font-size: 10.5px; font-weight: 700; color: var(--soft); line-height: 1.4; }
 .chip-main { display: flex; flex-direction: column; align-items: center; gap: 1px; background: none; border: 0; padding: 0; cursor: pointer; color: #fff; font-family: inherit; }
-button.chip-pos { border: 0; cursor: pointer; font-family: inherit; }
+button.chip-pos { position: relative; border: 0; cursor: pointer; font-family: inherit; }
+/* 역할 배지는 보기엔 작아도 손가락으로 누를 수 있는 면적을 넓혀 둡니다 (44px 기준) */
+button.chip-pos::after { content: ""; position: absolute; left: -7px; right: -7px; top: -9px; bottom: -13px; }
 button.chip-pos:hover { background: var(--ink); color: var(--yellow); }
 
 /* ── 전술 4축 ─────────────────────────────────────────────────── */
@@ -453,7 +466,7 @@ html[data-theme="night"] .growth .up { color: #37e07a; } html[data-theme="night"
 .modal h3 { font-size: 19px; }
 .modal-head { display: flex; align-items: center; gap: 10px; }
 .toast {
-  position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 20px);
+  position: fixed; left: 50%; bottom: calc(22px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px);
   z-index: 300; background: var(--ink); color: var(--bg); border: var(--bw) solid var(--line);
   padding: 9px 16px; font-weight: 900; font-size: 13px; box-shadow: var(--shadow);
   opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; max-width: 88vw; text-align: center;
@@ -535,7 +548,33 @@ html[data-theme="night"] .growth .up { color: #37e07a; } html[data-theme="night"
 .mcontrols { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .speeds { flex: 0 0 auto; min-width: 210px; }
 .speeds .spd { font-size: 12px; padding: 6px 0; }
-.drawer { border: var(--bw) solid var(--line); background: var(--paper2); box-shadow: var(--shadow-sm); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+/* 경기 중 전술 시트 — 화면 아래에 고정되고, 안에서 스크롤됩니다 (예전에는 페이지 흐름에 있어
+   뷰포트 밖으로 잘렸습니다) */
+.drawer {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 260;
+  max-height: min(82vh, 720px); overflow-y: auto; overscroll-behavior: contain;
+  border-top: var(--bw) solid var(--line); background: var(--paper);
+  box-shadow: 0 -4px 0 rgba(0, 0, 0, 0.18); padding: 12px clamp(12px, 3vw, 24px) calc(18px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; gap: 10px;
+}
+.drawer-back { position: fixed; inset: 0; z-index: 255; background: rgba(10, 10, 14, 0.45); }
+body.drawer-open { overflow: hidden; }
+@media (min-width: 760px) {
+  .drawer { left: auto; right: 16px; bottom: 16px; width: min(560px, calc(100vw - 32px)); border: var(--bw) solid var(--line); max-height: min(78vh, 640px); }
+}
+/* 포지션별 역할 — 경기 중·라커룸 공용 */
+.role-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 4px; }
+.role-row {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 5px 7px; min-height: 34px;
+  border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; font-family: inherit;
+  color: var(--ink); font-weight: 900; font-size: 11.5px; text-align: left;
+}
+.role-row:hover { background: var(--paper2); }
+.role-row .rr-pos { flex: none; font-size: 9.5px; font-weight: 900; background: var(--ink); color: var(--bg); padding: 1px 4px; }
+.role-row .rr-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-row .rr-role { flex: none; font-size: 10px; font-weight: 900; color: #101014; background: var(--yellow); padding: 1px 5px; }
+.hint-inline { font-size: 10px; font-weight: 800; color: var(--soft); }
+.ht-sub { font-size: 12px; color: var(--soft); margin: 10px 0 5px; }
 .drawer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .drawer-head h3 { font-size: 15px; }
 .mpanels { display: grid; grid-template-columns: 0.95fr 1.15fr 1fr; gap: 10px; align-items: start; }
@@ -641,7 +680,7 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .matchview {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 340px;
-    grid-template-areas: "bar bar" "stage panels" "ticker panels" "controls drawer";
+    grid-template-areas: "bar bar" "stage panels" "ticker panels" "controls panels";
     align-items: start; gap: 10px;
   }
   .scorebar { grid-area: bar; }
@@ -649,6 +688,7 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .ticker { grid-area: ticker; }
   .mcontrols { grid-area: controls; }
   .drawer { grid-area: drawer; }
+  .drawer[hidden] { display: none; }
   .mpanels { grid-area: panels; display: flex; flex-direction: column; align-items: stretch; gap: 10px; height: var(--pitch-h, 560px); max-height: calc(100vh - 240px); overflow: hidden; }
   .mfeed { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
   .mratings { flex: 0 0 auto; overflow: hidden; }
@@ -727,7 +767,9 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .card { padding: 11px; }
   .chip { width: 46px; }
   .chip-name { max-width: 46px; font-size: 8px; }
-  .chip-pos { font-size: 7px; }
+  /* 역할 배지는 손가락으로 누를 수 있게 조금 크게 — 보이는 높이 21px + 히트 여백 */
+  .chip-pos { font-size: 8px; padding: 5px 5px; }
+  button.chip-pos::after { left: -8px; right: -8px; top: -11px; bottom: -11px; }
   .tabs { gap: 4px; }
   .tab { padding: 8px 10px; font-size: 12px; }
   .scorebar { padding: 6px 8px; gap: 6px; }

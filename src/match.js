@@ -5,7 +5,7 @@
 // 화면(DOM)에 의존하지 않으므로 '즉시 결과'에서도 그대로 돌릴 수 있습니다.
 import { makeRng, clamp, rint, pick } from './rng.js';
 import { FORMATIONS } from './data.js';
-import { posFactor, autoLineup } from './world.js';
+import { posFactor, autoLineup, squadOf, available } from './world.js';
 import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING } from './tactics.js';
 
 export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
@@ -332,7 +332,9 @@ export class Match {
         corners: 0, freeKicks: 0, goalKicks: 0, fouls: 0, yellow: 0, red: 0, injuries: 0, shotDist: 0, offsides: 0,
         // 전개 패턴 계측 — 평균 패스 거리, 사이드 전환·스루·원투·컷백·크로스 빈도, 폭·깊이
         passDist: 0, passN: 0, longN: 0,
-        switchN: 0, throughN: 0, givegoN: 0, cutbackN: 0, crossN: 0, dribbleTicks: 0,
+        switchN: 0, throughN: 0, givegoN: 0, cutbackN: 0, crossN: 0, headerShots: 0, dribbleTicks: 0,
+        // 압박 탈취 지점·전환 창 — 압박의 이득(전방 탈취 → 즉시 슈팅)을 재는 값
+        winN: 0, winSum: 0, transShots: 0, behindShots: 0,
         widthSum: 0, widthN: 0, depthSum: 0, depthN: 0,
       },
     };
@@ -741,18 +743,20 @@ export class Match {
       df -= pass * 3; mf -= pass * 2.5; fw += pass * 2;
     }
     if (!hasBall) {
-      // 강한 압박 = 블록 자체가 올라와 상대를 조입니다
-      df += press * 4; mf += press * 6; fw += press * 9;
+      // 강한 압박 = 블록 자체가 조금 올라와 상대를 조입니다.
+      // (예전에는 라인을 9u까지 밀어 올려, 압박을 걸면 수비 대형이 통째로 앞으로 나가
+      //  뒤가 비었습니다 — 압박의 이득보다 실점이 커진 원인)
+      df += press * 0.8; mf += press * 1.6; fw += press * 2.4;
     } else {
-      df += press * 2;
+      df += press * 1.6;
     }
     // ── 팀 성향 ──
     // 잠그기·수비적: 수비 라인부터 내리고 라인 간격을 좁혀 두 줄 블록을 만듭니다.
     // 공격적·총공세: 전원이 앞으로 올라가고 공격 라인은 더 벌어집니다.
     if (ment !== 0) {
-      df += ment * (hasBall ? 5.5 : 6.5);
-      mf += ment * 9.5;
-      fw += ment * 5.5;
+      df += ment * (hasBall ? 6.5 : 9);
+      mf += ment * (hasBall ? 9.5 : 11);
+      fw += ment * 9.5;
       if (ment < 0) {
         const k = 1 + ment * 0.3;                  // -1 → 간격 70%
         mf = df + (mf - df) * k;
@@ -782,8 +786,11 @@ export class Match {
       df: clamp(df, 6, 88), mf: clamp(mf, 10, 92), fw: clamp(fw, 24, 94),
       wide: clamp(wide, 6, 28), mid: clamp(mid, 2.5, 12),
       ballP, line, press, pass, route, hasBall, men, oppLine, ment,
-      pressCount: Math.max(1, Math.min(4, 1 + Math.round((press + 1) * 1.25) - (side.reds || 0))),
-      pressRange: clamp(18 + (press + 1) * 7 - Math.max(0, -ment) * 3.5, 12, 34),
+      // 압박 인원·반경 — 압박이 세면 '더 많은 선수가 더 가까이' 달려듭니다.
+      // (예전에는 반경이 34u까지 넓어져, 30u 밖에 있던 4번째 선수가 자기 자리를 버리고
+      //  달려오느라 압박을 걸수록 대형이 무너졌습니다)
+      pressCount: Math.max(1, Math.min(3, 1 + Math.round((press + 1) * 1.0) - (side.reds || 0))),
+      pressRange: clamp(14 + (press + 1) * 6 - Math.max(0, -ment) * 3.5, 11, 27),
     };
   }
 
@@ -1045,7 +1052,7 @@ export class Match {
 
       // ① 크로스가 날아가는 중 — 문전으로 쇄도합니다 (헤더·세컨드볼 각도)
       if (ball.mode === 'pass' && ball.cross && ball.passer && ball.passer.side === e.side
-        && (e.pos === 'FW' || (e.pos === 'MF' && e.slot.x > 0.38))) {
+        && (e.pos === 'FW' || (e.pos === 'MF' && (e.slot.x > 0.38 || Math.abs(e.slot.y - 0.5) > 0.42)))) {
         const sign = e.slot.y < 0.5 ? -1 : 1;
         const ry = CY + sign * (4.5 + Math.abs(e.ry || 0) * 0.35);
         return this.onsideClamp(e, { x: dir > 0 ? 89 : W - 89, y: clamp(ry, 7, H - 7) });
@@ -1109,7 +1116,9 @@ export class Match {
           return this.onsideClamp(e, { x: dir > 0 ? 82 : W - 82, y: clamp(CY + mySide * 8.5, 9, H - 9) });
         }
         if (e.pos === 'MF' && Math.abs(sy) < 0.5 && e.slot.x > 0.4) {
-          return this.onsideClamp(e, { x: dir > 0 ? 79 : W - 79, y: clamp(CY + (e.slot.y < 0.5 ? -11 : 11), 10, H - 10) });
+          // 측면 루트를 쓰면 2선이 문전(박스)까지 올라와 크로스에 몸을 겁니다
+          const bx = 79 + Math.max(0, sh.route) * 6;
+          return this.onsideClamp(e, { x: dir > 0 ? bx : W - bx, y: clamp(CY + (e.slot.y < 0.5 ? -11 : 11), 10, H - 10) });
         }
       }
       // ⑥ 측면 공격수는 깊은 지역에서 엔드라인을 향해 벌어집니다 (컷백 각도)
@@ -1119,7 +1128,7 @@ export class Match {
       }
       // ⑦ 오버랩 — 윙백은 볼이 앞으로 넘어가면 윙어 뒤를 받쳐 줍니다 (풀백은 뒤에 남습니다 · 잠그기에서는 아무도 올라가지 않습니다)
       if (e.pos === 'DF' && wideRole && tune.overlap > 0 && sh.ment > -0.75 && sh.ballP > 44) {
-        let depth = clamp(sh.ballP - 4, 24, 82);
+        let depth = clamp(sh.ballP + 1, 24, 84);
         const lim = this.onsideLimit(e);
         if (lim != null) depth = Math.min(depth, lim - 0.8);
         return { x: dir > 0 ? depth : W - depth, y: clamp(CY + mySide * (H / 2 - 6.5), 3.5, H - 3.5) };
@@ -1199,8 +1208,10 @@ export class Match {
     if (e.runT > 0) return;
     if (e.runCd > 0) { e.runCd -= 1; return; }
     const tune = this.tuneOf(e);
+    // 압박으로 뺏은 직후에는 앞선이 뒷공간으로 한 번 더 달립니다 (전환의 실제 이득)
+    const trans = Math.max(this.transitionBonus(this.sides[e.side]), this.counterBonus(this.sides[e.side]));
     const push = (0.16 + Math.max(0, sh.line) * 0.08 + Math.max(0, sh.pass) * 0.04
-      + Math.max(0, sh.ment || 0) * 0.12) * clamp(0.6 + tune.run * 0.45, 0.4, 1.6);
+      + Math.max(0, sh.ment || 0) * 0.12 + trans * 0.18) * clamp(0.6 + tune.run * 0.45, 0.4, 1.6);
     if (this.rng() < push) {
       e.runT = rint(this.rng, 10, 22);
       e.runCd = e.runT + rint(this.rng, 12, 34);
@@ -1226,7 +1237,10 @@ export class Match {
     }
     // 깊은 측면에서는 안으로 접지 않고 엔드라인까지(컷백 각도)
     if (sh && p > 76 && Math.abs(e.y - CY) > 11 && sh.route > 0.15) ty = e.y + (e.y < CY ? -1.2 : 1.2);
-    return { x: clamp(e.x + dir * (p > 68 ? 8 : p > 45 ? 5.5 : 4), 2, W - 2), y: clamp(ty, 3, H - 3) };
+    // 압박으로 뺏은 직후·역습 창에는 수비가 정리되기 전에 골문 쪽으로 더 밀고 들어갑니다
+    const trans = Math.max(this.transitionBonus(this.sides[e.side]), this.counterBonus(this.sides[e.side]));
+    const push = trans > 0.3 ? 4.5 * trans : 0;
+    return { x: clamp(e.x + dir * (p > 68 ? 8 : p > 45 ? 5.5 : 4) + dir * push, 2, W - 2), y: clamp(ty, 3, H - 3) };
   }
 
   /* ───────────── 공 소유자의 판단 ───────────── */
@@ -1235,6 +1249,38 @@ export class Match {
     let n = 0;
     for (const o of opp) if (o.onPitch && dist(o, e) < 6.5) n += 1;
     return n;
+  }
+
+  /* 압박으로 공을 뺏은 직후의 전환 가중치 — 높은 곳에서 뺏을수록, 뺏은 직후일수록 큽니다 */
+  transitionBonus(side) {
+    const press = Number(side.tactic.press) || 0;
+    if (press <= 0.25) return 0;
+    const lw = side.lastWin;
+    if (!lw || lw.prog < 42) return 0;
+    const age = this.t - lw.t;
+    if (age < 0 || age > 38) return 0;
+    return clamp(press, 0, 1) * (1 - age / 38) * (lw.prog > 55 ? 1 : 0.55);
+  }
+
+  /* 실점 위험의 뿌리 — 공을 잃은 팀이 얼마나 앞으로 나와 있었는가.
+     높은 라인·전원 전진(총공세)일수록 잃은 자리 뒤에 공간이 크고, 그 공간으로 역습이 시작됩니다. */
+  counterBonus(side) {
+    const lw = side.lastWin;
+    if (!lw) return 0;
+    const age = this.t - lw.t;
+    if (age < 0 || age > 18) return 0;
+    if (lw.prog > 54) return 0;                 // 상대 진영에서 뺏은 공은 이미 골문 가까이 — 전환 보너스가 따로 있습니다
+    const opp = this.sides[this.opposing[side.name]];
+    let sum = 0, n = 0;
+    for (const e of opp.players) {
+      if (!e.onPitch || e.pos === 'GK') continue;
+      sum += prog(e.x, opp.dir);                // 상대가 자기 골문에서 얼마나 멀리 나와 있는가
+      n += 1;
+    }
+    if (!n) return 0;
+    const commit = clamp((sum / n - 45) / 30, 0, 1.2);
+    const support = clamp((lw.fwd ?? 3) / 4, 0.25, 1.3);
+    return commit * support * (1 - age / 18);
   }
 
   thinkCarrier() {
@@ -1257,15 +1303,31 @@ export class Match {
     const side = this.sides[c.side];
     const sh = side._shape || this.computeShape(side, true);
 
-    if (c.pos !== 'GK' && dGoal < 30) {
+    const behind = this.behindLine(c);
+    // 압박 탈취 직후의 전환 창 — 게겐프레싱의 실제 이득은 '뺏은 자리에서 바로 때리는 것'입니다
+    const trans = Math.max(this.transitionBonus(side), this.counterBonus(side));
+    const mentNow = Number(side.tactic.mentality) || 0;
+    const shootRange = 30 + Math.max(0, mentNow) * 6;      // 총공세는 조금 더 멀리서도 문을 봅니다
+    if (c.pos !== 'GK' && (dGoal < shootRange || (behind > 0.5 && dGoal < 38))) {
       const angle = 1 - Math.abs(c.y - CY) / H;
       const tune = this.tuneOf(c);
       let urge = clamp((26 - dGoal) / 23, 0, 1) * 1.02 * (this.eff(c, 'sho') / 70) * angle;
+      if (behind > 0.5) urge = Math.max(urge, 0.3) * 1.25;     // 라인 뒤 1대1 — 망설이지 않고 때립니다
+      if (trans > 0) urge = Math.max(urge, 0.16) * (1 + trans * 1.4);   // 압박으로 뺏은 직후
       if (side.tactic.route < -0.4) urge *= 1.2;
+      // 측면 루트 — 터치라인까지 내려간 뒤 좁은 각에서도 과감하게 때립니다 (컷백·니어포스트 슈팅)
+      if (side.tactic.route > 0.3 && Math.abs(c.y - CY) > 11) urge *= 1.45;
       urge *= tune.shoot;                                    // 포처·인사이드 포워드는 더 자주, 홀딩·풀백은 더 아깝게
-      urge *= 1 + Math.max(-0.3, Number(side.tactic.mentality) || 0) * 0.25;   // 공격적·총공세는 슈팅 가중 ↑
+      urge *= 1 + Math.max(-0.55, Number(side.tactic.mentality) || 0) * 0.42;  // 잠그기는 아껴 쏘고 총공세는 쏟아냅니다
       urge *= 1 - Math.min(pressure, 3) * 0.14;
-      if (this.rng() < clamp(urge, 0.01, 0.72)) return this.shoot(c, dGoal, pressure);
+      // 상대가 압박을 걸지 않으면 슈터에게 시간이 생깁니다 — 한 번 더 보고 때립니다
+      urge *= 1 + Math.max(0, -(Number(this.sides[this.opposing[c.side]].tactic.press) || 0)) * 0.22;
+      // 우리 팀 압박 성향도 슈팅 태도에 반영됩니다 — 압박 팀은 전방에서 계속 때리고, 대기 팀은 아낍니다
+      urge *= 1 + (Number(side.tactic.press) || 0) * 0.14;
+      if (this.rng() < clamp(urge, 0.01, 0.72)) {
+        if (trans > 0.3) side.stats.transShots += 1;
+        return this.shoot(c, dGoal, pressure);
+      }
     }
 
     // 빈 공간 드리블 — 앞이 비어 있으면 패스 대신 직접 치고 달립니다
@@ -1345,6 +1407,7 @@ export class Match {
     const route = side.tactic.route || 0;
     const ment = Number(side.tactic.mentality) || 0;
     const tune = this.tuneOf(c);          // 패서의 역할 — 크로스·스루패스·안전 패스 성향
+    const trans = Math.max(this.transitionBonus(side), this.counterBonus(side));   // 압박 탈취 직후에는 앞으로 찌릅니다
     const ballP = prog(c.x, c.dir);
     const offLine = this.offsideLineDepth(c.side);
     // 가끔은 라인을 확인하지 못하고 패스합니다 — 오프사이드가 나오는 지점입니다.
@@ -1431,6 +1494,8 @@ export class Match {
       if (this.roleOf(m) === 'target' && forward > 0.25 && d < 26) score += 0.16;
       // 팀 성향 — 앞으로 가는 패스에 가중(공격적·총공세) / 위험한 패스는 회피(잠그기·수비적)
       score += ment * Math.max(0, forward) * 0.26;
+      if (trans > 0) score += trans * Math.max(0, forward) * 0.8;
+      if (trans > 0.3 && kind === 'through') score += trans * 0.22;
       if (ment < 0) {
         score -= risk * -ment * 0.5;
         // 잠그기는 수비 뒤에서 공을 뺏은 뒤 앞선으로 길게 넘기는 역습을 노립니다
@@ -1488,6 +1553,8 @@ export class Match {
     ball.passer = c;
     ball.receiver = m;
     ball.cross = k === 'cross';
+    ball.press = this.pressureOn(c);       // 패스할 때 받은 압박 — 정확도에 반영됩니다
+    ball.dist = d;
     ball.owner = null;
     ball.trail = [];
     c.decCd = rint(this.rng, 0, 1);
@@ -1524,18 +1591,60 @@ export class Match {
   }
 
   /* ───────────── 슈팅 ───────────── */
+  /* 슈터와 골문 사이에 서 있는 수비수 수 — 내려앉은 블록은 몸으로 슈팅 각을 지웁니다.
+     (예전에는 거리·각도·압박만 봤기 때문에, 문전에 10명이 늘어선 잠그기도 먼 거리에서
+      한 명만 마크하는 총공세와 같은 확률로 슈팅을 내줬습니다) */
+  blockersOn(c) {
+    const opp = this.sides[this.opposing[c.side]].players;
+    const p0 = prog(c.x, c.dir);
+    const gx = c.dir > 0 ? W : 0;
+    const dGoal = Math.hypot(gx - c.x, CY - c.y) || 1;
+    let n = 0;
+    for (const o of opp) {
+      if (!o.onPitch || o.pos === 'GK') continue;
+      const po = prog(o.x, c.dir);
+      if (po <= p0 + 0.5) continue;                       // 슈터보다 뒤에 있으면 가리지 못합니다
+      const t = clamp((po - p0) / dGoal, 0, 1);
+      const laneY = c.y + (CY - c.y) * t;
+      const half = 3.4 + (po - p0) * 0.2;                 // 거리가 멀수록 시야가 넓습니다
+      if (Math.abs(o.y - laneY) <= half) n += 1;
+    }
+    return n;
+  }
+  /* 수비 라인 뒤에서 잡은 공인가 — 0(라인 앞) ~ 1.4(완전히 뒤, 골키퍼와 1대1) */
+  behindLine(c) {
+    const line = this.offsideLineDepth(c.side);
+    if (line == null) return 0;
+    const d = prog(c.x, c.dir) - line;
+    if (d <= 0.6) return 0;
+    return clamp(d / 10, 0, 1.4);
+  }
   xgFor(c, dGoal, pressure) {
     const angle = 1 - Math.abs(c.y - CY) / 42;
-    const base = 1.12 * Math.exp(-dGoal / 8.4) * clamp(angle, 0.12, 1);
+    const base = 1.26 * Math.exp(-dGoal / 8.4) * clamp(angle, 0.12, 1);
     const skill = 0.72 + this.eff(c, 'sho') / 210;
     const press = 1 - Math.min(pressure, 3) * 0.11;
-    return clamp(base * skill * press, 0.02, 0.6);
+    // 수비 팀의 성향 — 내려앉은 블록은 몸이 더 두껍고, 전원 전진한 팀은 뒷공간이 열려 있습니다
+    const defMent = Number(this.sides[this.opposing[c.side]].tactic.mentality) || 0;
+    // 내려앉을수록 문전에 몸이 많아 슈팅이 막히고, 전원 전진하면 뒤가 열립니다
+    const blockFloor = clamp(0.34 - Math.max(0, -defMent) * 0.2, 0.15, 0.4);
+    const block = clamp(1 - this.blockersOn(c) * 0.09 * (1 - defMent * 0.55), blockFloor, 1);   // 몸으로 막힌 슈팅
+    const behind = 1 + this.behindLine(c) * 0.6 * (1 + Math.max(0, defMent) * 0.25);            // 라인 뒤 1대1
+    // 공격 팀의 성향 — 가담 인원이 많으면 문전에 동료가 있어 마무리 각이 살고, 내려앉으면 고립됩니다
+    const attMent = Number(this.sides[c.side].tactic.mentality) || 0;
+    const support = 1 + attMent * 0.13;
+    // 수비 팀의 성향 — 전원 전진(총공세)하면 뒷공간이 열려 상대 슈팅의 값이 올라가고,
+    // 내려앉으면(잠그기) 문전이 빽빽해 슈팅 값이 내려갑니다
+    const defPress = Number(this.sides[this.opposing[c.side]].tactic.press) || 0;
+    const space = 1 + Math.max(0, defMent) * 0.34 - Math.max(0, -defMent) * 0.1
+      + Math.max(0, -defPress) * 0.12;
+    return clamp(base * skill * press * block * behind * support * space, 0.02, 0.85);
   }
 
   shoot(c, dGoal, pressure, header = false) {
     const side = this.sides[c.side];
     const gx = c.dir > 0 ? W : 0;
-    const xg = this.xgFor(c, dGoal, pressure) * (header ? 0.5 : 1);
+    const xg = this.xgFor(c, dGoal, pressure) * (header ? 0.62 : 1);
     const ball = this.ball;
     const gk = this.sides[this.opposing[c.side]].players.find((e) => e.pos === 'GK' && e.onPitch);
     // 결과는 슛을 때리는 순간 정해 두되(애니메이션을 미리 맞추기 위해),
@@ -1571,6 +1680,9 @@ export class Match {
     ball.passer = null;
     c.st.shots += 1;
     side.stats.shots += 1;
+    if (header) side.stats.headerShots += 1;
+    if (this.behindLine(c) > 0.5) side.stats.behindShots += 1;
+    side.stats.blockSum = (side.stats.blockSum || 0) + this.blockersOn(c);
     side.stats.xg += xg;
     side.stats.shotDist += dGoal;
     c.decCd = 2;
@@ -1778,7 +1890,8 @@ export class Match {
           const d = Math.hypot(o.x - b.x, o.y - b.y);
           // 공이 지나가는 길목의 수비수가 끊을 수 있습니다
           // (비행이 여러 틱으로 늘었으니 틱당 확률을 dur 로 나눠 전체 차단 확률은 그대로)
-          if (d < 1.9 && this.rng() < (0.07 + this.eff(o, 'def') / 1000) * STEP_K / Math.max(1, b.dur)) {
+          const cut = 1 - Math.max(0, -(Number(this.sides[b.passer.side].tactic.pass) || 0)) * 0.32;
+          if (d < 1.9 && this.rng() < (0.07 + this.eff(o, 'def') / 1000) * STEP_K / Math.max(1, b.dur) * cut) {
             this.intercept(o, b.passer);
             return;
           }
@@ -1801,6 +1914,7 @@ export class Match {
       for (const e of all) { const d = dist(e, b); if (d < bd) { bd = d; best = e; } }
       if (best && bd < 1.6) {
         b.owner = best; b.mode = 'carry'; best.decCd = 1;
+        this.noteWin(best);                     // 흐른 공을 주워 possession 을 되찾은 것도 '탈취'입니다
         if (best.pos === 'GK') { best.holdT = this.t; best.holdUntil = this.t + 1; }
       }
     }
@@ -1828,6 +1942,36 @@ export class Match {
     if (!rec || !rec.onPitch) return;
     const opps = this.sides[this.opposing[rec.side]].players.filter((e) => e.onPitch && e.pos !== 'GK');
 
+    // 패스 정확도 — 길게 차는 패스일수록, 압박받을수록 발밑에 정확히 닿지 않습니다.
+    // (예전에는 어떤 패스든 리시버 발밑에 정확히 도착해서 롱볼도 점유율이 떨어지지 않았고,
+    //  게겐프레싱으로 압박해도 상대 패스가 흔들리지 않아 압박의 이득이 없었습니다)
+    if (kind !== 'cross' && kind !== 'cutback') {
+      const dd = b.dist || Math.hypot(at.x - (b.from?.x ?? at.x), at.y - (b.from?.y ?? at.y));
+      const pressN = b.press || 0;
+      const pas = passer ? this.eff(passer, 'pas') : 62;
+      // 위험을 감수하는 축(롱볼)은 실수가 늘고, 안전을 택한 축(짧은 패스)은 줄어듭니다
+      const style = Number(this.sides[rec.side].tactic.pass) || 0;
+      const risk = 1 + Math.max(0, style) * 0.7 - Math.max(0, -style) * 0.4;
+      const errP = clamp(((dd > 22 ? (dd - 22) * 0.014 : 0) + pressN * 0.06 + (60 - pas) * 0.005) * risk, 0, 0.5);
+      if (this.rng() < errP) {
+        const st2 = this.sides[rec.side].stats;
+        st2.passBad = (st2.passBad || 0) + 1;
+        b.mode = 'loose';
+        b.vx = 0; b.vy = 0;
+        let bx = at.x + (this.rng() - 0.5) * Math.min(12, 3 + dd * 0.18);
+        let by = at.y + (this.rng() - 0.5) * Math.min(16, 4 + dd * 0.24);
+        // 긴 공은 수비 라인이 떨어뜨립니다 — 떨어진 자리 가까운 수비수가 먼저 줍습니다
+        if (dd > 28) {
+          let near = null, nd = 1e9;
+          for (const o of opps) { const d = Math.hypot(o.x - bx, o.y - by); if (d < nd) { nd = d; near = o; } }
+          if (near && nd < 13) { bx += (near.x - bx) * 0.4; by += (near.y - by) * 0.4; }
+        }
+        b.x = clamp(bx, 2, W - 2);
+        b.y = clamp(by, 3, H - 3);
+        return;
+      }
+    }
+
     // 스루패스는 '공이 떨어진 지점'에서 승부가 납니다 — 달려온 동료와 먼저 도착한 수비수의 경합
     if (kind === 'through') {
       const dr = Math.hypot(rec.x - at.x, rec.y - at.y);
@@ -1854,6 +1998,27 @@ export class Match {
       return;
     }
 
+    // 긴 공의 공중볼 — 롱볼은 앞선이 수비수와 붙어 버티는 경합입니다. 붙어 있으면 수비가 이깁니다.
+    // (예전에는 롱볼도 짧은 패스와 똑같이 리시버 발밑에 붙어, 점유율이 거의 떨어지지 않았습니다)
+    const dd2 = b.dist || Math.hypot(at.x - (b.from?.x ?? at.x), at.y - (b.from?.y ?? at.y));
+    if (dd2 > 26) {
+      const guard = opps.filter((o) => dist(o, rec) < 7).sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
+      if (guard) {
+        const air = this.eff(guard, 'def') * 0.6 + this.eff(guard, 'spd') * 0.2;
+        const hold = this.eff(rec, 'sho') * 0.22 + this.eff(rec, 'dri') * 0.2 + (rec.p.stats.sta || 60) * 0.5;
+        const p = clamp((air / (air + hold)) * 1.0, 0.24, 0.82);
+        if (this.rng() < p) {
+          b.cross = false; b.kind = 'pass';
+          b.owner = guard; b.mode = 'carry';
+          b.x = guard.x + guard.dir * 0.8; b.y = guard.y;
+          guard.decCd = 1; guard.st.tackles += 1; guard.rd += 0.04;
+          this.sides[guard.side].stats.tackles += 1;
+          if (passer) passer.st.passOk += 1;
+          return;
+        }
+      }
+    }
+
     const near = opps.filter((o) => dist(o, rec) < 3.2).sort((a, c2) => dist(a, rec) - dist(c2, rec))[0];
     if (near && this.rng() < 0.13 + this.eff(near, 'def') / 950) {
       if (passer) passer.st.passOk += 1;
@@ -1866,7 +2031,7 @@ export class Match {
       return;
     }
     // 크로스·컷백은 수비가 걷어내는 경우가 있습니다 (컷백은 낮고 빨라 걷어내기 어렵습니다)
-    const clearP = kind === 'cross' ? 0.26 : kind === 'cutback' ? 0.16 : 0;
+    const clearP = kind === 'cross' ? 0.19 : kind === 'cutback' ? 0.12 : 0;
     if (clearP && this.rng() < clearP) {
       const clears = this.sides[this.opposing[rec.side]].players
         .filter((e) => e.onPitch && e.pos !== 'GK')
@@ -1896,18 +2061,33 @@ export class Match {
       const dG = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
       if (pr < 2.6 && this.rng() < (b.cross || kind === 'cutback' ? 0.5 : 0.66)) { this.shoot(rec, dG, pr); return; }
     }
-    if ((b.cross || kind === 'cutback') && Math.abs(rec.y - CY) < 13 && prog(rec.x, rec.dir) > 70 && rec.pos === 'FW') {
+    if ((b.cross || kind === 'cutback') && Math.abs(rec.y - CY) < 13 && prog(rec.x, rec.dir) > 70 && (rec.pos === 'FW' || rec.pos === 'MF')) {
       const dGoal = Math.hypot((rec.dir > 0 ? W : 0) - rec.x, CY - rec.y);
       // 타깃맨은 머리로 때리는 확률이 더 높습니다
-      const headerP = kind === 'cutback' ? 0.46 : 0.36 + (this.roleOf(rec) === 'target' ? 0.16 : 0);
+      const routeUp = Math.max(0, Number(this.sides[rec.side].tactic.route) || 0);
+      const headerP = kind === 'cutback' ? 0.46 : 0.36 + routeUp * 0.12 + (this.roleOf(rec) === 'target' ? 0.16 : 0);
       if (this.rng() < headerP) { this.shoot(rec, dGoal, this.pressureOn(rec), true); return; }
     }
     b.cross = false;
     b.kind = 'pass';
   }
 
+  /* 공을 뺏은 순간을 기록합니다 — 압박 팀은 이 지점에서 곧바로 공격을 시작합니다 */
+  noteWin(defender) {
+    const side = this.sides[defender.side];
+    // 탈취 순간 우리 진영에 몇 명이 올라가 있었는가 — 역습의 '호위'가 됩니다.
+    // (내려앉아 싸우는 팀은 뺏어도 앞에 동료가 없어 역습이 외롭고, 압박·총공세 팀은 여러 명이 함께 나갑니다)
+    const fwd = side.players.filter((e) => e.onPitch && e.pos !== 'GK' && prog(e.x, defender.dir) > 48).length;
+    side.lastWin = { t: this.t, prog: prog(defender.x, defender.dir), fwd };
+    side.stats.winN += 1;
+    const wp = prog(defender.x, defender.dir);
+    side.stats.winSum += wp;
+    if (wp > 55) side.stats.winHigh = (side.stats.winHigh || 0) + 1;
+  }
+
   intercept(defender, passer) {
     const b = this.ball;
+    this.noteWin(defender);
     b.owner = defender;
     b.mode = 'carry';
     b.x = defender.x; b.y = defender.y;
@@ -1934,9 +2114,12 @@ export class Match {
       d.tackleCd = rint(this.rng, 1, 3) / STEP_K;
       const def = this.eff(d, 'def') + this.eff(d, 'spd') * 0.25;
       const dri = this.eff(c, 'dri') * 0.8 + this.eff(c, 'spd') * 0.45 + this.eff(c, 'vis') * 0.1;
-      const p = clamp((def / (def + dri)) * 0.42, 0.05, 0.44);
+      // 압박을 걸고 있으면 달려든 선수의 태클이 더 세게 들어갑니다 (게겐프레싱의 실제 이득)
+      const pressUp = 1 + Math.max(0, Number(this.sides[d.side].tactic.press) || 0) * 0.45;
+      const p = clamp((def / (def + dri)) * 0.42 * pressUp, 0.05, 0.5);
       if (this.rng() < p) {
         if (this.rng() < 0.7) { this.commitFoul(d, c); return; }
+        this.noteWin(d);
         b.owner = d; b.mode = 'carry';
         d.decCd = 1;
         d.st.tackles += 1; d.rd += 0.09;
@@ -2362,6 +2545,14 @@ export class Match {
     const side = this.sides[this.userSide];
     side.tactic = { ...side.tactic, ...tactic };
   }
+  /* 경기 중 역할 변경 — 자리에 붙은 역할을 바꿉니다 (선수는 그대로) */
+  setRoleAt(e, role) {
+    if (!e || !e.onPitch) return null;
+    const label = e.label || e.slot?.label || e.pos;
+    if (e.pos === 'GK' || label === 'GK') return null;
+    e.role = roleFor(label, role);
+    return e.role;
+  }
   setFormation(fid) {
     const side = this.sides[this.userSide];
     if (!FORMATIONS[fid]) return;
@@ -2369,12 +2560,38 @@ export class Match {
     const slots = FORMATIONS[fid].slots;
     const outfield = side.players.filter((e) => e.onPitch && e.pos !== 'GK');
     const gk = side.players.find((e) => e.pos === 'GK' && e.onPitch);
+    // 자리-선수 배정은 '포지션 적합도 우선'으로 전체를 봅니다 (자리 순서대로 남은 최고를 넣으면
+    // 수비수가 ST로 밀려 들어갑니다)
+    const pairs = [];
+    outfield.forEach((e) => slots.forEach((slot, i) => {
+      if (slot.pos === 'GK') return;
+      pairs.push({ e, i, v: posFactor(slot.pos, e.p.pos) * 100 + e.p.ovr * 0.6 });
+    }));
+    pairs.sort((a, b) => b.v - a.v);
+    const placed = new Array(slots.length).fill(null);
     const used = new Set();
-    slots.forEach((slot) => {
+    for (const { e, i } of pairs) {
+      if (placed[i] || used.has(e)) continue;
+      placed[i] = e; used.add(e);
+    }
+    // 두 자리 교환으로 개선
+    for (let iter = 0; iter < 5; iter++) {
+      let moved = false;
+      for (let a = 0; a < slots.length; a += 1) {
+        for (let b = a + 1; b < slots.length; b += 1) {
+          const ea = placed[a], eb = placed[b];
+          if (!ea || !eb) continue;
+          const now = posFactor(slots[a].pos, ea.p.pos) + posFactor(slots[b].pos, eb.p.pos);
+          const sw = posFactor(slots[a].pos, eb.p.pos) + posFactor(slots[b].pos, ea.p.pos);
+          if (sw > now + 0.001) { placed[a] = eb; placed[b] = ea; moved = true; }
+        }
+      }
+      if (!moved) break;
+    }
+    slots.forEach((slot, i) => {
       if (slot.pos === 'GK') { if (gk) { gk.slot = slot; gk.factor = posFactor('GK', gk.p.pos); } return; }
-      const cands = outfield.filter((e) => !used.has(e)).sort((a, b) => ((b.p.pos === slot.pos ? 10 : 0) + b.p.ovr / 10) - ((a.p.pos === slot.pos ? 10 : 0) + a.p.ovr / 10));
-      const e = cands[0];
-      if (e) { used.add(e); e.slot = slot; e.pos = slot.pos; e.label = slot.label; e.role = roleFor(slot.label, e.role); e.factor = posFactor(slot.pos, e.p.pos); }
+      const e = placed[i];
+      if (e) { e.slot = slot; e.pos = slot.pos; e.label = slot.label; e.role = roleFor(slot.label, e.role); e.factor = posFactor(slot.pos, e.p.pos); }
     });
   }
   canSub() { return this.sides[this.userSide].subsUsed < 5 && !this.done; }
@@ -2464,10 +2681,16 @@ export function lineupFor(world, teamId) {
   const base = teamId === world.myTeamId ? world.myLineup : autoLineup(world, teamId, t.formation);
   const bad = (id) => { const p = world.players[id]; return !p || p.bans > 0 || p.inj > 0; };
   if (!base.starters.some((id) => id && bad(id))) return base;
-  // 출전 정지·부상 선수는 후보 중 뛸 수 있는 선수로 바꿉니다
-  const pool = (base.bench || []).filter((id) => !bad(id) && !base.starters.includes(id));
+  // 출전 정지·부상 선수는 뛸 수 있는 선수로 바꿉니다.
+  // 후보가 모자라면 선수단 전체에서, 그것도 없으면 그대로 둡니다(경기는 11명으로 시작해야 합니다).
+  const used = new Set(base.starters.filter(Boolean));
+  const pool = [
+    ...(base.bench || []).filter((id) => !bad(id) && !used.has(id)),
+    ...squadOf(world, teamId).filter((p) => available(world, p) && !used.has(p.id)).map((p) => p.id),
+  ];
   const starters = base.starters.map((id) => (id && !bad(id) ? id : pool.shift() || id));
-  return { ...base, starters };
+  const bench = (base.bench || []).filter((id) => !starters.includes(id));
+  return { ...base, starters, bench };
 }
 
 /* 다른 경기의 결과를 세계에 반영 */

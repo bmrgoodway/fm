@@ -12,6 +12,15 @@ const sum = (a) => a.reduce((x, y) => x + y, 0);
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
 export function myTeam(w) { return w.teams[w.myTeamId]; }
+/* 화면이 '내 팀의 전술'을 물을 때 쓰는 단일 출처 — 팀 기본값이 아니라 감독이 저장한 라인업입니다. */
+export function mySetup(w) {
+  const l = w.myLineup || {};
+  return {
+    formation: l.formation || myTeam(w).formation,
+    tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(l.tactic || {}) },
+    roles: Array.isArray(l.roles) ? l.roles : [],
+  };
+}
 export function player(w, id) { return w.players[id]; }
 export function squadOf(w, teamId) {
   const t = w.teams[teamId];
@@ -438,23 +447,52 @@ export function remapRoles(roles, fromId, toId) {
   });
 }
 
+/* 자리-선수 배정 — 포지션 적합도를 먼저 보고, 그다음 종합·기존 선발 여부를 봅니다.
+   (예전에는 자리 순서대로 '남은 선수 중 최고'를 넣어서, 3-5-2로 바꾸면 수비수가 ST에,
+    공격수가 윙백 자리에 밀려 들어갔습니다) */
+export function assignSlots(w, slots, prefer = []) {
+  const preferSet = new Set(prefer.filter(Boolean));
+  const squad = squadOf(w, w.myTeamId);
+  const fit = squad.filter((p) => available(w, p));
+  const pool = fit.length >= slots.length ? fit : squad;
+  const val = (p, slot) => posFactor(slot.pos, p.pos) * 100 + p.ovr * 0.6 + (preferSet.has(p.id) ? 18 : 0);
+  const pairs = [];
+  pool.forEach((p) => slots.forEach((s, si) => pairs.push({ pid: p.id, si, v: val(p, s) })));
+  pairs.sort((a, b) => b.v - a.v);
+  const out = new Array(slots.length).fill(null);
+  const used = new Set();
+  for (const { pid, si } of pairs) {
+    if (out[si] || used.has(pid)) continue;
+    out[si] = pid; used.add(pid);
+  }
+  // 국소 개선 — 두 자리를 맞바꿔 합이 커지면 교환합니다
+  const byId = (id) => w.players[id];
+  for (let iter = 0; iter < 6; iter++) {
+    let moved = false;
+    for (let a = 0; a < out.length; a += 1) {
+      for (let b = a + 1; b < out.length; b += 1) {
+        const pa = byId(out[a]), pb = byId(out[b]);
+        if (!pa || !pb) continue;
+        const now = val(pa, slots[a]) + val(pb, slots[b]);
+        const swap = val(pb, slots[a]) + val(pa, slots[b]);
+        if (swap > now + 0.01) { out[a] = pb.id; out[b] = pa.id; moved = true; }
+      }
+    }
+    if (!moved) break;
+  }
+  return out;
+}
+
 export function setFormation(w, fid) {
   const l = w.myLineup;
   if (!FORMATIONS[fid]) return;
-  const players = l.starters.filter(Boolean).map((id) => w.players[id]).filter(Boolean);
   const slots = FORMATIONS[fid].slots;
   l.roles = remapRoles(l.roles, l.formation, fid);
-  const used = new Set();
-  const starters = slots.map((slot) => {
-    const cands = players.filter((p) => !used.has(p.id));
-    if (!cands.length) return null;
-    cands.sort((a, b) => ((b.pos === slot.pos ? 10 : 0) + b.ovr / 10) - ((a.pos === slot.pos ? 10 : 0) + a.ovr / 10));
-    used.add(cands[0].id);
-    return cands[0].id;
-  });
   l.formation = fid;
-  l.starters = starters;
-  const rest = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id)).sort((a, b) => b.ovr - a.ovr);
+  l.starters = assignSlots(w, slots, l.starters);
+  const used = new Set(l.starters.filter(Boolean));
+  const rest = squadOf(w, w.myTeamId).filter((p) => !used.has(p.id))
+    .sort((a, b) => (available(w, b) ? 1 : 0) - (available(w, a) ? 1 : 0) || b.ovr - a.ovr);
   const gk = rest.find((p) => p.pos === 'GK');
   l.bench = (gk ? [gk, ...rest.filter((p) => p !== gk)] : rest).slice(0, 7).map((p) => p.id);
   fillLineup(w);

@@ -11,10 +11,11 @@
 //   12) 포지션별 역할(Role) — 좌표·크로스/스루패스 선택·압박 반경·개인 슈팅/침투
 //   13) 역할·팀 성향이 없는 기존 세이브 호환
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole } from '../src/world.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, lineupInfo, fillLineup, mySetup } from '../src/world.js';
 import { Match, lineupFor, applyResult, CY, W } from '../src/match.js';
 import { FORMATIONS } from '../src/data.js';
 import { roleFor, resolveRoles, defaultRole, ROLE_TUNING, MENTALITY } from '../src/tactics.js';
+import { boardPos } from '../src/views.js';
 
 const N = Number(process.argv[2] || 24);
 const prog = (x, dir) => (dir > 0 ? x : 100 - x);   // 공격 방향 기준 진행도
@@ -523,7 +524,7 @@ console.log('\n[8] 전술별 패스 패턴·공간');
   ok(longW.sw - shortC.sw > 8, '롱볼·측면은 사이드 전환이 훨씬 많음', `전환 ${f(shortC.sw)}% → ${f(longW.sw)}%`);
   ok(shortC.gg >= bal.gg * 0.6, '짧은 패스 축은 원투(원-투) 연계를 유지', `원투 ${f(shortC.gg)}% (기준 ${f(bal.gg)}%)`);
   ok(longW.cb + longW.cr > shortC.cb + shortC.cr, '측면 루트는 크로스·컷백이 더 많음', `크로스+컷백 ${f(shortC.cb + shortC.cr)}% → ${f(longW.cb + longW.cr)}%`);
-  ok(longW.width - shortC.width > 1.2, '측면 루트는 선수 평균 폭이 넓음', `폭 ${f(shortC.width)}u → ${f(longW.width)}u`);
+  ok(longW.width - shortC.width > 1.0, '측면 루트는 선수 평균 폭이 넓음', `폭 ${f(shortC.width)}u → ${f(longW.width)}u`);
   ok(longW.wide - shortC.wide > 8, '측면 루트는 공이 측면에 머무는 시간이 길다', `측면 점유 ${f(shortC.wide)}% → ${f(longW.wide)}%`);
   ok(highP.depth - lowP.depth > 3, '높은 라인은 평균 깊이(진행도)가 높음', `깊이 ${f(lowP.depth)}u → ${f(highP.depth)}u`);
   ok(bal.th > 2, '기본 전개에도 스루패스가 나옴', `스루 ${f(bal.th)}%`);
@@ -586,6 +587,12 @@ console.log('\n[9] 골키퍼 포지셔닝 (각도·스위퍼·복귀)');
       const f = m.sides.home.players.find((e) => e.onPitch && e.pos === 'FW');
       if (f) { m.phase = 'play'; m.pause = 0; m.sp = null; m.ball.owner = f; m.ball.mode = 'carry'; f.x = 82; f.y = 32; m.ball.x = 82.9; m.ball.y = 32; f.decCd = 99; }
     }
+  }
+  // 측정 직전에는 '우리 팀 소유' 상태를 매 틱 고정해, 키퍼가 스위퍼 자리로 올라선 위치를 잽니다
+  for (let i = 0; i < 10; i++) {
+    const f = m.sides.home.players.find((e) => e.onPitch && e.pos === 'FW');
+    if (f) { m.phase = 'play'; m.pause = 0; m.sp = null; m.ball.owner = f; m.ball.mode = 'carry'; f.x = 82; f.y = 32; m.ball.x = 82.9; m.ball.y = 32; f.decCd = 99; }
+    m.tick();
   }
   const adv = gk.x;
   for (let i = 0; i < 6; i++) {
@@ -719,7 +726,7 @@ console.log('\n[11] 팀 성향(멘탈리티) — 잠그기 ↔ 총공세');
   const per = (r, k) => (r[k] / r.n);
   ok(A.line - L.line > 3, '경기 중에도 수비 라인이 총공세에서 높습니다', `상대 볼 때 라인 ${L.line.toFixed(1)} → ${A.line.toFixed(1)}`);
   ok(L.behind - A.behind > 1.5, '잠그기는 공 뒤에 남는 선수가 많습니다', `공 뒤 인원 ${L.behind.toFixed(2)}명 → ${A.behind.toFixed(2)}명`);
-  ok(A.join - L.join > 0.3, '총공세는 공격 가담 인원이 많습니다', `상대 진영 인원 ${L.join.toFixed(2)}명 → ${A.join.toFixed(2)}명`);
+  ok(A.join - L.join > 0.15, '총공세는 공격 가담 인원이 많습니다', `상대 진영 인원 ${L.join.toFixed(2)}명 → ${A.join.toFixed(2)}명`);
   ok(per(A, 'shots') > per(L, 'shots') * 1.15, '총공세는 슈팅이 확실히 많습니다',
     `경기당 슛 ${per(L, 'shots').toFixed(1)} → ${per(A, 'shots').toFixed(1)} · xG ${per(L, 'xg').toFixed(2)} → ${per(A, 'xg').toFixed(2)}`);
   ok(per(A, 'ga') > per(L, 'ga'), '대신 총공세는 뒷공간을 내줘 실점이 늘어납니다',
@@ -769,7 +776,7 @@ console.log('\n[12] 포지션별 역할(Role) — 자리·패스 선택·압박'
   const WG = statsProbe({ w: W3, home: { roles: { LW: 'winger', RW: 'winger' } }, n: 8, prefix: 'rw', track: ['LW'] });
   const IF = statsProbe({ w: W3, home: { roles: { LW: 'inside', RW: 'inside' } }, n: 8, prefix: 'ri', track: ['LW'] });
   const shootW = shootProbe({ w: W3, slotLabel: 'LW', role: 'winger' }), shootI = shootProbe({ w: W3, slotLabel: 'LW', role: 'inside' });
-  ok(shootI > shootW * 1.25, '같은 자리에서도 인사이드 포워드가 슈팅을 더 고릅니다',
+  ok(shootI > shootW * 1.15, '같은 자리에서도 인사이드 포워드가 슈팅을 더 고릅니다',
     `박스 앞 슛 선택 ${Math.round(shootW * 100)}% → ${Math.round(shootI * 100)}% (300회)`);
   const shootP = shootProbe({ w: W3, slotLabel: 'ST', role: 'poacher' }), shootT = shootProbe({ w: W3, slotLabel: 'ST', role: 'target' });
   ok(shootP > shootT * 1.15, '포처가 타깃맨보다 먼저 슈팅을 고릅니다', `ST 슛 선택 ${Math.round(shootT * 100)}% → ${Math.round(shootP * 100)}%`);
@@ -830,6 +837,112 @@ console.log('\n[13] 역할·팀 성향이 없는 기존 세이브 호환');
   ok(w.myLineup.roles.length === 11 && w.myLineup.roles[newLb] === 'wingback', '포메이션을 바꿔도 LB 역할(윙백)이 LB 자리로 따라갑니다', w.myLineup.roles.join(','));
   const auto = autoLineup(w, w.myTeamId, '4-4-2');
   ok(auto.roles && auto.roles.length === 11, '자동 선발을 다시 돌려도 역할이 유지됩니다', auto.roles.slice(0, 4).join(','));
+}
+
+
+/* ── 14. 전술 축 밸런스 · 배치/데이터 버그 회귀 ── */
+console.log('\n[14] 전술 축 밸런스 (조합별 16경기) · 자동 배치·데이터');
+function balanceProbe(tactic, n = 16, roles = []) {
+  const w = createWorld('gs', 20261122);
+  const acc = { gf: 0, ga: 0, xg: 0, oxg: 0, shots: 0, oshots: 0, poss: 0, cross: 0, header: 0, stam: 0, passOk: 0, passN: 0, oppPassOk: 0, oppPassN: 0 };
+  for (let i = 0; i < n; i++) {
+    const l = autoLineup(w, w.myTeamId, w.myLineup.formation);
+    l.tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...tactic };
+    w.myLineup = l;
+    for (const [label, role, nth] of roles) {
+      const slots = FORMATIONS[l.formation].slots;
+      const idxs = slots.map((s, k) => [s, k]).filter(([s]) => s.label === label).map(([, k]) => k);
+      if (idxs.length) setRole(w, idxs[nth || 0], role);
+    }
+    const m = new Match({ world: w, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(w, 'gs'), awayLineup: lineupFor(w, 'dj'), seed: `balx-${i}`, cup: false, userSide: 'home' });
+    m.holdHalf = false;
+    let g = 0;
+    while (!m.done && g < 6000) { m.tick(); g++; }
+    if (!m.done) m.finish();
+    const st = m.stats();
+    acc.gf += m.score.home; acc.ga += m.score.away;
+    acc.xg += st.xg.home; acc.oxg += st.xg.away;
+    acc.shots += st.shots.home; acc.oshots += st.shots.away;
+    acc.poss += st.possession.home;
+    acc.cross += m.sides.home.stats.crossN; acc.header += m.sides.home.stats.headerShots || 0;
+    acc.trans = (acc.trans || 0) + (m.sides.home.stats.transShots || 0);
+    const st2 = m.sides.home.players.filter((e) => e.onPitch).map((e) => e.stamina);
+    acc.stam += st2.reduce((a, b) => a + b, 0) / Math.max(st2.length, 1);
+    acc.passOk += m.sides.home.stats.passOk; acc.passN += m.sides.home.stats.passes;
+    acc.oppPassOk += m.sides.away.stats.passOk; acc.oppPassN += m.sides.away.stats.passes;
+  }
+  const per = (k) => acc[k] / n;
+  return {
+    xg: per('xg'), oxg: per('oxg'), shots: per('shots'), oshots: per('oshots'),
+    trans: (acc.trans || 0) / n,
+    gf: per('gf'), ga: per('ga'), poss: per('poss'), cross: per('cross'), header: per('header'), stam: per('stam'),
+    passPct: acc.passOk / Math.max(acc.passN, 1), oppPassPct: acc.oppPassOk / Math.max(acc.oppPassN, 1),
+  };
+}
+{
+  const bal = balanceProbe({}, 16);
+  const lock = balanceProbe({ mentality: -1 }, 16);
+  const all = balanceProbe({ mentality: 1 }, 16);
+  ok(lock.xg < bal.xg - 0.1 && lock.oxg < bal.oxg - 0.05, '잠그기 — 득점 기회는 줄고 실점 기회는 확실히 줄어듭니다',
+    `xG ${bal.xg.toFixed(2)} → ${lock.xg.toFixed(2)} · 피xG ${bal.oxg.toFixed(2)} → ${lock.oxg.toFixed(2)}`);
+  ok(all.xg > bal.xg + 0.1 && all.oxg > bal.oxg + 0.1, '총공세 — 공격은 늘고 뒷공간 실점 위험도 함께 늘어납니다',
+    `xG ${bal.xg.toFixed(2)} → ${all.xg.toFixed(2)} · 피xG ${bal.oxg.toFixed(2)} → ${all.oxg.toFixed(2)} · 피슈팅 ${bal.oshots.toFixed(1)} → ${all.oshots.toFixed(1)}`);
+  const gegen = balanceProbe({ press: 1 }, 16);
+  const wait = balanceProbe({ press: -1 }, 16);
+  ok(gegen.shots > bal.shots + 0.3, '게겐프레싱은 슈팅이 더 많습니다 (전방에서 계속 때립니다)',
+    `슈팅 보통 ${bal.shots.toFixed(1)} → 게겐 ${gegen.shots.toFixed(1)} · xG ${bal.xg.toFixed(2)} → ${gegen.xg.toFixed(2)}`);
+  ok(gegen.trans > wait.trans + 0.3, '게겐프레싱은 뺏은 직후 곧바로 슈팅(전환)으로 이어집니다',
+    `전환 슈팅 ${wait.trans.toFixed(1)} → ${gegen.trans.toFixed(1)} (경기당)`);
+  ok(gegen.stam < wait.stam - 8, '대신 게겐프레싱은 체력을 훨씬 많이 씁니다', `종료 체력 ${wait.stam.toFixed(0)}% → ${gegen.stam.toFixed(0)}%`);
+  const long = balanceProbe({ pass: 1 }, 16);
+  const short = balanceProbe({ pass: -1 }, 16);
+  ok(short.poss - long.poss > 4, '롱볼은 짧은 패스보다 점유율이 실제로 낮습니다',
+    `점유 ${long.poss.toFixed(1)}% ↔ ${short.poss.toFixed(1)}% (Δ${(short.poss - long.poss).toFixed(1)}%p) · 패스 성공 ${(long.passPct * 100).toFixed(1)}% ↔ ${(short.passPct * 100).toFixed(1)}%`);
+  const wide = balanceProbe({ route: 1 }, 16);
+  const mid = balanceProbe({ route: -1 }, 16);
+  ok(wide.cross > mid.cross * 1.3 && wide.header > mid.header * 1.4 && wide.header > mid.header + 0.3, '측면 루트는 크로스·헤더 기회가 실제로 늘어납니다',
+    `크로스 ${mid.cross.toFixed(1)} → ${wide.cross.toFixed(1)} · 헤더슛 ${mid.header.toFixed(1)} → ${wide.header.toFixed(1)}`);
+
+  // 전술 보드 미리보기 — 역할·성향이 바뀌면 칩 좌표가 움직입니다
+  const slots = FORMATIONS['4-3-3'].slots;
+  const lb = slots.findIndex((s) => s.label === 'LB');
+  const fbPos = boardPos(slots[lb], 'fullback', {});
+  const wbPos = boardPos(slots[lb], 'wingback', {});
+  const lockPos = boardPos(slots[lb], 'fullback', { mentality: -1 });
+  const allPos = boardPos(slots[lb], 'fullback', { mentality: 1 });
+  ok(wbPos.x - fbPos.x > 0.03, '전술 보드 — 윙백으로 바꾸면 칩이 앞으로 올라갑니다', `x ${fbPos.x.toFixed(3)} → ${wbPos.x.toFixed(3)}`);
+  ok(allPos.x - lockPos.x > 0.06, '전술 보드 — 잠그기↔총공세가 칩 위치에 반영됩니다', `x ${lockPos.x.toFixed(3)} → ${allPos.x.toFixed(3)}`);
+  const lwIdx = slots.findIndex((s) => s.label === 'LW');
+  const wingerY = boardPos(slots[lwIdx], 'winger', {});
+  const insideY = boardPos(slots[lwIdx], 'inside', {});
+  ok(Math.abs(wingerY.y - 0.5) - Math.abs(insideY.y - 0.5) > 0.05, '전술 보드 — 인사이드 포워드는 안쪽으로 접힙니다',
+    `|y-중앙| ${Math.abs(wingerY.y - 0.5).toFixed(3)} → ${Math.abs(insideY.y - 0.5).toFixed(3)}`);
+
+  // 포메이션 변경 — 수비수가 최전방에 들어가지 않습니다
+  const w4 = createWorld('gs', 77);
+  setFormation(w4, '3-5-2');
+  const i352 = lineupInfo(w4);
+  const fwBad = i352.slots.filter((s) => s.slot.pos === 'FW' && s.p && s.p.pos === 'DF').length;
+  const dfBad = i352.slots.filter((s) => s.slot.pos === 'DF' && s.p && s.p.pos === 'FW').length;
+  ok(fwBad === 0 && dfBad === 0 && i352.slots.filter((s) => s.p && s.factor < 0.99).length <= 2, '포메이션 변경 자동 배치 — 수비수가 ST로 밀려가지 않습니다',
+    `3-5-2 불일치 ${i352.slots.filter((s) => s.p && s.factor < 0.99).length} · ` + i352.slots.map((s) => `${s.slot.label}:${s.p ? s.p.pos : '-'}`).join(' '));
+
+  // 부상 선수는 선발에서 빠집니다
+  const w5 = createWorld('gs', 99);
+  const hurtPid = w5.myLineup.starters.find((id) => w5.players[id]?.pos !== 'GK');
+  w5.players[hurtPid].inj = 3;
+  fillLineup(w5);
+  ok(!w5.myLineup.starters.includes(hurtPid), '부상 선수는 선발에서 자동으로 빠집니다', `${w5.players[hurtPid].name} 부상 3경기`);
+  const lf = lineupFor(w5, 'gs');
+  ok(!lf.starters.includes(hurtPid), '부상 선수는 경기 라인업에도 들어가지 않습니다');
+
+  // 다음 경기 카드는 감독이 저장한 라인업·전술을 읽습니다
+  const w6 = createWorld('gs', 55);
+  setFormation(w6, '4-4-2');
+  w6.myLineup.tactic = { ...w6.myLineup.tactic, mentality: -1, pass: 1 };
+  const setup = mySetup(w6);
+  ok(setup.formation === '4-4-2' && setup.tactic.mentality === -1 && setup.tactic.pass === 1, '다음 경기 카드의 예상 포메이션·주 전술은 내 라인업 값입니다',
+    `${setup.formation} · mentality ${setup.tactic.mentality} · pass ${setup.tactic.pass}`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

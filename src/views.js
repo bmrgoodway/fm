@@ -1,7 +1,7 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
 import { FORMATIONS } from './data.js';
 import * as W from './world.js';
-import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole } from './tactics.js';
+import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING } from './tactics.js';
 
 export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -150,6 +150,11 @@ function nextMatchCard(app, w) {
   const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
   const oppForm = w.form?.[oppId] || [];
   const myForm = me.recent || [];
+  // 내 팀의 '예상'은 감독이 실제로 저장한 라인업·전술이어야 합니다 (팀 기본값이 아니라)
+  const mySetup = W.mySetup(w);
+  const myTactic = mySetup.tactic;
+  const myFormation = mySetup.formation;
+  const inj = W.myLineup?.starters?.map((id) => (id ? w.players[id] : null)).filter((p) => p && (p.inj > 0 || p.bans > 0)) || [];
   const unavailable = W.squadOf(w, w.myTeamId).filter((p) => p.bans > 0 || p.inj > 0);
   const bar = (a, b) => `<span class="cmp-bar"><i class="me" data-w="${Math.round((a / (a + b)) * 100)}"></i></span>`;
   return `<article class="card next">
@@ -162,10 +167,11 @@ function nextMatchCard(app, w) {
     <dl class="cmp">
       <div><dt>전력</dt><dd>${bar(myP, oppP)}<span>${myP} : ${oppP}</span></dd></div>
       <div><dt>최근 5경기</dt><dd>${formChips(myForm.slice(-5))}<span class="vs-sep">vs</span>${formChips(opp.recent?.slice(-5) || [])}</dd></div>
-      <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(me.formation, me, false)}<span class="vs-sep">vs</span>${miniPitch(opp.formation, opp, true)}</dd></div>
-      <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(me.tactic))}</span><span class="vs-sep">vs</span><span>${esc(tacticWords(opp.tactic))}</span></dd></div>
+      <div><dt>예상 포메이션</dt><dd class="mini-row">${miniPitch(myFormation, me, false)}<span class="vs-sep">vs</span>${miniPitch(opp.formation, opp, true)}</dd></div>
+      <div><dt>주 전술</dt><dd class="tac"><span>${esc(tacticWords(myTactic))}</span><span class="vs-sep">vs</span><span>${esc(tacticWords(opp.tactic))}</span></dd></div>
       ${unavailable.length ? `<div><dt>결장</dt><dd class="tac"><span class="pill xs">${unavailable.length}명</span><span class="sm">${unavailable.map((p) => `${esc(p.name)}(${W.ifUnavailable(p)})`).join(', ')}</span></dd></div>` : ''}
     </dl>
+    ${inj.length ? `<p class="warn-bar">🚑 선발에 뛸 수 없는 선수가 ${inj.length}명 있습니다 (${inj.map((p) => esc(p.name)).join(', ')}). 경기를 시작하면 자동으로 교체됩니다.</p>` : ''}
     <div class="actions">
       <button class="btn primary" data-act="play" type="button">경기 시작 ▶</button>
       <button class="btn" data-act="instant" type="button">즉시 결과 ⏩</button>
@@ -231,9 +237,34 @@ function scheduleTab(app, w) {
 }
 
 /* ── 전술/선수단 탭 ── */
-function chipFor(slot, entry, idx, selected, myId) {
+/* ── 전술 보드 좌표 ─────────────────────────────────────────────
+   슬롯 좌표만 그리면 역할(윙백·IF·홀딩…)과 팀 성향(잠그기~총공세)을 바꿔도
+   그림이 1px도 움직이지 않습니다. 경기 엔진이 쓰는 것과 같은 값을 그대로 옮겨
+   '내가 바꾼 것'이 보드에서 눈에 보이게 만듭니다. */
+export function boardPos(slot, role, tactic) {
+  const t = tactic || {};
+  const ment = Number(t.mentality) || 0;
+  const line = Number(t.line) || 0;
+  const route = Number(t.route) || 0;
+  if (slot.pos === 'GK') return { x: slot.x, y: slot.y };
+  const tune = ROLE_TUNING[role] || {};
+  const lineW = slot.pos === 'DF' ? 1 : slot.pos === 'MF' ? 0.9 : 0.6;
+  const mentW = slot.pos === 'DF' ? 0.065 : slot.pos === 'MF' ? 0.095 : 0.055;
+  let x = slot.x + (tune.depth || 0) / 100 + ment * mentW + line * 0.075 * lineW;
+  // 성향 — 잠그기는 간격을 좁히고(두 줄 블록), 총공세는 벌립니다
+  const spread = 1 + (ment < 0 ? ment * 0.16 : ment * 0.08);
+  let y = 0.5 + (slot.y - 0.5) * (tune.width || 1) * spread;
+  // 측면 루트는 폭을 조금 더 벌립니다
+  if (Math.abs(slot.y - 0.5) > 0.3) y = 0.5 + (y - 0.5) * (1 + Math.max(0, route) * 0.07);
+  return { x: Math.max(0.06, Math.min(0.95, x)), y: Math.max(0.06, Math.min(0.94, y)) };
+}
+
+function chipFor(slot, entry, idx, selected, myId, tactic) {
+  const role = (entry && entry.role) || defaultRole(slot.label);
+  const pos = boardPos(slot, role, tactic);
+  const at = `data-px="${pos.x.toFixed(4)}" data-py="${pos.y.toFixed(4)}"`;
   if (!entry || !entry.p) {
-    return `<div class="chip empty ${selected ? 'sel' : ''}" data-px="${slot.x}" data-py="${slot.y}">
+    return `<div class="chip empty ${selected ? 'sel' : ''}" ${at}>
       <button class="chip-main" data-act="slot" data-slot="${idx}" type="button" aria-label="${esc(slot.label)} 자리 · 비어 있음">
         <span class="chip-num">+</span><span class="chip-name">비어 있음</span>
       </button>
@@ -242,16 +273,16 @@ function chipFor(slot, entry, idx, selected, myId) {
   }
   const p = entry.p;
   const bad = entry.factor < 0.99;
-  const role = entry.role || defaultRole(slot.label);
   const gk = slot.pos === 'GK';
-  return `<div class="chip ${selected ? 'sel' : ''} ${bad ? 'bad-pos' : ''}" data-px="${slot.x}" data-py="${slot.y}" data-team="${myId}">
-    <button class="chip-main" data-act="slot" data-slot="${idx}" type="button" aria-label="${esc(p.name)} ${esc(slot.label)} 선택">
+  const off = p.inj > 0 || p.bans > 0;
+  return `<div class="chip ${selected ? 'sel' : ''} ${bad ? 'bad-pos' : ''} ${gk ? 'gk' : ''}" ${at} data-team="${myId}">
+    <button class="chip-main" data-act="slot" data-slot="${idx}" type="button" aria-label="${esc(p.name)} ${esc(slot.label)} 선택${off ? ' · 출전 불가' : ''}">
       <span class="chip-num">${p.num}</span>
       <span class="chip-name">${esc(p.name)}</span>
     </button>
     ${gk
-      ? `<span class="chip-pos">GK${bad ? ` <em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}</span>`
-      : `<button class="chip-pos" data-act="role-cycle" data-slot="${idx}" type="button" title="눌러서 역할 바꾸기 — ${esc(roleEffect(role))}" aria-label="${esc(slot.label)} 역할 ${esc(roleLabel(role))} · 눌러서 바꾸기">${esc(slot.label)} · ${esc(roleShort(role))}${bad ? ` <em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}</button>`}
+      ? ''
+      : `<button class="chip-pos" data-act="role-cycle" data-slot="${idx}" type="button" title="눌러서 역할 바꾸기 — ${esc(roleEffect(role))}" aria-label="${esc(slot.label)} 역할 ${esc(roleLabel(role))} · 눌러서 바꾸기">${esc(slot.label)} · ${esc(roleShort(role))}${bad ? ` <em>↯ ${Math.round(entry.factor * 100)}%</em>` : ''}${off ? ' 🚑' : ''}</button>`}
   </div>`;
 }
 
@@ -280,7 +311,7 @@ function pitchBoard(app, w, info) {
   const slots = FORMATIONS[l.formation].slots;
   return `<div class="pitchboard" role="group" aria-label="선발 라인업">
     <div class="pb-lines" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-    ${slots.map((s, i) => chipFor(s, info.slots[i], i, app.state.selSlot === i, w.myTeamId)).join('')}
+    ${slots.map((s, i) => chipFor(s, info.slots[i], i, app.state.selSlot === i, w.myTeamId, l.tactic)).join('')}
     <span class="pb-goal top">상대 골문</span><span class="pb-goal bottom">우리 골문</span>
   </div>`;
 }
@@ -321,6 +352,7 @@ function squadTab(app, w) {
   const selNote = selIdx >= 0 && info.slots[selIdx].slot.pos !== 'GK'
     ? `역할 · <b>${esc(roleLabel(info.roles[selIdx]))}</b> — ${esc(roleEffect(info.roles[selIdx]))}` : '';
   const mismatch = info.slots.filter((s) => s.p && s.factor < 0.99).length;
+  const outMen = info.slots.filter((s) => s.p && (s.p.inj > 0 || s.p.bans > 0));
   const slices = FORMATIONS[l.formation].slots;
   const ment = Number(l.tactic.mentality) || 0;
   const mentNow = mentalityOf(ment);
@@ -344,6 +376,7 @@ function squadTab(app, w) {
         ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${l.formation === f ? 'on' : ''}" data-act="formation" data-formation="${f}">${f}</button>`).join('')}
         <button type="button" class="btn small ghost right" data-act="auto-lineup">자동 선발</button>
       </div>
+      ${outMen.length ? `<p class="warn-bar">🚑 선발 중 뛸 수 없는 선수 ${outMen.length}명 — ${outMen.map((s) => esc(s.p.name)).join(', ')}. 경기를 시작하면 자동으로 교체됩니다.</p>` : ''}
       ${pitchBoard(app, w, info)}
       ${roleBar(info, app.state.roleSlot ?? app.state.selSlot, slices)}
       <p class="hint">선발을 누른 뒤 후보 선수를 누르면 자리가 바뀝니다. <b>↯</b> 는 포지션 불일치 보정입니다. 포지션 이름(<b>LB · 풀백</b>)을 누르면 역할이 바로 바뀝니다.</p>

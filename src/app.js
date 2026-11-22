@@ -246,6 +246,14 @@ function startMatch(instant) {
   const nx = W.userNextMatch(w);
   if (!nx) { toast('이번 시즌 남은 경기가 없습니다.'); return; }
   const { round, fixture } = nx;
+  // 부상·정지 선수가 선발에 남아 있으면 뛸 수 있는 선수로 정리합니다 (경고 없이 그대로 뛰던 버그)
+  const before = (w.myLineup.starters || []).slice();
+  W.fillLineup(w);
+  const changed = before.filter((id, i) => id && w.myLineup.starters[i] !== id);
+  if (changed.length) {
+    W.saveWorld(w);
+    toast(`출전할 수 없는 선수 ${changed.length}명을 자동으로 교체했습니다.`, 'warn');
+  }
   const homeId = fixture.home, awayId = fixture.away;
   const userSide = homeId === w.myTeamId ? 'home' : 'away';
   const seed = `${w.seed}-s${w.season}-r${round.no}-h${homeId}-a${awayId}`;

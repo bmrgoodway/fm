@@ -2,7 +2,7 @@
 // · 엔진은 틱(경기 15초)마다 상태를 만들고, 화면은 매 프레임 이전 좌표→현재 좌표를 보간(lerp)합니다.
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
 import { W as PW, H as PH, CY, GOAL_HALF, diveProgress } from './match.js';
-import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect } from './tactics.js';
+import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, nextRole, defaultRole } from './tactics.js';
 import { FORMATIONS } from './data.js';
 import * as X from './world.js';
 import { esc } from './views.js';
@@ -30,6 +30,7 @@ export function mountMatch(app, m, meta) {
   diag.ball = () => ({ mode: m.ball.mode, x: Math.round(m.ball.x * 10) / 10, y: Math.round(m.ball.y * 10) / 10, t: Math.round(m.ball.t * 100) / 100, dur: Math.round(m.ball.dur * 100) / 100, phase: m.phase });
   diag.flash = () => ({ hidden: flash.hidden, score: $('m-score').textContent });
   diag.replaying = false;
+  diag.speed = () => ({ speed, paused, phase: m.phase, half: m.half });
   diag.shotFrames = 0; diag.shotFramesBad = 0;   // 슛 비행 중 배너가 떠 있던 프레임 수(점검용)
   diag.gk = () => {
     const out = [];
@@ -107,7 +108,8 @@ export function mountMatch(app, m, meta) {
       <button type="button" class="btn small ghost" data-mact="ff">즉시 결과 ⏩</button>
     </div>
 
-    <div class="drawer" id="drawer" hidden></div>
+    <div class="drawer-back" id="drawer-back" hidden></div>
+    <div class="drawer" id="drawer" role="dialog" aria-label="경기 중 전술" hidden></div>
 
     <div class="mpanels">
       <div class="card mstats">
@@ -154,6 +156,7 @@ export function mountMatch(app, m, meta) {
   </section>`;
 
   const $ = (id) => document.getElementById(id);
+  $('drawer-back').addEventListener('click', () => { drawer = null; setDrawerPause(false); renderDrawer(); });
   const canvas = $('pitch');
   const ctx = canvas.getContext('2d');
   const flash = $('goalflash');
@@ -376,6 +379,7 @@ export function mountMatch(app, m, meta) {
     cancelAnimationFrame(replay.raf); replay.raf = 0;
     $('replaybar').hidden = true;
     diag.replaying = false;
+  diag.speed = () => ({ speed, paused, phase: m.phase, half: m.half });
   diag.shotFrames = 0; diag.shotFramesBad = 0;   // 슛 비행 중 배너가 떠 있던 프레임 수(점검용)
     if (replay.ticker) {
       $('tk-min').textContent = replay.ticker.min;
@@ -749,33 +753,93 @@ export function mountMatch(app, m, meta) {
     flashTimer = setTimeout(() => { flash.hidden = true; }, 2600);
   }
 
-  /* ── 드로어(전술·교체) ── */
+  /* ── 드로어(전술·교체) ──
+     화면 밖으로 잘리던 사이드 패널을 '화면 안 고정 시트'로 바꿨습니다.
+     열면 경기가 자동으로 멈추고(초 단위로 흘러가며 조작을 놓치지 않게), 닫으면 원래 배속으로 돌아옵니다. */
+  let pauseBeforeDrawer = null;      // 드로어를 열기 전에 이미 멈춰 있었는지
+  function setDrawerPause(open) {
+    const pauseBtn = $('m-pause');
+    if (open) {
+      if (pauseBeforeDrawer == null) pauseBeforeDrawer = paused;
+      if (!paused) {
+        paused = true;
+        if (pauseBtn) { pauseBtn.textContent = '재생'; pauseBtn.setAttribute('aria-pressed', 'true'); }
+      }
+    } else if (pauseBeforeDrawer === false) {
+      paused = false;
+      if (pauseBtn) { pauseBtn.textContent = '일시정지'; pauseBtn.setAttribute('aria-pressed', 'false'); }
+      if (!raf && !m.done && speed !== 0) start();
+    }
+    if (!open) pauseBeforeDrawer = null;
+  }
+
+  // 역할 목록 — 지금 이 자리에 선 선수와 그 역할
+  function mySlots() {
+    const side = m.sides[m.userSide];
+    return side.players.map((e) => ({ e, label: e.label || e.slot?.label || e.pos, role: m.roleOf(e), num: e.num, name: e.name, pos: e.pos }));
+  }
+
+  function roleGridHtml() {
+    return `<div class="role-grid" role="group" aria-label="포지션별 역할">
+      ${mySlots().filter((r) => r.pos !== 'GK').map((r) => {
+        const opts = rolesForLabel(r.label);
+        const next = nextRole(r.label, r.role);
+        return `<button type="button" class="role-row" data-mrole="${r.e.id}" title="${esc(roleLabel(r.role))} — 누르면 ${esc(roleLabel(next))}"
+          aria-label="${esc(r.label)} ${esc(r.name)} · ${esc(roleLabel(r.role))} · 눌러서 ${esc(roleLabel(next))}로 바꾸기" aria-pressed="true">
+          <span class="rr-pos">${esc(r.label)}</span>
+          <span class="rr-name">${esc(r.name)}</span>
+          <span class="rr-role">${esc(roleShort(r.role))}${opts.length > 1 ? ' ↻' : ''}</span>
+        </button>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // 경기 중 역할 변경을 커리어 세이브(자리별 역할)에도 남깁니다
+  function syncRoles() {
+    const side = m.sides[m.userSide];
+    const slots = FORMATIONS[side.formation]?.slots || [];
+    app.world.myLineup.formation = side.formation;
+    app.world.myLineup.roles = slots.map((sl) => {
+      const e = side.players.find((p) => p.onPitch && p.slot === sl);
+      return e ? m.roleOf(e) : defaultRole(sl.label);
+    });
+    app.save();
+  }
+
   function renderDrawer() {
     const el = $('drawer');
-    if (!drawer) { el.hidden = true; el.innerHTML = ''; return; }
+    if (!drawer) { el.hidden = true; el.innerHTML = ''; document.body.classList.remove('drawer-open'); return; }
     el.hidden = false;
+    document.body.classList.add('drawer-open');
     if (drawer === 'tactics') {
       const side = m.sides[m.userSide];
       const ment = Number(side.tactic.mentality) || 0;
-      el.innerHTML = `<div class="drawer-head"><h3>전술 즉시 변경</h3><button class="btn small" data-mact="close">닫기</button></div>
-      <div class="drawer-sec"><h4>팀 성향 <span class="pill">${esc(mentalityOf(ment).name)}</span></h4>
+      el.innerHTML = `<div class="drawer-head"><h3>전술 즉시 변경 <span class="pill">${esc(mentalityOf(ment).name)}</span></h3><button class="btn small" data-mact="close">닫기</button></div>
+      <div class="drawer-sec"><h4>팀 성향</h4>
         <div class="ment-row in-game" role="group" aria-label="팀 성향">
-          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - ment) < 0.01 ? 'on' : ''}" data-mment="${mt.v}">${esc(mt.name)}</button>`).join('')}
+          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - ment) < 0.01 ? 'on' : ''}" data-mment="${mt.v}" aria-pressed="${Math.abs(mt.v - ment) < 0.01}">${esc(mt.name)}</button>`).join('')}
         </div>
         <p class="axis-eff">${esc(mentalityEffect(ment, true))}</p>
       </div>
-      <div class="form-row">${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-mform="${f}">${f}</button>`).join('')}</div>
-      <ul class="axes compact">${AXES.map((a) => {
-        const v = side.tactic[a.key] || 0;
-        return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
-        <div class="axis-ctl"><span class="axis-end">${a.left}</span><span class="seg">${STEPS.map((s) => `<button type="button" class="${Math.abs(s - v) < 0.01 ? 'on' : ''}" data-mtactic="${a.key}" data-val="${s}" aria-label="${a.name}">${s > 0 ? '▲' : s < 0 ? '▼' : '●'}</button>`).join('')}</span><span class="axis-end">${a.right}</span></div>
-        <p class="axis-eff">${a.effect(v)}</p></li>`;
-      }).join('')}</ul>`;
+      <div class="drawer-sec"><h4>포메이션</h4>
+        <div class="form-row">${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-mform="${f}" aria-pressed="${side.formation === f}">${f}</button>`).join('')}</div>
+      </div>
+      <div class="drawer-sec"><h4>포지션별 역할 <span class="hint-inline">자리를 누르면 역할이 바뀝니다</span></h4>
+        ${roleGridHtml()}
+      </div>
+      <div class="drawer-sec"><h4>전술 4축</h4>
+        <ul class="axes compact">${AXES.map((a) => {
+          const v = side.tactic[a.key] || 0;
+          return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
+          <div class="axis-ctl"><span class="axis-end">${a.left}</span><span class="seg">${STEPS.map((s) => `<button type="button" class="${Math.abs(s - v) < 0.01 ? 'on' : ''}" data-mtactic="${a.key}" data-val="${s}" aria-label="${a.name}" aria-pressed="${Math.abs(s - v) < 0.01}">${s > 0 ? '▲' : s < 0 ? '▼' : '●'}</button>`).join('')}</span><span class="axis-end">${a.right}</span></div>
+          <p class="axis-eff">${a.effect(v)}</p></li>`;
+        }).join('')}</ul>
+      </div>`;
       el.querySelectorAll('[data-mment]').forEach((b) => b.addEventListener('click', () => {
         const v = Number(b.dataset.mment);
         m.setTactic({ mentality: v });
         app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
-        app.save(); renderDrawer();
+        app.save(); renderDrawer(); draw(1);
         app.toast?.(`팀 성향 · ${mentalityOf(v).name}`, 'ok');
       }));
       el.querySelectorAll('[data-mtactic]').forEach((b) => b.addEventListener('click', () => {
@@ -787,9 +851,19 @@ export function mountMatch(app, m, meta) {
         const prev = app.world.myLineup.formation;
         m.setFormation(b.dataset.mform);
         app.world.myLineup.formation = b.dataset.mform;
-        // 커리어 저장에도 역할을 새 포메이션 자리로 옮겨 둡니다
         app.world.myLineup.roles = X.remapRoles(app.world.myLineup.roles, prev, b.dataset.mform);
-        app.save(); renderDrawer(); draw(1);
+        syncRoles();
+        renderDrawer(); draw(1);
+      }));
+      el.querySelectorAll('[data-mrole]').forEach((b) => b.addEventListener('click', () => {
+        const e = m.sides[m.userSide].players.find((p) => p.id === b.dataset.mrole && p.onPitch);
+        if (!e) return;
+        const label = e.label || e.slot?.label || e.pos;
+        const got = m.setRoleAt(e, nextRole(label, m.roleOf(e)));
+        if (!got) return;
+        syncRoles();
+        app.toast?.(`${label} · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+        renderDrawer();
       }));
     }
     if (drawer === 'subs') {
@@ -813,7 +887,7 @@ export function mountMatch(app, m, meta) {
         app.save();
       }));
     }
-    el.querySelectorAll('[data-mact="close"]').forEach((b) => b.addEventListener('click', () => { drawer = null; renderDrawer(); }));
+    el.querySelectorAll('[data-mact="close"]').forEach((b) => b.addEventListener('click', () => { drawer = null; setDrawerPause(false); renderDrawer(); }));
   }
 
   /* ── 하프타임(라커룸) ── */
@@ -823,28 +897,32 @@ export function mountMatch(app, m, meta) {
     $('ht-score').textContent = `${m.score.home} - ${m.score.away}`;
     const my = m.userSide === 'home' ? s.shots.home : s.shots.away;
     const opp = m.userSide === 'home' ? s.shots.away : s.shots.home;
-    $('ht-note').textContent = `전반 ${m.clock()} 종료 — 슈팅 ${my} : ${opp}. 라커룸에서 전술·선수를 정비하세요.`;
+    $('ht-note').textContent = `전반 ${m.clock()} 종료 — 슈팅 ${my} : ${opp}. 라커룸에서 전술·역할·선수를 정비하세요.`;
+    const ment = Number(side.tactic.mentality) || 0;
     const axes = AXES.map((a) => {
       const v = side.tactic[a.key] || 0;
       return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
         <div class="axis-ctl"><span class="axis-end">${a.left}</span>
-        <span class="seg">${STEPS.map((x) => `<button type="button" class="${Math.abs(x - v) < 0.01 ? 'on' : ''}" data-ht="${a.key}" data-val="${x}">${x > 0 ? '▲' : x < 0 ? '▼' : '●'}</button>`).join('')}</span>
+        <span class="seg">${STEPS.map((x) => `<button type="button" class="${Math.abs(x - v) < 0.01 ? 'on' : ''}" data-ht="${a.key}" data-val="${x}" aria-pressed="${Math.abs(x - v) < 0.01}">${x > 0 ? '▲' : x < 0 ? '▼' : '●'}</button>`).join('')}</span>
         <span class="axis-end">${a.right}</span></div></li>`;
     }).join('');
     const bench = side.bench.filter((e) => !e.onPitch);
-  const posLabel = (e) => (e.injured ? '🚑 ' : '') + e.pos;
+    const posLabel = (e) => (e.injured ? '🚑 ' : '') + e.pos;
     const subs = side.players.filter((e) => e.onPitch).map((e) => `<li>
         <button type="button" class="sub-btn ${outPid === e.id ? 'sel' : ''}" data-htout="${e.id}">
           <span class="rn">${e.num}</span><span>${esc(e.name)}</span>
           <small>${e.pos} · 체력 ${Math.round(e.stamina)}%${e.injured ? ' · 🚑' : ''}</small>
         </button></li>`).join('');
     $('ht-body').innerHTML = `<div class="ht-cols">
-      <div><h4>전술 정비</h4>
+      <div><h4>팀 성향 <span class="pill">${esc(mentalityOf(ment).name)}</span></h4>
         <div class="ment-row in-game" role="group" aria-label="팀 성향">
-          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - (Number(side.tactic.mentality) || 0)) < 0.01 ? 'on' : ''}" data-htment="${mt.v}">${esc(mt.name)}</button>`).join('')}
+          ${MENTALITY.map((mt) => `<button type="button" class="ment-btn ${Math.abs(mt.v - ment) < 0.01 ? 'on' : ''}" data-htment="${mt.v}" aria-pressed="${Math.abs(mt.v - ment) < 0.01}">${esc(mt.name)}</button>`).join('')}
         </div>
-        <p class="axis-eff">${esc(mentalityEffect(Number(side.tactic.mentality) || 0, true))}</p>
-        <ul class="axes compact">${axes}</ul></div>
+        <p class="axis-eff">${esc(mentalityEffect(ment, true))}</p>
+        <ul class="axes compact">${axes}</ul>
+        <h4 class="ht-sub">포지션별 역할 <span class="hint-inline">자리를 누르면 역할이 바뀝니다</span></h4>
+        ${roleGridHtml()}
+      </div>
       <div><h4>선수 교체 <span class="pill">${5 - side.subsUsed}명 남음</span></h4>
         <p class="hint">나갈 선수를 고른 뒤 들어올 후보를 누르세요.</p>
         <div class="sub-cols ht-subcols">
@@ -858,11 +936,22 @@ export function mountMatch(app, m, meta) {
       m.setTactic({ mentality: v });
       app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
       app.save(); renderHalftime();
+      app.toast?.(`팀 성향 · ${mentalityOf(v).name} — ${mentalityEffect(v, true)}`, 'ok');
     }));
     $('ht-body').querySelectorAll('[data-ht]').forEach((b) => b.addEventListener('click', () => {
       m.setTactic({ [b.dataset.ht]: Number(b.dataset.val) });
       app.world.myLineup.tactic = { ...m.sides[m.userSide].tactic };
       app.save(); renderHalftime();
+    }));
+    $('ht-body').querySelectorAll('[data-mrole]').forEach((b) => b.addEventListener('click', () => {
+      const e = m.sides[m.userSide].players.find((p) => p.id === b.dataset.mrole && p.onPitch);
+      if (!e) return;
+      const label = e.label || e.slot?.label || e.pos;
+      const got = m.setRoleAt(e, nextRole(label, m.roleOf(e)));
+      if (!got) return;
+      syncRoles();
+      app.toast?.(`${label} · ${roleLabel(got)} — ${roleEffect(got)}`, 'ok');
+      renderHalftime();
     }));
     $('ht-body').querySelectorAll('[data-htout]').forEach((b) => b.addEventListener('click', () => { outPid = b.dataset.htout; renderHalftime(); }));
     $('ht-body').querySelectorAll('[data-htin]').forEach((b) => b.addEventListener('click', () => {
@@ -1035,12 +1124,23 @@ export function mountMatch(app, m, meta) {
   root.querySelectorAll('[data-mact]').forEach((b) => b.addEventListener('click', () => {
     if (replay.on) endReplay();
     const act = b.dataset.mact;
-    if (act === 'tactics' || act === 'subs') { drawer = drawer === act ? null : act; renderDrawer(); }
+    if (act === 'tactics' || act === 'subs') {
+      const opening = drawer !== act;
+      drawer = opening ? act : null;
+      setDrawerPause(opening);
+      renderDrawer();
+      if (opening) $('drawer').scrollTop = 0;
+    }
     if (act === 'ff') { cancelAnimationFrame(raf); raf = 0; stepToEnd(); }
   }));
   $('ht-start').addEventListener('click', () => {
     $('halftime').hidden = true;
+    const keepSpeed = speed;
     m.startSecondHalf();
+    // 후반에도 고른 배속(2x·4x)을 그대로 유지합니다 — 1x로 돌아가던 버그
+    speed = keepSpeed;
+    m.setSpeed(keepSpeed || 1);
+    root.querySelectorAll('.spd').forEach((x) => x.classList.toggle('on', Number(x.dataset.speed) === keepSpeed));
     syncScore();
     halfShown = false;
     lastStats = m.events.length; lastRatings = m.events.length;   // 지난 이벤트를 다시 띄우지 않습니다
