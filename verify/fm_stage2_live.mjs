@@ -38,6 +38,25 @@ async function startCareer(page) {
   await sleep(700);
 }
 // 저장된 커리어에서 다음 경기 상대를 읽습니다 (화면과 같은 출처)
+async function toastGone(page) {
+  await page.waitForFunction(() => {
+    const t = document.getElementById('toast');
+    return !t || !t.classList.contains('on');
+  }, null, { timeout: 8000 }).catch(() => {});
+}
+/* 스크린샷용 — 토스트를 완전히 숨기고, 대상 카드가 머리·탭바에 가리지 않게 위치시킵니다. */
+async function prepShot(page, selector, offset = 130) {
+  await toastGone(page);
+  await page.evaluate(({ sel, off }) => {
+    const t = document.getElementById('toast');
+    if (t) { t.classList.remove('on'); t.style.display = 'none'; }
+    const el = document.querySelector(sel);
+    if (!el) return;
+    const y = el.getBoundingClientRect().top + window.scrollY - off;
+    window.scrollTo(0, Math.max(0, y));
+  }, { sel: selector, off: offset });
+  await sleep(600);
+}
 const nextOpp = (page) => page.evaluate(() => {
   const w = JSON.parse(localStorage.getItem('fm:career') || 'null');
   if (!w) return null;
@@ -132,8 +151,7 @@ console.log('\n[데스크톱 1440×900]');
   ok(pitchFit && pitchFit.bad === 0, '예상 배치의 이름·자리 라벨이 피치 밖으로 나가지 않습니다', `${pitchFit ? pitchFit.bad : '?'}개 이탈`);
   const hs = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
   ok(hs.sw <= hs.cw + 1, '데스크톱 가로 스크롤이 없습니다', `${hs.sw} ≤ ${hs.cw}`);
-  await page.locator('#scout-report').scrollIntoViewIfNeeded();
-  await sleep(250);
+  await prepShot(page, '#scout-report', 132);
   await page.screenshot({ path: `${SHOT_DIR}/fm-scouting.png` });
   out.metrics.scoutFull = full;
 
@@ -199,6 +217,10 @@ console.log('\n[데스크톱 1440×900]');
   const aiChip2 = forced.ai === 'home' ? lead.chipH : lead.chipA;
   ok(['수비적', '잠그기'].includes(aiChip2), '이기고 있는 AI는 수비적/잠그기로 내립니다', `배지 "${aiChip2}" · 기록 "${lead.opp}"`);
   ok(lead.diag.log.length >= 2, '성향 변경이 두 번 이상 기록됩니다', JSON.stringify(lead.diag.log.map((c) => `${c.minute}' ${c.from}→${c.to}`)));
+  // 스크린샷용 — 경기를 멈추고 중계 로그의 AI 멘트를 보이게 한 뒤 찍습니다.
+  await page.locator('#m-pause').click();
+  await page.evaluate(() => document.querySelector('.feed .ev-ai-tactic')?.scrollIntoView({ block: 'nearest' }));
+  await sleep(350);
   await page.screenshot({ path: `${SHOT_DIR}/fm-ai-adapt.png` });
   out.metrics.lead = lead;
   await page.close();
@@ -232,8 +254,7 @@ console.log('\n[모바일 390×844]');
     return els.filter((e) => parseFloat(getComputedStyle(e).fontSize) < 10.5).length;
   });
   ok(tiny === 0, '공략 힌트 글자가 10.5px 이상입니다', `${tiny}개 작음`);
-  await page.locator('.next .scout-mini').scrollIntoViewIfNeeded();
-  await sleep(250);
+  await prepShot(page, '.next .scout-mini', 205);
   await page.screenshot({ path: `${SHOT_DIR}/fm-mobile.png` });
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.locator('#scout-report').scrollIntoViewIfNeeded();

@@ -143,7 +143,7 @@ function scoutPitch(rep, team, big = false) {
   const dots = rep.lineupDetail.map((x) => {
     const pos = boardPos(x.slot, x.role, rep.tactic);
     // 깊게 내려서는 팀은 수비수가 골키퍼와 겹쳐 보이므로, 골키퍼와 최소 간격만 띄웁니다.
-    const gx = x.p.pos === 'GK' ? pos.x : Math.max(pos.x, 0.125);
+    const gx = x.p.pos === 'GK' ? pos.x : Math.max(pos.x, 0.15);
     const cx = (gx * 100).toFixed(1), cy = (pos.y * 64).toFixed(1);
     const r = x.p.pos === 'GK' ? 3.6 : 3.2;
     const labelY = Number(cy) > 51 ? Number(cy) - 4.4 : Number(cy) + 6.1;
