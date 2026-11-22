@@ -973,6 +973,12 @@ console.log('\n[15] 상대 스카우팅 — 실제 라인업·전술과 일치')
   ok(wide.tactic.route >= 0.5 && wide.hints.some((h) => h.tag === '루트' && /측면/.test(h.text)), '측면 크로스 팀에게는 측면 대비가 나옵니다', wide.hints.find((h) => h.tag === '루트')?.text.slice(0, 30) + '…');
   const mine = scoutReport(world, 'gs');
   ok(mine.formation === world.myLineup.formation && mine.tactic.mentality === (world.myLineup.tactic.mentality || 0), '내 팀을 스카우팅하면 내가 저장한 라인업·성향이 나옵니다', `${mine.formation} · ${mine.mentality.name}`);
+  // 축이 중립인 팀에도 공략이 비지 않아야 합니다 (포메이션·수비 라인·추천)
+  const allReports = Object.keys(world.teams).map((id) => ({ id, rep: scoutReport(world, id) }));
+  ok(allReports.every((x) => x.rep.hints.length >= 3), '모든 상대에게 공략 힌트가 3개 이상 나옵니다', allReports.map((x) => `${x.id}:${x.rep.hints.length}`).join(' '));
+  const neutral = allReports.find((x) => x.id === 'sc').rep;
+  ok(neutral.hints.some((h) => h.tag === '포메이션') && neutral.hints.some((h) => h.tag === '추천') && neutral.hints.some((h) => h.tag === '수비'),
+    '성향이 중립인 상대도 포메이션·수비 라인·추천 힌트가 나옵니다', neutral.hints.map((h) => h.tag).join('·'));
 }
 
 /* ── 16. AI 감독 실시간 맞대응 ── */

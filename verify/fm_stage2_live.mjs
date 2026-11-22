@@ -92,10 +92,9 @@ console.log('\n[데스크톱 1440×900]');
   await sleep(700);
   const anchor = await page.evaluate(() => {
     const r = document.querySelector('#scout-report').getBoundingClientRect();
-    const hh = 64;   // sticky 헤더
-    return { top: Math.round(r.top), ok: r.top > -40 && r.top < hh + 90 };
+    return { top: Math.round(r.top), ok: r.top > 40 && r.top < 220 };
   });
-  ok(anchor.ok, '‘스카우팅 상세 보고서’ 링크가 보고서로 이동합니다', `보고서 top ${anchor.top}px`);
+  ok(anchor.ok, '‘스카우팅 상세 보고서’ 링크가 보고서로 이동합니다(머리·탭바에 가리지 않음)', `보고서 top ${anchor.top}px`);
 
   // ② 상세 보고서
   const full = await page.evaluate(() => {

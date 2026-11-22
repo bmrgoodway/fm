@@ -277,6 +277,8 @@ html[data-theme="night"] .tc-words { color: #03210f; }
 
 /* ── 상대 스카우팅 ─────────────────────────────────────────────── */
 .scout { gap: 12px; }
+/* 앵커로 이동할 때 sticky 헤더·탭바에 카드 제목이 가리지 않게 합니다 */
+#scout-report { scroll-margin-top: calc(var(--head-h) + 46px); }
 .scout-mini { display: flex; flex-direction: column; gap: 7px; border: 1.5px solid var(--line); background: var(--paper2); padding: 8px 9px; }
 .sm-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
 .sm-head .pill { margin-left: auto; }

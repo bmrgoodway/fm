@@ -69,6 +69,46 @@ function axisHints(tactic) {
   return out;
 }
 
+/* 상대의 수비 라인·포메이션에서 나오는 공략 — 축이 중립인 팀에도 힌트가 남도록. */
+function squadHints(xi) {
+  const out = [];
+  const dfs = xi.filter((x) => x.slot.pos === 'DF');
+  const avg = (arr, k) => (arr.length ? arr.reduce((a, x) => a + (x.p.stats[k] || 0), 0) / arr.length : 0);
+  const dfDef = Math.round(avg(dfs, 'def')), dfSpd = Math.round(avg(dfs, 'spd'));
+  if (dfs.length && dfSpd <= 70) {
+    out.push({ tag: '수비', text: `상대 수비 라인 스피드가 평균 ${dfSpd}로 느립니다. 뒷공간으로 빠른 침투(포처·스루패스)가 통합니다.` });
+  } else if (dfs.length && dfDef <= 70) {
+    out.push({ tag: '수비', text: `수비 라인 수비력이 평균 ${dfDef}입니다. 정면 승부를 피하고 빠른 전환·2선 침투로 흔드세요.` });
+  } else if (dfs.length) {
+    out.push({ tag: '수비', text: `수비 라인이 단단합니다(평균 수비 ${dfDef}·스피드 ${dfSpd}). 무리한 돌파보다 세트피스와 두 번째 공을 노리세요.` });
+  }
+  return out;
+}
+
+/* 포메이션별 약점 — 상대가 서는 모양에 따라 파고들 곳이 다릅니다. */
+const FORMATION_HINT = {
+  '4-3-3': '측면 공격수가 폭을 크게 벌립니다. 풀백 뒤 공간으로 역습하면 중앙 수비가 벌어진 틈이 나옵니다.',
+  '4-4-2': '두 줄 4-4-2입니다. 중원을 3명으로 채워 숫자 우위를 만들고, 측면에서 2대1로 풀백을 끌어내세요.',
+  '3-5-2': '윙백이 터치라인 끝까지 올라옵니다. 그 뒤 측면 공간이 비니, 윙어를 넓게 두고 반대쪽 전환으로 노리세요.',
+  '4-2-3-1': '수비형 미드필더 두 명 앞, CAM 자리(라인 사이)가 열려 있습니다. 플레이메이커를 그 자리에 두고 킬패스를 받게 하세요.',
+};
+
+/* 지금 이 상대에게 준비해 둘 대응 — 축과 성향에서 바로 뽑습니다. */
+function recommendHint(tactic, ment) {
+  const v = (k) => Number(tactic[k]) || 0;
+  const rec = [];
+  if (v('line') >= 0.25) rec.push('수비 라인 뒤 침투(포처·스루패스)');
+  if (v('line') <= -0.25) rec.push('측면 크로스·중거리 슈팅으로 블록 흔들기');
+  if (v('press') >= 0.25) rec.push('짧은 패스·원투로 압박 벗기기');
+  if (v('press') <= -0.25) rec.push('측면 전환으로 빈 공간 만들기');
+  if (v('route') >= 0.25) rec.push('풀백을 수비에 두고 측면 2대1 차단');
+  if (v('route') <= -0.25) rec.push('홀딩으로 중앙 패스 길목 차단');
+  if (ment.v >= 0.5) rec.push('뺏은 직후 빠른 역습');
+  if (ment.v <= -0.5) rec.push('세트피스와 두 번째 공');
+  if (!rec.length) rec.push('원투·짧은 패스로 템포를 만들고 기회엔 과감한 슈팅');
+  return { tag: '추천', text: `준비해 둘 대응 — ${rec.slice(0, 3).join(' · ')}.` };
+}
+
 /* 상대 한 팀의 스카우팅 보고서. */
 export function scoutReport(w, teamId) {
   const team = w.teams[teamId];
@@ -102,8 +142,19 @@ export function scoutReport(w, teamId) {
         : ment.v > 0 ? [{ tag: '성향', text: '공격적 성향으로 라인을 올립니다. 우리가 공을 잡았을 때 뒤에 남는 수비가 적으니, 한 번 넘기면 넓은 공간이 나옵니다.' }]
           : ment.v < 0 ? [{ tag: '성향', text: '수비적 성향으로 가담을 줄입니다. 문전 수비가 두터우니 무리한 돌파보다 세트피스·중거리가 낫습니다.' }]
             : []),
+    ...squadHints(xi),
+    ...(FORMATION_HINT[lineup.formation] ? [{ tag: '포메이션', text: FORMATION_HINT[lineup.formation] }] : []),
+    recommendHint(tactic, ment),
     ...(keyPlayers[0] ? [{ tag: '경계', text: `${keyPlayers[0].name}(${keyPlayers[0].slot}·${keyPlayers[0].roleLabel}) — ${keyPlayers[0].mark}` }] : []),
   ];
+  // 같은 말이 두 번 들어가지 않게, 태그·문장 기준으로 한 번씩만 남깁니다.
+  const seen = new Set();
+  const unique = hints.filter((h) => {
+    const k = `${h.tag}|${h.text}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   return {
     teamId, name: team.name, short: team.short, nick: team.nick, stadium: team.stadium,
     formation: lineup.formation, formationName: FORMATIONS[lineup.formation]?.name || lineup.formation,
@@ -119,7 +170,7 @@ export function scoutReport(w, teamId) {
     }),
     xi: xi.map((x) => ({ num: x.p.num, name: x.p.name, pos: x.p.pos, slot: x.slot.label, role: x.role, roleShort: roleShort(x.role), ovr: x.ovr })),
     keyPlayers,
-    hints: hints.slice(0, 6),
+    hints: unique.slice(0, 6),
     power: teamPower(w, teamId),
     rank: row?.rank ?? null, play: row?.play ?? 0,
     form: (team.recent || []).slice(-5),
