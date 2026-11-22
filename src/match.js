@@ -1431,7 +1431,11 @@ export class Match {
       if (this.roleOf(m) === 'target' && forward > 0.25 && d < 26) score += 0.16;
       // 팀 성향 — 앞으로 가는 패스에 가중(공격적·총공세) / 위험한 패스는 회피(잠그기·수비적)
       score += ment * Math.max(0, forward) * 0.26;
-      if (ment < 0) score -= risk * -ment * 0.5;
+      if (ment < 0) {
+        score -= risk * -ment * 0.5;
+        // 잠그기는 수비 뒤에서 공을 뺏은 뒤 앞선으로 길게 넘기는 역습을 노립니다
+        if (m.pos === 'FW' && forward > 0.6 && d > 24) score += -ment * 0.24;
+      }
 
       if (inFinal && Math.abs(m.y - CY) > 14 && route > 0.3) score += 0.35;
       if (inFinal && Math.abs(m.y - CY) < 14 && route < -0.3) score += 0.3;
