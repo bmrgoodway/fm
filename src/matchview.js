@@ -41,6 +41,17 @@ export function mountMatch(app, m, meta) {
     }
     return out;
   };
+  diag.offside = () => ({ offsides: m.stats().offsides, goals: m.offsideGoals, flash: m.offsideFlash ? { at: m.offsideFlash.at, x: Math.round(m.offsideFlash.x * 10) / 10, y: Math.round(m.offsideFlash.y * 10) / 10, lineX: Math.round((m.offsideFlash.lineX || 0) * 10) / 10 } : null });
+  diag.gkPose = () => {
+    const out = {};
+    for (const s of ['home', 'away']) {
+      const e = m.sides[s].players.find((p) => p.onPitch && p.pos === 'GK');
+      if (!e) continue;
+      const own = m.sides[s].dir > 0 ? 0 : 100;
+      out[s] = { x: Math.round(e.x * 10) / 10, y: Math.round(e.y * 10) / 10, out: Math.round(Math.abs(e.x - own) * 10) / 10, ballOut: Math.round(Math.abs(m.ball.x - own) * 10) / 10 };
+    }
+    return out;
+  };
   diag.ballAt = () => ({ x: Math.round(m.ball.x * 10) / 10, y: Math.round(m.ball.y * 10) / 10, mode: m.ball.mode, owner: m.ball.owner ? m.ball.owner.name : null, ownerPos: m.ball.owner ? m.ball.owner.pos : null });
 
   // 슛·골 판정은 공이 도착한 틱에 확정되지만, 화면에는 '공이 닿은 다음 틱'에 공개합니다.
@@ -433,6 +444,31 @@ export function mountMatch(app, m, meta) {
       ctx.strokeRect(gx === 0 ? CX(-1.6) : CX(PW), CYp(CY - GOAL_HALF), 1.6 * scale, GOAL_HALF * 2 * scale);
     }
 
+    // 오프사이드 — 판정 순간 잠깐 라인과 깃발을 비춥니다 (공이 다음 플레이로 넘어가면 사라짐)
+    if (S === m && m.offsideFlash && m.t - m.offsideFlash.at <= 6) {
+      const f = m.offsideFlash;
+      const k = clamp01((m.t - f.at + a) / 6);
+      ctx.save();
+      ctx.globalAlpha = 1 - k * 0.65;
+      if (f.lineX != null) {
+        ctx.strokeStyle = '#ffdc1a'; ctx.lineWidth = 2; ctx.setLineDash([6, 5]);
+        ctx.beginPath(); ctx.moveTo(CX(f.lineX), CYp(0)); ctx.lineTo(CX(f.lineX), CYp(PH)); ctx.stroke();
+        ctx.setLineDash([]);
+      }
+      const fx = CX(f.x), fy = CYp(f.y) - Math.max(14, scale * 3.0);
+      const label = '🚩 오프사이드';
+      ctx.font = `900 ${Math.max(11, Math.round(scale * 1.55))}px "Pretendard Variable", Pretendard, sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const tw = ctx.measureText(label).width + 16, th = Math.max(20, scale * 2.6);
+      ctx.fillStyle = 'rgba(16,16,20,.86)';
+      ctx.fillRect(fx - tw / 2, fy - th / 2, tw, th);
+      ctx.strokeStyle = '#ffdc1a'; ctx.lineWidth = 1.6;
+      ctx.strokeRect(fx - tw / 2, fy - th / 2, tw, th);
+      ctx.fillStyle = '#ffdc1a';
+      ctx.fillText(label, fx, fy + 0.5);
+      ctx.restore();
+    }
+
     // 세트피스 표시 (코너·프리킥 지점)
     if (S.sp) {
       const sx = CX(S.sp.x), sy = CYp(S.sp.y);
@@ -644,7 +680,7 @@ export function mountMatch(app, m, meta) {
   /* ── 패널 갱신 ── */
   const statRows = [
     ['shots', '슈팅'], ['onTarget', '유효슈팅'], ['xg', '기대득점(xG)'], ['saves', '선방'],
-    ['corners', '코너킥'], ['fouls', '파울'], ['yellow', '경고'], ['red', '퇴장'],
+    ['corners', '코너킥'], ['fouls', '파울'], ['offsides', '오프사이드'], ['yellow', '경고'], ['red', '퇴장'],
   ];
   function renderStats() {
     const s = m.stats();
@@ -828,6 +864,7 @@ export function mountMatch(app, m, meta) {
       ['xG', s.xg.home.toFixed(2), s.xg.away.toFixed(2)],
       ['코너킥', s.corners.home, s.corners.away],
       ['파울', s.fouls.home, s.fouls.away],
+      ['오프사이드', s.offsides.home, s.offsides.away],
       ['경고 / 퇴장', `${s.yellow.home} / ${s.red.home}`, `${s.yellow.away} / ${s.red.away}`],
     ].map(([k, h, a]) => `<div class="ov-row"><b>${h}</b><span>${k}</span><b>${a}</b></div>`).join('');
     $('m-overlay').hidden = false;

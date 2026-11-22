@@ -75,11 +75,13 @@ ok(fps.ballLerp, '공도 매 프레임 보간');
 await page.getByRole('button', { name: '2x' }).click();
 const space = await page.evaluate(async () => {
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-  const acc = { frames: 0, nn: 0, close: 0, pairs: 0, swarm: 0, min: 99 };
+  const acc = { frames: 0, nn: 0, close: 0, pairs: 0, swarm: 0, min: 99, gkHi: 0, gkHiN: 0, gkLo: 0, gkLoN: 0, gkMax: 0, offs: 0 };
   const t0 = performance.now();
+  let lastM = null;
   while (performance.now() - t0 < 9000) {
     await new Promise((r) => setTimeout(r, 160));
     const m = window.__fm.match;
+    lastM = m;
     if (m.phase !== 'play' || !m.ball.owner) continue;
     for (const s of ['home', 'away']) {
       const ps = m.sides[s].players.filter((e) => e.onPitch);
@@ -92,21 +94,41 @@ const space = await page.evaluate(async () => {
         acc.pairs++; if (dist(ps[i], ps[j]) < 4) acc.close++;
       }
       acc.swarm += ps.filter((e) => dist(e, m.ball) < 6).length;
+      // 골키퍼 위치 — 우리 볼 때 전진(스위퍼), 상대 위험 지역에서는 골문 앞
+      const gk = ps.find((e) => e.pos === 'GK');
+      if (gk) {
+        const side = m.sides[s];
+        const own = side.dir > 0 ? 0 : 100;
+        const out = Math.abs(gk.x - own);
+        acc.gkMax = Math.max(acc.gkMax, out);
+        const bp = side.dir > 0 ? m.ball.x : 100 - m.ball.x;
+        const hasBall = m.ball.owner.side === s;
+        if (hasBall && bp > 60) { acc.gkHi += out; acc.gkHiN++; }
+        if (!hasBall && bp < 30) { acc.gkLo += out; acc.gkLoN++; }
+      }
     }
     acc.frames++;
   }
+  // 오프사이드 판정이 화면 데이터로도 잡히는지
+  const st = lastM ? lastM.stats() : { offsides: { home: 0, away: 0 } };
+  acc.offs = st.offsides.home + st.offsides.away;
   return {
     frames: acc.frames,
     avgNN: +(acc.nn / Math.max(acc.frames * 22, 1)).toFixed(2),
     minNN: +acc.min.toFixed(2),
     closePct: +((acc.close / Math.max(acc.pairs, 1)) * 100).toFixed(1),
     swarm: +(acc.swarm / Math.max(acc.frames, 1)).toFixed(2),
+    gkAdvance: +(acc.gkHi / Math.max(acc.gkHiN, 1)).toFixed(1),
+    gkDeep: +(acc.gkLo / Math.max(acc.gkLoN, 1)).toFixed(1),
+    gkMax: +acc.gkMax.toFixed(1),
   };
 });
 out.metrics.space = space;
 console.log('  · 공간 계측', JSON.stringify(space));
 ok(space.closePct < 4, '화면에서도 선수가 겹치지 않음(4u 이내 쌍 비율)', `${space.closePct}% · 최근접 ${space.minNN}u`);
 ok(space.swarm < 4.2, '공 주변에 전원이 몰리지 않음', `평균 ${space.swarm}명`);
+ok(space.gkMax <= 16, '골키퍼가 골문에서 박스 앞까지만 나옴', `최대 ${space.gkMax}u`);
+ok(space.gkAdvance - space.gkDeep > 2, '골키퍼가 공격 시 전진·수비 시 복귀(스위퍼)', `전진 ${space.gkAdvance}u ↔ 수비 ${space.gkDeep}u`);
 
 // 4x로 한 경기를 끝까지 — 하프타임 카드, 득점 리플레이, 결과 화면
 await page.getByRole('button', { name: '4x' }).click();
@@ -191,6 +213,29 @@ out.metrics.match = fin;
 console.log('  · 경기 결과', JSON.stringify({ score: fin.score, passLen: fin.passLen, patterns: fin.patterns, wideShare: fin.wideShare }));
 const pat = fin.patterns;
 ok(fin.rows.length >= 6, '경기 종료 요약에 코너·파울·카드까지 표시', fin.rows.join(' | ').slice(0, 110));
+// 오프사이드 — 기록·중계·피치 표시가 한 줄로 이어지는지
+const off = await page.evaluate(() => {
+  const m = window.__fm.match;
+  const s = m.stats();
+  const evs = m.events.filter((e) => e.type === 'offside');
+  const rows = [...document.querySelectorAll('#m-statrows tr')].map((r) => r.textContent.replace(/\s+/g, ' ').trim());
+  const ov = [...document.querySelectorAll('.ov-row')].map((r) => r.textContent.replace(/\s+/g, ' ').trim());
+  return {
+    offs: s.offsides.home + s.offsides.away,
+    evs: evs.length,
+    texts: evs.slice(-2).map((e) => e.text),
+    goals: m.offsideGoals || 0,
+    row: rows.find((x) => x.includes('오프사이드')) || '',
+    ovRow: ov.find((x) => x.includes('오프사이드')) || '',
+    flash: m.offsideFlash ? { lineX: Math.round(m.offsideFlash.lineX * 10) / 10, x: Math.round(m.offsideFlash.x * 10) / 10 } : null,
+  };
+});
+out.metrics.offside = off;
+ok(!!off.row, '실시간 기록에 오프사이드 행', off.row);
+ok(!!off.ovRow, '경기 종료 요약에도 오프사이드', off.ovRow);
+ok(off.offs === off.evs, '오프사이드 수치와 중계 이벤트가 일치', `${off.offs}회 / 이벤트 ${off.evs}건`);
+ok(off.goals === 0, '오프사이드 위치에서 나온 득점 0건', `${off.goals}건`);
+if (off.offs > 0) ok(!!off.flash, '오프사이드 피치 표시(🚩·라인) 데이터', JSON.stringify(off.flash));
 if (!replayOk) {
   // 무득점 경기였으면 다음 경기를 바로 시작해 리플레이를 한 번 더 시도합니다
   await continueFromResult(page);

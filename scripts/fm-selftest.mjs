@@ -8,9 +8,10 @@
 //   6) 다경기 밸런스(득점·xG·코너·프리킥·골킥·파울·카드·부상)
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld } from '../src/world.js';
-import { Match, lineupFor, applyResult } from '../src/match.js';
+import { Match, lineupFor, applyResult, CY, W } from '../src/match.js';
 
 const N = Number(process.argv[2] || 24);
+const prog = (x, dir) => (dir > 0 ? x : 100 - x);   // 공격 방향 기준 진행도
 let fails = 0;
 const ok = (cond, label, detail = '') => {
   console.log(`${cond ? '  ✅' : '  ❌'} ${label}${detail ? ` — ${detail}` : ''}`);
@@ -61,6 +62,34 @@ function shapeProbe(tactic, hasBall = true) {
   return out;
 }
 
+// 수비 블록이 실제로 어느 높이에 서는지 — 상대 미드필더가 우리 진영에서 공을 소유한 채 블록을 마주하게 두고,
+// 가장 깊은 수비수 두 명(=실제 수비 라인)의 평균 x 를 잽니다. (경기 중 전환 국면의 잡음 없이 라인만 측정)
+function blockProbe(tactic, ticks = 90) {
+  // 상대 미드필더가 우리 진영(x=34)에 공을 가진 채 블록을 마주하게 고정하고,
+  // 가장 깊은 수비수 두 명(= 실제 수비 라인)의 평균 x 를 여러 판본으로 재어 평균합니다.
+  let sum = 0, n = 0;
+  for (const seed of ['b1', 'b2', 'b3']) {
+    const m = newMatch('gs', 'dj', `${seed}-${JSON.stringify(tactic)}`);
+    m.sides.home.tactic = { line: 0, pass: 0, press: 0, route: 0, ...tactic };
+    m.sides.away.tactic = { line: 0, pass: 0, press: 0, route: 0 };
+    for (let i = 0; i < ticks; i++) {
+      const away = m.sides.away.players.find((e) => e.onPitch && e.pos === 'MF');
+      if (away) {
+        m.phase = 'play'; m.pause = 0; m.sp = null;
+        m.ball.owner = away; m.ball.mode = 'carry';
+        away.x = 34; away.y = CY; away.px = 34; away.py = CY; away.warp = null; away.decCd = 99;
+        m.ball.x = 34.9; m.ball.y = CY;
+      }
+      m.tick();
+      // 전환 국면(공이 우리 골문 쪽으로 밀리거나 소유가 바뀐 순간)은 빼고 블록이 선 상태만 잽니다
+      if (m.phase !== 'play' || !m.ball.owner || m.ball.owner.side !== 'away' || m.ball.x > 42) continue;
+      const dfs = m.sides.home.players.filter((e) => e.onPitch && e.pos === 'DF').map((e) => e.x).sort((a, b) => a - b);
+      sum += (dfs[0] + (dfs[1] ?? dfs[0])) / 2; n += 1;
+    }
+  }
+  return sum / Math.max(n, 1);
+}
+
 // 경기 중에도 실제로 그렇게 서는지 (압박 인원·라인 높이)
 function liveProbe(tactic, ticks = 120) {
   const m = newMatch('gs', 'dj', `live-${JSON.stringify(tactic)}`);
@@ -96,9 +125,9 @@ console.log('\n[1] 전술 4축 → 좌표 변화');
   ok(ph.pressN - pl.pressN >= 2, '강한 압박 — 볼 주변 압박 인원 1명 → 3명 이상', `${pl.pressN}명 → ${ph.pressN}명`);
   const passShort = shapeProbe({ pass: -1 }), passLong = shapeProbe({ pass: 1 });
   ok(Math.abs(passLong.fw - passShort.fw) > 3, '롱볼 vs 짧은 패스 — 최전방 높이 차이', `FW x ${passShort.fw.toFixed(1)} → ${passLong.fw.toFixed(1)}`);
-  // 경기 안에서도 실제 좌표가 달라지는지
-  const l1 = liveProbe({ line: -1 }), l2 = liveProbe({ line: 1 });
-  ok(Math.abs(l2.df - l1.df) > 3, '경기 중 실제 수비 라인 위치도 달라짐', `DF x ${l1.df.toFixed(1)} → ${l2.df.toFixed(1)}`);
+  // 경기 안에서도 실제 좌표가 달라지는지 (수비 블록의 실제 라인)
+  const b1 = blockProbe({ line: -1 }), b2 = blockProbe({ line: 1 });
+  ok(b2 - b1 > 3, '경기 중 실제 수비 라인 위치도 달라짐', `수비 라인 x ${b1.toFixed(1)} → ${b2.toFixed(1)} (Δ${(b2 - b1).toFixed(1)})`);
   const p1 = liveProbe({ press: -1 }), p2 = liveProbe({ press: 1 });
   ok(p2.press - p1.press > 0.5, '경기 중 볼 주변 압박 인원 차이', `${p1.press.toFixed(2)}명 → ${p2.press.toFixed(2)}명`);
 }
@@ -337,6 +366,166 @@ console.log('\n[8] 전술별 패스 패턴·공간');
   // 네 축을 바꿨을 때 득점이 한쪽으로 무너지지 않는지
   const gl = [bal, shortC, longW, highP, lowP].map((x) => x.goals);
   ok(Math.max(...gl) - Math.min(...gl) < 2.2, '전술별 득점 편차가 과하지 않음', gl.map(f).join(' / '));
+}
+
+/* ── 9. 골키퍼 포지셔닝 ── */
+console.log('\n[9] 골키퍼 포지셔닝 (각도·스위퍼·복귀)');
+{
+  const m = newMatch('gs', 'dj', 'gkpose');
+  m.holdHalf = false;
+  let ang = 0, angN = 0, lat = 0, latN = 0, latSign = 0;
+  let hi = 0, hiN = 0, lo = 0, loN = 0, outMax = 0;
+  let g = 0;
+  while (!m.done && g < 4000) {
+    m.tick(); g++;
+    if (m.phase !== 'play') continue;
+    for (const s of ['home', 'away']) {
+      const side = m.sides[s];
+      const e = side.players.find((p) => p.onPitch && p.pos === 'GK');
+      if (!e) continue;
+      const own = side.dir > 0 ? 0 : W;
+      const vx = m.ball.x - own, vy = m.ball.y - CY;
+      const L = Math.hypot(vx, vy) || 1;
+      // 골문 중앙 → 공 직선까지의 수직 거리 (각도선 위에 서 있는가)
+      ang += Math.abs((e.x - own) * vy - (e.y - CY) * vx) / L; angN += 1;
+      const out = Math.abs(e.x - own);
+      if (out > outMax) outMax = out;
+      if (Math.abs(vy) > 12) {
+        lat += Math.abs(e.y - CY); latN += 1;
+        if (Math.sign(e.y - CY) === Math.sign(vy)) latSign += 1;
+      }
+      const ballP = prog(m.ball.x, side.dir);
+      const hasBall = !!m.ball.owner && m.ball.owner.side === s;
+      if (hasBall && ballP > 60) { hi += out; hiN += 1; }
+      if (!hasBall && ballP < 30) { lo += out; loN += 1; }
+    }
+  }
+  const f1 = (v, n) => (v / Math.max(n, 1)).toFixed(1);
+  ok(ang / Math.max(angN, 1) < 2.5, '골키퍼가 공-골문 각도선 위에 서서 각도를 좁힘', `각도선 이탈 평균 ${(ang / Math.max(angN, 1)).toFixed(2)}u`);
+  ok(latSign / Math.max(latN, 1) > 0.85, '공이 측면에 있으면 같은 쪽으로 따라 이동', `같은 쪽 ${Math.round((latSign / Math.max(latN, 1)) * 100)}% · 평균 ${f1(lat, latN)}u`);
+  ok(hi / Math.max(hiN, 1) > 5.5, '우리 공격 시 페널티 박스 앞까지 전진(스위퍼)', `${f1(hi, hiN)}u (n=${hiN})`);
+  ok(lo / Math.max(loN, 1) < 4.5, '상대가 위험 지역에 들어오면 골문 앞으로 내려섬', `${f1(lo, loN)}u (n=${loN})`);
+  ok(hi / Math.max(hiN, 1) - lo / Math.max(loN, 1) > 3, '전진 폭과 복귀 폭이 실제로 구분됨', `${f1(lo, loN)}u ↔ ${f1(hi, hiN)}u`);
+  ok(outMax <= 15.6, '골키퍼가 골문에서 너무 멀리 나가지 않음', `최대 ${outMax.toFixed(1)}u`);
+}
+{
+  // 우리 공격 → 전진한 키퍼, 상대 역습 → 몇 틱 만에 골문 앞으로 복귀
+  const m = newMatch('gs', 'dj', 'gkret');
+  m.holdHalf = false;
+  m.sides.home.tactic = { line: 1, pass: 0, press: 0, route: 0 };
+  const gk = m.sides.home.players.find((e) => e.onPitch && e.pos === 'GK');
+  for (let i = 0; i < 44; i++) {
+    m.tick();
+    if (i % 4 === 0 && m.phase === 'play') {
+      const f = m.sides.home.players.find((e) => e.onPitch && e.pos === 'FW');
+      if (f) { m.ball.owner = f; m.ball.mode = 'carry'; f.x = 82; f.y = 32; m.ball.x = 82.9; m.ball.y = 32; f.decCd = 9; }
+    }
+  }
+  const adv = gk.x;
+  for (let i = 0; i < 6; i++) {
+    const a = m.sides.away.players.find((e) => e.onPitch && e.pos === 'FW');
+    if (a) { m.phase = 'play'; m.pause = 0; m.ball.owner = a; m.ball.mode = 'carry'; a.x = 26; a.y = 32; m.ball.x = 26; m.ball.y = 32; a.decCd = 9; }
+    m.tick();
+  }
+  const back = gk.x;
+  ok(adv > 7 && back < adv - 4, '상대 역습 시 골문 앞으로 빠르게 복귀', `전진 ${adv.toFixed(1)}u → 복귀 ${back.toFixed(1)}u`);
+}
+{
+  // 다이빙 중에는 몸이 공으로 뻗은 상태 — 발로 미끄러지지 않아야 합니다
+  const m = newMatch('gs', 'dj', 'gkdive');
+  m.holdHalf = false;
+  const gk = m.sides.home.players.find((e) => e.onPitch && e.pos === 'GK');
+  m.phase = 'play'; m.pause = 0;
+  // 슛이 날아가는 국면을 만들어 둔 뒤 다이빙을 겁니다 (판정 전 2틱)
+  m.ball.owner = null; m.ball.mode = 'shot'; m.ball.from = { x: 60, y: 32 }; m.ball.to = { x: 0, y: 30 };
+  m.ball.t = 0; m.ball.dur = 6; m.ball.x = 60; m.ball.y = 32; m.ball.px = 60; m.ball.py = 32;
+  gk.dive = { at: m.t, dur: 6, to: 5, save: false, landAt: null };
+  gk.y = 40;
+  const x0 = gk.x, y0 = gk.y;
+  m.tick(); m.tick();
+  ok(Math.abs(gk.x - x0) < 0.05 && Math.abs(gk.y - y0) < 0.05, '다이빙 중에는 골키퍼가 미끄러지지 않음', `Δ ${Math.hypot(gk.x - x0, gk.y - y0).toFixed(2)}u`);
+  ok(gk.dive && gk.dive.landAt == null, '다이빙 자세가 판정 전에 풀리지 않음');
+}
+
+/* ── 10. 오프사이드 ── */
+console.log('\n[10] 오프사이드 판정 · 라인 타기');
+{
+  // 상대 수비 라인을 한 줄로 세우고, 리시버를 라인 앞/뒤에 두고 패스를 냅니다
+  const setup = (beyond) => {
+    const m = newMatch('gs', 'dj', `off-${beyond}`);
+    m.holdHalf = false;
+    for (let i = 0; i < 6; i++) m.tick();
+    m.phase = 'play'; m.pause = 0; m.sp = null;
+    const side = m.sides.home, opp = m.sides.away;
+    const passer = side.players.find((e) => e.onPitch && e.pos === 'MF');
+    const recv = side.players.find((e) => e.onPitch && e.pos === 'FW');
+    const ys = [4, 10, 16, 22, 44, 50, 56, 62];
+    let k = 0;
+    for (const e of opp.players) {
+      if (!e.onPitch || e.pos === 'GK') continue;
+      e.x = 70 + (k % 2) * 1; e.y = ys[k % ys.length]; e.px = e.x; e.py = e.y; e.warp = null; k += 1;
+    }
+    passer.x = 60; passer.y = 32; passer.px = 60; passer.py = 32; passer.warp = null;
+    recv.warp = null;
+    const line = m.offsideLineDepth('home');
+    recv.x = line + (beyond ? 3 : -1); recv.y = 32;
+    recv.px = recv.x; recv.py = recv.y;
+    m.ball.owner = passer; m.ball.mode = 'carry'; m.ball.x = 60.9; m.ball.y = 32; passer.decCd = 0;
+    return { m, passer, recv, line };
+  };
+  const off = setup(true);
+  off.m.passTo(off.passer, off.recv, 'pass');
+  ok(!!off.m.ball.offside, '패스 출발 순간 라인 뒤 리시버 → 오프사이드 플래그', `라인 ${off.line.toFixed(1)} · 리시버 ${off.recv.x.toFixed(1)}`);
+  off.m.ball.t = off.m.ball.dur;
+  off.m.resolvePass();
+  const st = off.m.stats();
+  ok(st.offsides.home === 1, '오프사이드 기록(통계) 반영', `오프사이드 ${st.offsides.home}`);
+  ok(off.m.phase === 'setpiece' && off.m.sp && off.m.sp.type === 'freekick' && off.m.sp.side === 'away', '상대 프리킥으로 재개', `${off.m.phase}${off.m.sp ? ' · ' + off.m.sp.type + ' · ' + off.m.sp.side : ''}`);
+  ok(off.m.events.some((e) => e.type === 'offside' && /오프사이드/.test(e.text)), '중계 멘트에 오프사이드', off.m.events.filter((e) => e.type === 'offside').map((e) => e.text).slice(-1)[0] || '');
+  ok(!!off.m.offsideFlash && off.m.offsideFlash.lineX != null, '피치 표시(🚩 오프사이드·라인) 데이터', `lineX ${off.m.offsideFlash ? off.m.offsideFlash.lineX.toFixed(1) : '-'}`);
+  const on = setup(false);
+  on.m.passTo(on.passer, on.recv, 'pass');
+  ok(!on.m.ball.offside, '라인 안(온사이드) 리시버 → 판정 없음', `라인 ${on.line.toFixed(1)} · 리시버 ${on.recv.x.toFixed(1)}`);
+  // 코너킥·골킥은 오프사이드가 없습니다
+  const ck = setup(true);
+  ck.m.passTo(ck.passer, ck.recv, 'cross');
+  ok(!ck.m.ball.offside, '크로스(코너킥)는 오프사이드로 잡지 않음');
+  const gk2 = setup(true);
+  gk2.m.passTo(gk2.passer, gk2.recv, false, { safe: true });
+  ok(!gk2.m.ball.offside, '골킥 패스는 오프사이드 예외');
+  // 공격수는 패스 전에 라인을 타고, 러닝 목표도 라인을 넘지 않습니다
+  const run = setup(false);
+  const runner = run.m.sides.home.players.find((e) => e.onPitch && e.pos === 'FW' && e !== run.recv);
+  runner.runT = 12; runner.runOff = false;
+  run.m.sides.home._shape = run.m.computeShape(run.m.sides.home, true);
+  const tgt = run.m.targetFor(runner, run.m.sides.home, true);
+  const lim = run.m.onsideLimit(runner);
+  ok(tgt.x <= lim + 0.01, '침투 러닝 목표가 오프사이드 라인을 넘지 않음(라인 타기)', `목표 ${tgt.x.toFixed(1)} ≤ 한계 ${lim.toFixed(1)}`);
+}
+{
+  // 경기당 빈도와 오프사이드 득점
+  let offSum = 0, offGoals = 0, maxOff = 0;
+  const n = Math.min(N, 24);
+  for (let i = 0; i < n; i++) {
+    const home = ids[i % ids.length], away = ids[(i * 3 + 1) % ids.length];
+    const m = new Match({
+      world, homeId: home, awayId: away,
+      homeLineup: lineupFor(world, home), awayLineup: lineupFor(world, away),
+      seed: `off-bal-${i}`, cup: false, userSide: 'home',
+    });
+    m.holdHalf = false;
+    let g = 0;
+    while (!m.done && g < 5000) { m.tick(); g++; }
+    if (!m.done) m.finish();
+    const s = m.stats();
+    const o = s.offsides.home + s.offsides.away;
+    offSum += o; maxOff = Math.max(maxOff, o);
+    offGoals += m.offsideGoals || 0;
+  }
+  const avgOff = offSum / n;
+  ok(avgOff >= 1 && avgOff <= 6, `경기당 오프사이드 ${avgOff.toFixed(1)}회 (현실 1~6)`, `${n}경기 · 최대 ${maxOff}회`);
+  ok(maxOff <= 8, '오프사이드가 한 경기에 몰려 나오지 않음', `최대 ${maxOff}회`);
+  ok(offGoals === 0, '오프사이드 위치에서 나온 득점 0건', `${offGoals}건`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);
