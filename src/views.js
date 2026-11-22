@@ -1,5 +1,6 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
-import { FORMATIONS, STAT_LABEL } from './data.js';
+import { FORMATIONS, STAT_LABEL, STAT_KEYS } from './data.js';
+import { KL_TEAMS, KL_DIVISIONS, KL_ROSTERS } from './kleague2026.js';
 import * as W from './world.js';
 import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING, SET_PIECES, SET_PIECE_TYPES, resolveSetPiece, setPieceKey, setPieceLabel, setPieceEffect } from './tactics.js';
 import { scoutReport } from './scout.js';
@@ -75,18 +76,24 @@ const rankLabel = (n) => `${n}위`;
 
 function teamLine(w, id) {
   const t = w.teams[id];
-  return `<span class="tl">${badge(t)}<b>${esc(t.short)}</b></span>`;
+  if (!t) return '';
+  return `<button type="button" class="tl" data-act="club" data-team="${id}" title="${esc(t.name)} 선수단 보기">${badge(t)}<b>${esc(t.short)}</b></button>`;
 }
 
 /* ─────────────────────────── 구단 선택 ─────────────────────────── */
 export function renderSelect(app) {
   const hasSave = !!app.savedGame;
-  const cards = Object.values(app.defs).map((t) => {
-    const w = { ...t };
+  const mode = app.state.pickMode === 'kleague' ? 'kleague' : 'custom';
+  const div = Number(app.state.pickDiv) || 1;
+  const clip = mode === 'kleague' ? KL_TEAMS.filter((t) => t.div === div) : Object.values(app.defs).filter((t) => !t.div);
+  const cards = clip.map((t) => {
+    const divTag = mode === 'kleague' ? `<span class="divtag k${t.div}">${esc(W.divName({ divisions: KL_DIVISIONS }, t.div))}</span>` : '';
+    const rec = mode === 'kleague' && t.id === 'geumsan' ? '<span class="rec-tag">추천 시작</span>' : '';
     return `<button class="team-card" data-act="team" data-team="${t.id}" type="button">
-      <span class="tc-top">${badge(t)}<span class="tc-name"><b>${esc(t.name)}</b><small>${esc(t.nick)}</small></span></span>
+      <span class="tc-top">${badge(t)}<span class="tc-name"><b>${esc(t.name)}</b><small>${esc(t.nick)} · ${esc(t.city)}</small></span>${divTag}${rec}</span>
       <span class="tc-meta">
-        <span><b>${t.power}</b> 기본 전력</span><span><b>${won(t.budget)}</b> 자금</span>
+        <span><b>${t.power}</b> 전력</span>
+        ${mode === 'kleague' ? `<span class="tc-stadium">${esc(t.stadium)}</span>` : `<span><b>${won(t.budget)}</b> 자금</span>`}
         <span><b>${esc(t.formation)}</b> 포메이션</span>
       </span>
       <span class="tc-words">${esc(tacticWords(t.tactic))}</span>
@@ -94,20 +101,39 @@ export function renderSelect(app) {
       <span class="tc-go">감독 취임 →</span>
     </button>`;
   }).join('');
+  const modeTabs = `<div class="mode-tabs" role="group" aria-label="리그 선택">
+    <button type="button" class="mode-tab ${mode === 'custom' ? 'on' : ''}" data-act="pick-mode" data-mode="custom" aria-pressed="${mode === 'custom'}">
+      <b>커스텀 리그</b><small>기존 10개 구단 · 단일 리그 18라운드 + 컵</small>
+    </button>
+    <button type="button" class="mode-tab ${mode === 'kleague' ? 'on' : ''}" data-act="pick-mode" data-mode="kleague" aria-pressed="${mode === 'kleague'}">
+      <b>K리그 2026</b><small>실제 56개 구단 · K4→K1 승강제 + 코리아컵</small>
+    </button>
+  </div>`;
+  const divTabs = mode === 'kleague' ? `<div class="div-tabs" role="group" aria-label="디비전">
+    ${KL_DIVISIONS.map((d) => {
+      const n = KL_TEAMS.filter((t) => t.div === d.id).length;
+      return `<button type="button" class="div-tab k${d.id} ${d.id === div ? 'on' : ''}" data-act="pick-div" data-div="${d.id}" aria-pressed="${d.id === div}">
+        <b>${esc(d.name)}</b><small>${n}팀 · ${d.lo}~${d.hi}</small></button>`;
+    }).join('')}
+  </div>` : '';
+  const savedName = hasSave ? app.savedGame.teams[app.savedGame.myTeamId].name : '';
+  const savedSub = hasSave
+    ? `${esc(savedName)} · ${esc(W.seasonLabel(app.savedGame))}${W.isKL(app.savedGame) ? ` · ${esc(W.divName(app.savedGame, W.divOf(app.savedGame, app.savedGame.myTeamId)))}` : ''}`
+    : '';
 
   return `
   ${hasSave ? `<div class="resume">
-    <div><b>저장된 커리어가 있습니다</b><span class="sm">${esc(app.savedGame.teams[app.savedGame.myTeamId].name)} · ${app.savedGame.season}시즌</span></div>
+    <div><b>저장된 커리어가 있습니다</b><span class="sm">${savedSub}</span></div>
     <button class="btn primary" data-act="continue" type="button">커리어 이어하기</button>
   </div>` : ''}
   <section class="hero">
     <div class="hero-copy">
       <span class="eyebrow">GOODWAY APPS · FOOTBALL MANAGER</span>
       <h1>미니 <span class="hl">풋볼 매니저</span></h1>
-      <p class="hero-desc">2D 바둑알 매치 엔진 · 10팀 리그 + 컵대회 · 전술 4축 · 이적 시장</p>
+      <p class="hero-desc">2D 바둑알 매치 엔진 · K리그 1~4부 승강제 · 코리아컵 · 전술 4축 · 이적 시장</p>
       <ul class="feat">
         <li>90분을 360틱으로 실시간 시뮬레이션</li>
-        <li>감독 개입 — 배속·전술 변경·선수 교체</li>
+        <li>K4에서 시작해 K1까지 올라가는 커리어</li>
         <li>로그인 없이 이 브라우저에 세이브</li>
       </ul>
     </div>
@@ -126,7 +152,10 @@ export function renderSelect(app) {
       </svg>
     </div>
   </section>
-  <div class="sec-head"><h2>구단을 선택하세요</h2><p class="hint">팀마다 예산·전력·주력 전술이 다릅니다. 언제든 새 게임으로 다시 시작할 수 있습니다.</p></div>
+  <div class="sec-head"><h2>리그를 고르세요</h2><p class="hint">K리그 2026은 실제 2026 시즌 K1~K4 56개 구단의 선수 명단으로 시작합니다. K4부터 올라가는 커리어를 권합니다.</p></div>
+  ${modeTabs}
+  ${divTabs}
+  <div class="sec-head"><h2>${mode === 'kleague' ? `${esc(W.divName({ divisions: KL_DIVISIONS }, div))} 구단 ${clip.length}개` : '구단을 선택하세요'}</h2><p class="hint">팀마다 전력·예산·주력 전술이 다릅니다. 언제든 새 게임으로 다시 시작할 수 있습니다.</p></div>
   <div class="team-grid">${cards}</div>`;
 }
 
@@ -143,19 +172,21 @@ export function renderHub(app) {
   const table = W.standings(w);
   const myRow = table.find((r) => r.id === w.myTeamId);
   const lr = W.leagueRoundOf(w);
+  const divRounds = W.isKL(w) ? (w.calendar.filter((r) => r.type === 'league' && r.div === W.divOf(w, w.myTeamId)).length || 1) : 18;
+  const divNow = W.isKL(w) ? W.divName(w, W.divOf(w, w.myTeamId)) : null;
   const body = { schedule: scheduleTab, squad: squadTab, market: marketTab, records: recordsTab }[app.state.tab] || scheduleTab;
   return `
   <section class="clubbar">
     <div class="club-id">${badge(me, 'big')}
-      <div><h2>${esc(me.name)}</h2><p class="sm">${esc(me.nick)} · ${esc(me.stadium)}</p></div>
+      <div><h2>${esc(me.name)}</h2><p class="sm">${divNow ? `<span class="divtag k${W.divOf(w, w.myTeamId)}">${esc(divNow)}</span> · ` : ''}${esc(me.nick)} · ${esc(me.stadium)}</p></div>
     </div>
     <div class="club-stats">
-      <div><small>시즌</small><b>${w.season}</b></div>
+      <div><small>시즌</small><b>${esc(W.seasonLabel(w))}</b></div>
       <div><small>리그 순위</small><b>${myRow && myRow.play > 0 ? rankLabel(myRow.rank) : '—'}</b></div>
       <div><small>이적 자금</small><b>${won(me.budget)}</b></div>
       <div><small>주급</small><b>${W.fmt(W.teamWageTotal(w, w.myTeamId))}<span class="unit">만/주</span></b></div>
       <div><small>스쿼드 전력</small><b>${W.teamPower(w, w.myTeamId)}</b></div>
-      <div><small>리그 라운드</small><b>${lr > 18 ? '종료' : lr + 'R'}</b></div>
+      <div><small>리그 라운드</small><b>${lr > divRounds ? '종료' : `${lr} / ${divRounds}R`}</b></div>
     </div>
     <button class="btn small ghost" data-act="new-game" type="button">새 게임</button>
   </section>
@@ -213,7 +244,7 @@ function scoutCard(w) {
   const opp = w.teams[oppId];
   const rep = scoutReport(w, oppId);
   if (!rep) return '';
-  const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
+  const label = round.type === 'cup' ? W.cupLabelOf(w, round.stage) : `리그 ${round.leagueRound}R`;
   const form = rep.form.length
     ? `<span class="form">${rep.form.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>`
     : '<span class="muted sm">경기 없음</span>';
@@ -255,7 +286,7 @@ function nextMatchCard(app, w) {
   const oppId = isHome ? fixture.away : fixture.home;
   const opp = w.teams[oppId], me = W.myTeam(w);
   const myP = W.teamPower(w, w.myTeamId), oppP = W.teamPower(w, oppId);
-  const label = round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`;
+  const label = round.type === 'cup' ? W.cupLabelOf(w, round.stage) : `리그 ${round.leagueRound}R`;
   const oppForm = w.form?.[oppId] || [];
   const myForm = me.recent || [];
   // 상대 스카우팅 — 상대의 실제 라인업·전술 데이터를 그대로 읽습니다.
@@ -318,7 +349,7 @@ function recentList(app, w) {
     const oppId = isHome ? f.away : f.home;
     const g = isHome ? f.hg : f.ag, o = isHome ? f.ag : f.hg;
     const res = g > o ? 'W' : g < o ? 'L' : 'D';
-    return `<li><i class="f-${res}">${res === 'W' ? '승' : res === 'L' ? '패' : '무'}</i>${teamLine(w, oppId)}<span class="score">${g} : ${o}</span><span class="muted xs">${x.round.type === 'cup' ? W.CUP_LABEL[x.round.stage] : '리그 ' + x.round.leagueRound + 'R'}</span></li>`;
+    return `<li><i class="f-${res}">${res === 'W' ? '승' : res === 'L' ? '패' : '무'}</i>${teamLine(w, oppId)}<span class="score">${g} : ${o}</span><span class="muted xs">${x.round.type === 'cup' ? W.cupLabelOf(w, x.round.stage) : '리그 ' + x.round.leagueRound + 'R'}</span></li>`;
   }).join('')}</ul>`;
 }
 
@@ -345,7 +376,7 @@ function scheduleTab(app, w) {
   return `<div class="grid2">
     ${nextMatchCard(app, w)}
     <article class="card">
-      <div class="card-head"><h3>${(() => { const nx = W.userNextMatch(w); if (!nx) return '이번 라운드'; return nx.round.type === 'cup' ? W.CUP_LABEL[nx.round.stage] : `리그 ${nx.round.leagueRound}라운드`; })()}</h3><span class="pill">다른 경기</span></div>
+      <div class="card-head"><h3>${(() => { const nx = W.userNextMatch(w); if (!nx) return '이번 라운드'; return nx.round.type === 'cup' ? W.cupLabelOf(w, nx.round.stage) : `리그 ${nx.round.leagueRound}라운드`; })()}</h3><span class="pill">다른 경기</span></div>
       ${roundFixtures(app, w)}
       <h4 class="sub">최근 경기</h4>
       ${recentList(app, w)}
@@ -362,7 +393,7 @@ function scheduleTab(app, w) {
         const isHome = f.home === w.myTeamId;
         const oppId = isHome ? f.away : f.home;
         const r = W.resultOf(w, x.round, w.myTeamId);
-        return `<tr><td>${x.round.no}</td><td>${x.round.type === 'cup' ? W.CUP_LABEL[x.round.stage] : '리그'}</td><td>${teamLine(w, oppId)}</td><td>${isHome ? '홈' : '원정'}</td><td>${r ? `<b class="res-${r.res}">${r.mine} : ${r.opp}</b>` : '<span class="muted">예정</span>'}</td></tr>`;
+        return `<tr><td>${x.round.no}</td><td>${x.round.type === 'cup' ? W.cupLabelOf(w, x.round.stage) : '리그'}</td><td>${teamLine(w, oppId)}</td><td>${isHome ? '홈' : '원정'}</td><td>${r ? `<b class="res-${r.res}">${r.mine} : ${r.opp}</b>` : '<span class="muted">예정</span>'}</td></tr>`;
       }).join('')}</tbody>
     </table></div>
   </article>`;
@@ -466,32 +497,49 @@ function pitchBoard(app, w, info) {
 function playerCard(w, p, opts = {}) {
   if (!p) return '<p class="muted">선수를 선택하세요.</p>';
   const st = p.season || {};
-  const stats = ['spd', 'sho', 'pas', 'dri', 'def', 'vis', 'sta', 'gk'].map((k) => {
-    const label = { spd: '스피드', sho: '슈팅', pas: '패스', dri: '드리블', def: '수비', vis: '시야', sta: '체력', gk: 'GK' }[k];
-    return `<li><span>${label}</span><i class="bar"><i data-w="${p.stats[k]}"></i></i><b>${p.stats[k]}</b></li>`;
+  const team = w.teams[p.teamId];
+  const full = !!opts.full;
+  const stats = STAT_KEYS.map((k) => {
+    const v = p.stats[k];
+    return `<li><span>${STAT_LABEL[k]}</span><i class="bar"><i data-w="${v}"></i></i><b>${v}</b></li>`;
   }).join('');
-  return `<div class="pcard">
-    <div class="pc-head">
+  const avg = st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(2) : '—';
+  const recent = (p.recent || []).slice(-5);
+  const logs = (p.growthLog || []).slice(-4).reverse();
+  return `<div class="pcard ${full ? 'full' : ''}">
+    ${full ? '' : `<div class="pc-head">
+      ${team ? badge(team) : ''}
       <span class="pc-num">${p.num}</span>
-      <div><h4>${esc(p.name)}</h4><p class="sm">${p.pos} · ${p.age}세 · 종합 <b>${p.ovr}</b></p></div>
+      <div><h4>${esc(p.name)}</h4><p class="sm">${p.pos} · ${esc({ GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' }[p.pos] || p.pos)} · ${p.age}세${team ? ` · ${esc(team.short)}` : ''}${p.loan ? ' · 임대' : ''}</p></div>
       <span class="pc-ovr">${p.ovr}</span>
-    </div>
+    </div>`}
+    ${full ? `<div class="pc-top">
+      <div><span class="pc-label">${esc(team ? team.name : '자유계약')}</span><span class="pc-label">#${p.num}</span><span class="pc-label">${p.pos}</span><span class="pc-label">${p.age}세</span></div>
+      <b class="pc-ovr sm">${p.ovr}</b>
+    </div>` : ''}
     <ul class="stats8">${stats}</ul>
     <div class="pc-meta">
       <div><small>몸값</small><b>${won(p.value)}</b></div>
       <div><small>주급</small><b>${W.fmt(p.wage)}만</b></div>
-      <div><small>시즌 출전</small><b>${st.apps || 0}경기</b></div>
+      <div><small>잠재력</small><b>${potOf(p)}</b></div>
+      <div><small>출전</small><b>${st.apps || 0}경기</b></div>
+      <div><small>선발/교체</small><b>${st.starts || 0} / ${st.subs || 0}</b></div>
       <div><small>득점/도움</small><b>${st.goals || 0} / ${st.assists || 0}</b></div>
-      <div><small>평균 평점</small><b>${st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(2) : '—'}</b></div>
+      <div><small>평균 평점</small><b>${avg}</b></div>
+      <div><small>경고/퇴장</small><b>${st.yellow || 0} / ${st.red || 0}</b></div>
+    </div>
+    <div class="pc-recent">
+      <small>최근 평점</small>
+      <span class="ratings">${recent.length ? recent.map((r) => `<i class="rt ${r >= 7.5 ? 'hot' : r < 6 ? 'cold' : ''}">${r.toFixed(1)}</i>`).join('') : '<span class="muted xs">경기 기록 없음</span>'}</span>
     </div>
     ${(() => {
       const gs = W.growthStatus(p);
-      const logs = (p.growthLog || []).slice(-3).reverse();
       return `<div class="grow-box">
         <div class="gb-head"><b>성장</b>${statusPill(p)}<span class="sm">잠재력 <b>${potOf(p)}</b> · ${esc(gs.note)}</span></div>
         <ul class="grow-log">${logs.map((l) => `<li><span class="muted xs">${l.s}시즌</span>${l.d ? deltaChip(l.d) : ''}<span>${logWords(l) || '능력치 변화 없음'}</span></li>`).join('') || '<li class="muted sm">아직 경기 기록이 없습니다.</li>'}</ul>
       </div>`;
     })()}
+    ${st.cleanSheets ? `<p class="hint">무실점 ${st.cleanSheets}경기</p>` : ''}
     ${(p.bans > 0 || p.inj > 0) ? `<p class="warn-bar">${p.bans > 0 ? `⛔ 출전 정지 ${p.bans}경기` : ''}${p.bans > 0 && p.inj > 0 ? ' · ' : ''}${p.inj > 0 ? `🚑 부상 ${p.inj}경기 결장` : ''}</p>` : ''}
     ${opts.note ? `<p class="hint">${opts.note}</p>` : ''}
   </div>`;
@@ -507,6 +555,39 @@ function trainingCard(w) {
     <p class="hint">경기에 나선 선수는 <b>출전·평점(7.0 이상 가산)·득점·도움</b>만큼 매 라운드 성장합니다. 잠재력이 높은 어린 선수는 훈련 방향에 따라 자라는 능력치가 달라지고, 30대는 서서히 내려갑니다.</p>
   </article>`;
 }
+
+/* ── 선수단 필터·정렬 ── */
+const POS_ORDER = { GK: 0, DF: 1, MF: 2, FW: 3 };
+export function sortSquad(list, app) {
+  const pos = app.state.posFilter || 'ALL';
+  const key = app.state.sortKey || 'ovr';
+  const dir = app.state.sortDir === 1 ? 1 : -1;
+  const out = list.filter((p) => pos === 'ALL' || p.pos === pos);
+  out.sort((a, b) => {
+    let d = 0;
+    if (key === 'age') d = a.age - b.age;
+    else if (key === 'value') d = a.value - b.value;
+    else if (key === 'pos') d = (POS_ORDER[a.pos] - POS_ORDER[b.pos]) || (a.ovr - b.ovr);
+    else if (key === 'name') d = String(a.name).localeCompare(String(b.name), 'ko');
+    else d = a.ovr - b.ovr;
+    return d * dir || a.num - b.num;
+  });
+  return out;
+}
+
+function filterBar(app, opts = {}) {
+  const pos = app.state.posFilter || 'ALL';
+  const key = app.state.sortKey || 'ovr';
+  const dir = app.state.sortDir === 1 ? 1 : -1;
+  const chips = [['ALL', '전체'], ['GK', 'GK'], ['DF', 'DF'], ['MF', 'MF'], ['FW', 'FW']];
+  const sorts = [['ovr', '종합'], ['age', '나이'], ['value', '몸값'], ['pos', '포지션'], ['name', '이름']];
+  return `<div class="filter-bar">
+    ${opts.noPos ? '' : `<span class="seg" role="group" aria-label="포지션">${chips.map(([k, l]) => `<button type="button" class="${pos === k ? 'on' : ''}" data-act="pos-filter" data-pos="${k}" aria-pressed="${pos === k}">${l}</button>`).join('')}</span>`}
+    <span class="seg" role="group" aria-label="정렬">${sorts.map(([k, l]) => `<button type="button" class="${key === k ? 'on' : ''}" data-act="sort" data-key="${k}" aria-pressed="${key === k}">${l}${key === k ? (dir === 1 ? '↑' : '↓') : ''}</button>`).join('')}</span>
+    <input class="search" type="search" placeholder="${esc(opts.placeholder || '선수 이름·포지션 검색')}" data-filter-input aria-label="선수 검색" />
+  </div>`;
+}
+const squadFilterBar = (app) => filterBar(app);
 
 function squadTab(app, w) {
   const info = W.lineupInfo(w);
@@ -572,10 +653,12 @@ function squadTab(app, w) {
   </div>
   <article class="card">
     <div class="card-head"><h3>선수단 ${w.teams[w.myTeamId].squad.length}명</h3><span class="pill">주급 합계 ${W.fmt(W.teamWageTotal(w, w.myTeamId))}만/주</span></div>
-    <div class="table-wrap"><table class="tbl squad">
+    ${squadFilterBar(app)}
+    <div class="table-wrap"><table class="tbl squad" id="squad-table">
       <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>잠재</th><th>최근</th><th>스피드</th><th>슈팅</th><th>패스</th><th>수비</th><th>체력</th><th>몸값</th><th>출전</th></tr></thead>
-      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}${p.loan ? ' <span class="pill xs" title="임대">임대</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td><td>${recentCell(p)}</td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
+      <tbody>${sortSquad(W.squadOf(w, w.myTeamId), app).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}" data-fname="${esc(p.name)} ${p.pos}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}${p.loan ? ' <span class="pill xs" title="임대">임대</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td><td>${recentCell(p)}</td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
     </table></div>
+    <p class="hint">이름을 누르면 오른쪽 카드에 상세 능력치가 나옵니다. <b>포지션·정렬·검색</b>으로 원하는 선수를 바로 찾을 수 있습니다.</p>
   </article>`;
 }
 
@@ -589,7 +672,7 @@ function offersCard(w) {
       if (!p || !from) return '';
       return `<li class="offer">
         <div class="of-top">${badge(from)}<div class="of-who"><b>${esc(p.name)}</b><small>${p.pos} · ${p.age}세 · 종합 ${p.ovr} · 잠재 ${potOf(p)}</small></div><span class="of-price">${won(o.price)}</span></div>
-        <p class="of-line">${esc(from.name)} · ${esc(from.nick)} · 제안 ${won(o.price)} <span class="muted">(${o.round}R)</span></p>
+        <p class="of-line">${esc(from.name)} · ${esc(W.divName(w, from.div || 1))} · 제안 ${won(o.price)} <span class="muted">(${o.round}R)</span></p>
         <div class="of-acts">
           <button class="btn small primary" data-act="offer-accept" data-id="${o.id}" type="button">수락</button>
           <button class="btn small" data-act="offer-counter" data-id="${o.id}" type="button">역제안</button>
@@ -614,9 +697,25 @@ function transferFeed(w) {
 function marketTab(app, w) {
   const me = W.myTeam(w);
   const wage = W.teamWageTotal(w, w.myTeamId);
-  const rows = w.market.map((e) => {
+  const kl = W.isKL(w);
+  const myDiv = W.divOf(w, w.myTeamId);
+  const divFilter = Number(app.state.marketDiv) || 0;
+  const posFilter = app.state.posFilter || 'ALL';
+  const key = app.state.sortKey || 'ovr';
+  const dir = app.state.sortDir === 1 ? 1 : -1;
+  const entries = w.market.filter((e) => {
     const p = w.players[e.pid];
-    if (!p) return '';
+    if (!p) return false;
+    if (posFilter !== 'ALL' && p.pos !== posFilter) return false;
+    if (kl && divFilter && e.from && W.divOf(w, e.from) !== divFilter) return false;
+    return true;
+  }).sort((a, b) => {
+    const pa = w.players[a.pid], pb = w.players[b.pid];
+    let d = key === 'age' ? pa.age - pb.age : key === 'value' ? pa.value - pb.value : pa.ovr - pb.ovr;
+    return d * dir;
+  });
+  const rows = entries.map((e) => {
+    const p = w.players[e.pid];
     const from = e.from ? w.teams[e.from] : null;
     const c = W.canSign(w, e);
     const price = e.loan ? `임대 ${won(e.fee ?? 0)}` : e.price ? won(e.price) : '무료';
@@ -625,9 +724,9 @@ function marketTab(app, w) {
       : e.from
         ? `<span class="act-pair"><button type="button" class="btn small ${c.ok ? 'primary' : ''}" data-act="sign" data-pid="${p.id}" ${c.ok ? '' : `disabled title="${esc(c.why)}"`}>영입</button><button type="button" class="btn small" data-act="negotiate" data-pid="${p.id}">협상</button></span>`
         : `<button type="button" class="btn small ${c.ok ? 'primary' : ''}" data-act="sign" data-pid="${p.id}" ${c.ok ? '' : `disabled title="${esc(c.why)}"`}>FA 영입</button>`;
-    return `<tr class="${e.loan ? 'loan' : ''}">
-      <td><b>${esc(p.name)}</b><small class="pos">${p.pos}</small></td>
-      <td>${from ? `<span class="tl">${badge(from)}${esc(from.short)}</span>` : '<span class="pill free">자유계약</span>'}${e.loan ? ' <span class="pill xs">임대</span>' : ''}</td>
+    return `<tr class="${e.loan ? 'loan' : ''}" data-fname="${esc(p.name)} ${p.pos}">
+      <td><button type="button" class="linkname" data-act="player-modal" data-pid="${p.id}" data-team="${e.from || ''}"><b>${esc(p.name)}</b></button><small class="pos">${p.pos}</small></td>
+      <td>${from ? teamLine(w, from.id) : '<span class="pill free">자유계약</span>'}${e.loan ? ' <span class="pill xs">임대</span>' : ''}</td>
       <td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td>
       <td>${won(p.value)}</td><td><b>${price}</b></td>
       <td>${W.fmt(p.wage)}만</td>
@@ -641,21 +740,27 @@ function marketTab(app, w) {
       <td>${p.loan ? '' : `<button type="button" class="btn small danger" data-act="sell" data-pid="${p.id}">방출</button>`}</td>
     </tr>`).join('');
   const overWage = wage > me.wage;
+  const divChips = kl ? `<span class="seg" role="group" aria-label="디비전">${[[0, '전체'], [1, 'K1'], [2, 'K2'], [3, 'K3'], [4, 'K4']].map(([d, l]) => `<button type="button" class="${divFilter === d ? 'on' : ''} ${d ? `k${d}` : ''}" data-act="market-div" data-div="${d}" aria-pressed="${divFilter === d}">${l}</button>`).join('')}</span>` : '';
   return `${offersCard(w)}
   <article class="card">
-    <div class="card-head"><h3>이적 시장</h3><span class="pill">${w.season}시즌 · 라운드마다 갱신</span></div>
+    <div class="card-head"><h3>이적 시장</h3><span class="pill">${esc(W.seasonLabel(w))} · 라운드마다 갱신</span></div>
     <div class="money-row">
       <div><small>이적 자금</small><b>${won(me.budget)}</b></div>
       <div><small>주급 사용</small><b>${W.fmt(wage)}<span class="unit"> / ${W.fmt(me.wage)}만</span></b></div>
       <div><small>선수단</small><b>${me.squad.length}<span class="unit"> / 24명</span></b></div>
       <div><small>이번 시즌 지출</small><b>${won(w.finance.spent)}</b></div>
+      ${kl ? `<div><small>내 디비전</small><b>${esc(W.divName(w, myDiv))}</b></div>` : ''}
     </div>
     ${overWage ? '<p class="warn-bar">주급 예산을 초과했습니다. 선수를 방출해 공간을 만든 뒤 영입할 수 있습니다.</p>' : ''}
+    <div class="filter-bar">${divChips}
+      <span class="seg" role="group" aria-label="정렬">${[['ovr', '종합'], ['age', '나이'], ['value', '몸값']].map(([k, l]) => `<button type="button" class="${key === k ? 'on' : ''}" data-act="sort" data-key="${k}" aria-pressed="${key === k}">${l}${key === k ? (dir === 1 ? '↑' : '↓') : ''}</button>`).join('')}</span>
+      <input class="search" type="search" placeholder="선수 이름 검색" data-filter-input aria-label="이적 시장 검색" />
+    </div>
     <div class="table-wrap"><table class="tbl market buy">
       <thead><tr><th>선수</th><th>소속</th><th>나이</th><th>종합</th><th>잠재</th><th>몸값</th><th>이적료</th><th>주급</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="9" class="muted">시장에 나온 선수가 없습니다.</td></tr>'}</tbody>
+      <tbody>${rows || '<tr><td colspan="9" class="muted">조건에 맞는 선수가 없습니다.</td></tr>'}</tbody>
     </table></div>
-    <p class="hint"><b>영입</b>은 요청가 그대로, <b>협상</b>은 낮은 금액을 불러 흥정합니다(상대가 받아들일 최저선이 있습니다). <b>FA</b>는 이적료 없이, <b>임대</b>는 임대료만 내고 시즌이 끝나면 원소속으로 돌아갑니다. 주급 예산을 넘으면 영입할 수 없습니다.</p>
+    <p class="hint"><b>영입</b>은 요청가 그대로, <b>협상</b>은 낮은 금액을 불러 흥정합니다(상대가 받아들일 최저선이 있습니다). <b>FA</b>는 이적료 없이, <b>임대</b>는 임대료만 내고 시즌이 끝나면 원소속으로 돌아갑니다. 주급 예산을 넘으면 영입할 수 없습니다.${kl ? ' 소속 구단을 누르면 그 구단 선수단 전체를 볼 수 있습니다.' : ''}</p>
   </article>
   ${transferFeed(w)}
   <article class="card">
@@ -668,33 +773,74 @@ function marketTab(app, w) {
 }
 
 /* ── 순위/기록 탭 ── */
-function recordsTab(app, w) {
-  const table = W.standings(w);
-  const rows = table.map((r) => {
-    const t = w.teams[r.id];
-    return `<tr class="${r.id === w.myTeamId ? 'on' : ''}">
-      <td class="rank ${r.rank <= 3 ? 'top' : r.rank >= 9 ? 'low' : ''}">${r.rank}</td>
-      <td>${teamLine(w, r.id)}</td>
-      <td>${r.play}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td>
-      <td>${r.gf}</td><td>${r.ga}</td><td>${r.gd > 0 ? '+' + r.gd : r.gd}</td><td><b>${r.pts}</b></td>
-      <td>${formChips(r.form)}</td>
-    </tr>`;
-  }).join('');
+const ZONE = {
+  1: { top: 1, up: 0, down: 2, po: 1 },
+  2: { top: 1, up: 2, down: 2, po: 2 },
+  3: { top: 1, up: 2, down: 2, po: 2 },
+  4: { top: 1, up: 2, down: 0, po: 0 },
+};
 
-  const stageList = [0, 1, 2, 3].map((i) => w.cup.stages[i] || { name: W.CUP_NAMES[i], matches: [] });
-  const stages = stageList.map((s) => {
-    const ms = s.matches.map((m) => {
+function cupBracket(w) {
+  const count = W.cupStageCount(w);
+  const names = W.cupNamesOf(w);
+  const list = Array.from({ length: count }, (_, i) => w.cup.stages[i] || { name: names[i], matches: [] });
+  const active = list.findIndex((s) => s.matches.some((m) => !m.played));
+  return list.map((s, i) => {
+    const ms = s.matches || [];
+    const done = ms.filter((m) => m.played).length;
+    const cur = active < 0 ? count - 1 : active;
+    const open = i === count - 1 || (i === cur && ms.length <= 8);
+    const rows = ms.map((m) => {
       const winnerSide = m.played ? (m.winner === m.home ? 'h' : 'a') : '';
-      return `<li class="cup-match">
+      const mine = m.home === w.myTeamId || m.away === w.myTeamId;
+      return `<li class="cup-match ${mine ? 'mine' : ''}">
         <span class="cm-team ${winnerSide === 'h' ? 'win' : ''}">${esc(w.teams[m.home]?.short || '?')}</span>
         <span class="cm-score">${m.played ? `${m.hg}<i>:</i>${m.ag}` : 'vs'}</span>
         <span class="cm-team ${winnerSide === 'a' ? 'win' : ''}">${esc(w.teams[m.away]?.short || '?')}</span>
         ${m.aet ? '<small class="aet">연장</small>' : ''}
       </li>`;
     }).join('');
-    const placeholder = `<li class="cup-match ghost"><span class="cm-team">대진 미정</span></li>`;
-    return `<div class="cup-stage"><h4>${s.name}</h4><ul>${ms || placeholder}</ul></div>`;
+    return `<details class="cup-stage" ${open ? 'open' : ''}>
+      <summary>${esc(s.name)}<span class="cup-n">${ms.length ? `${done}/${ms.length}경기` : '대진 미정'}</span></summary>
+      <ul>${rows || '<li class="cup-match ghost"><span class="cm-team">대진 미정</span></li>'}</ul>
+    </details>`;
   }).join('');
+}
+
+function recordsTab(app, w) {
+  const kl = W.isKL(w);
+  const myDiv = W.divOf(w, w.myTeamId);
+  const divs = kl ? W.divisionsOf(w) : [{ id: 1, name: '리그', teams: Object.keys(w.teams) }];
+  const cur = kl ? (Number(app.state.divTab) || myDiv) : 1;
+  const table = W.standingsFor(w, kl ? cur : null);
+  const zone = ZONE[cur] || { top: 1, up: 0, down: 0, po: 0 };
+  const n = table.length;
+  const rows = table.map((r) => {
+    const t = w.teams[r.id];
+    const chips = [];
+    if (kl) {
+      const done = w.calendar.filter((rd) => rd.type === 'league' && rd.div === cur).every((rd) => rd.played);
+      if (r.rank === 1) {
+        if (cur > 1) chips.push('<span class="zchip up">승격</span>');
+        chips.push(`<span class="zchip champ">${done ? '우승' : '선두'}</span>`);
+      }
+      if (cur > 1 && r.rank === 2) chips.push('<span class="zchip po">승강 PO</span>');
+      if (cur < 4 && n > 2 && r.rank === n) chips.push('<span class="zchip down">강등</span>');
+      if (cur < 4 && n > 2 && r.rank === n - 1) chips.push('<span class="zchip po">승강 PO</span>');
+    }
+    return `<tr class="${r.id === w.myTeamId ? 'on' : ''}">
+      <td class="rank ${r.rank <= 3 ? 'top' : r.rank >= n - 1 ? 'low' : ''}">${r.rank}</td>
+      <td>${teamLine(w, r.id)}${chips.join('')}</td>
+      <td>${r.play}</td><td>${r.win}</td><td>${r.draw}</td><td>${r.loss}</td>
+      <td>${r.gf}</td><td>${r.ga}</td><td>${r.gd > 0 ? '+' + r.gd : r.gd}</td><td><b>${r.pts}</b></td>
+      <td>${formChips(r.form)}</td>
+    </tr>`;
+  }).join('');
+
+  const divTabs = kl ? `<div class="div-tabs inline" role="group" aria-label="디비전 순위표">
+    ${divs.map((d) => `<button type="button" class="div-tab k${d.id} ${d.id === cur ? 'on' : ''}" data-act="divtab" data-div="${d.id}" aria-pressed="${d.id === cur}">
+      <b>${esc(d.name)}</b><small>${d.table ? d.table.length : d.teams.length}팀${d.id === myDiv ? ' · 내 리그' : ''}</small></button>`).join('')}
+  </div>` : '';
 
   const board = (kind, title) => {
     const list = W.leaders(w, kind, 5);
@@ -704,60 +850,97 @@ function recordsTab(app, w) {
     </article>`;
   };
 
-  return `<div class="grid2">
+  return `${divTabs}
+  <div class="grid2">
     <article class="card">
-      <div class="card-head"><h3>리그 순위표</h3><span class="pill">${w.season}시즌 · 10팀 18라운드</span></div>
+      <div class="card-head"><h3>${esc(kl ? W.divName(w, cur) : '리그')} 순위표</h3><span class="pill">${esc(W.seasonLabel(w))} · ${table.length}팀</span></div>
       <div class="table-wrap"><table class="tbl standings">
         <thead><tr><th>순위</th><th>팀</th><th>경기</th><th>승</th><th>무</th><th>패</th><th>득</th><th>실</th><th>득실</th><th>승점</th><th>최근</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
-      <p class="hint">1위 우승 · 9~10위는 다음 시즌을 다시 준비합니다. 컵대회는 별도 토너먼트입니다.</p>
+      <p class="hint">${kl
+        ? `<b>${esc(W.divName(w, cur))}</b> · 각 경계(1↔2부, 2↔3부, 3↔4부)에서 꼴찌↔1위가 맞교대하고, 2번째끼리 승강 플레이오프를 치릅니다. ${cur < 4 ? '상위 디비전으로 올라가면 예산·주급 상한·스폰서가 커집니다.' : '위로 올라가는 것이 이 게임의 목표입니다.'}`
+        : '1위 우승 · 9~10위는 다음 시즌을 다시 준비합니다. 컵대회는 별도 토너먼트입니다.'}</p>
     </article>
     <article class="card">
-      <div class="card-head"><h3>컵대회 대진</h3><span class="pill">10팀 토너먼트</span></div>
-      <div class="bracket">${stages}</div>
+      <div class="card-head"><h3>${kl ? '코리아컵' : '컵대회'} 대진</h3><span class="pill">${kl ? `56팀 · ${W.cupStageCount(w)}단계` : '10팀 토너먼트'}</span></div>
+      <div class="bracket">${cupBracket(w)}</div>
     </article>
   </div>
   <div class="grid3">${board('goals', '⚽ 득점왕')}${board('assists', '🅰️ 도움왕')}${board('rating', '⭐ 평점 리더')}</div>
   <article class="card">
     <div class="card-head"><h3>구단 소식</h3><span class="pill">최근</span></div>
-    <ul class="news">${w.news.slice(0, 8).map((n) => `<li><span class="pill xs">${n.season}시즌</span>${esc(n.text)}</li>`).join('') || '<li class="muted sm">소식이 없습니다.</li>'}</ul>
+    <ul class="news">${w.news.slice(0, 8).map((n2) => `<li><span class="pill xs">${n2.year || n2.season}시즌</span>${esc(n2.text)}</li>`).join('') || '<li class="muted sm">소식이 없습니다.</li>'}</ul>
   </article>`;
 }
 
 /* ── 시즌 결산 ── */
+function promoRows(w, moves, done) {
+  return moves.map((m) => {
+    const mine = (id) => id === w.myTeamId;
+    if (m.kind === 'direct') {
+      return `<li class="${mine(m.up) || mine(m.down) ? 'on' : ''}"><span class="pill xs">맞교대</span>
+        <b>${esc(w.teams[m.up]?.short || m.upName || '?')}</b> <span class="up">▲</span>
+        <span class="muted">/</span>
+        <b>${esc(w.teams[m.down]?.short || m.downName || '?')}</b> <span class="down">▼</span></li>`;
+    }
+    const winId = done ? m.winner : m.winner;
+    const loseId = done ? m.loser : (m.winner === m.upper ? m.lower : m.upper);
+    return `<li class="${mine(m.upper) || mine(m.lower) ? 'on' : ''}"><span class="pill xs">승강 PO</span>
+      <b>${esc(w.teams[m.upper]?.short || '?')}</b> vs <b>${esc(w.teams[m.lower]?.short || '?')}</b>
+      <span class="muted xs">${done ? `→ ${esc(w.teams[winId]?.short || '')} 승리` : '단판 · 상위 리그 홈'}</span></li>`;
+  }).join('');
+}
+
 export function renderSeason(app) {
   const w = app.world;
   const r = app.state.seasonResult;
   const s = r.summary;
   const my = s.table.find((x) => x.id === w.myTeamId);
   const done = app.state.seasonPhase === 'done';
+  const kl = W.isKL(w);
+  const myDiv = s.myDiv || 1;
+  const label = kl ? W.divName(w, myDiv) : '리그';
+  const myTeamNow = w.teams[w.myTeamId];
+  const nextDiv = kl ? W.divOf(w, w.myTeamId) : 1;
+  const moved = kl && done && nextDiv !== myDiv;
+  const moves = done ? (r.promo || []) : (s.moves || []);
   return `<section class="season">
-    <span class="eyebrow">${r.season || w.season}시즌 결산</span>
-    <h1>${s.myRank === 1 ? '🏆 리그 우승!' : `${s.myRank}위로 시즌 마감`}</h1>
-    <p class="hero-desc">${esc(w.teams[w.myTeamId].name)} · 승점 ${my?.pts ?? 0} · ${my?.win ?? 0}승 ${my?.draw ?? 0}무 ${my?.loss ?? 0}패 (${my?.gf ?? 0}-${my?.ga ?? 0})</p>
+    <span class="eyebrow">${esc(r.seasonLabel || r.label || (kl ? W.seasonLabel(w) : `${r.season || w.season}시즌`))} 결산 · ${esc(label)}</span>
+    <h1>${s.myRank === 1 ? '🏆 리그 우승!' : `${s.myRank}위로 시즌 마감`}${moved ? ` <span class="move-tag ${nextDiv < myDiv ? 'up' : 'down'}">${nextDiv < myDiv ? '승격' : '강등'}</span>` : ''}</h1>
+    <p class="hero-desc">${esc(myTeamNow.name)} · 승점 ${my?.pts ?? 0} · ${my?.win ?? 0}승 ${my?.draw ?? 0}무 ${my?.loss ?? 0}패 (${my?.gf ?? 0}-${my?.ga ?? 0})</p>
     <div class="season-grid">
-      <article class="card"><div class="card-head"><h3>최종 순위</h3><span class="pill">리그 우승 ${s.champion ? esc(w.teams[s.champion].short) : '—'}</span></div>
+      <article class="card"><div class="card-head"><h3>${esc(label)} 최종 순위</h3><span class="pill">${kl ? `${esc(W.divName(w, myDiv))} 우승 ${s.champion ? esc(w.teams[s.champion].short) : '—'}` : `리그 우승 ${s.champion ? esc(w.teams[s.champion].short) : '—'}`}</span></div>
         <ol class="final-table">${s.table.map((x) => `<li class="${x.id === w.myTeamId ? 'on' : ''}"><span>${x.rank}</span>${teamLine(w, x.id)}<b>${x.pts}</b><small>${x.gf}:${x.ga}</small></li>`).join('')}</ol>
       </article>
-      <article class="card"><h3>컵대회</h3>
+      <article class="card"><h3>${kl ? '코리아컵' : '컵대회'}</h3>
         <p class="cup-result">${s.cupWinner ? `${teamLine(w, s.cupWinner)} <b>우승</b>` : '결승 미완료'}</p>
-        <p class="sm">${esc(w.teams[w.myTeamId].short)} — ${esc(s.cupOut)}</p>
+        <p class="sm">${esc(myTeamNow.short)} — ${esc(s.cupOut)}</p>
         <h3 class="sub">재정</h3>
         <div class="money-row">
-          ${done ? `<div><small>리그 상금</small><b>${won(r.prize - r.cupPrize)}</b></div>
-          <div><small>컵 상금</small><b>${won(r.cupPrize)}</b></div>` : '<div><small>상금</small><b>다음 시즌 시작 시 정산</b></div>'}
-          <div><small>현재 이적 자금</small><b>${won(w.teams[w.myTeamId].budget)}</b></div>
+          ${done ? `<div><small>리그 상금</small><b>${won(r.prize - r.cupPrize - (r.sponsor || 0))}</b></div>
+          <div><small>컵 상금</small><b>${won(r.cupPrize)}</b></div>
+          ${r.sponsor ? `<div><small>스폰서</small><b>${won(r.sponsor)}</b></div>` : ''}` : '<div><small>상금</small><b>다음 시즌 시작 시 정산</b></div>'}
+          <div><small>현재 이적 자금</small><b>${won(myTeamNow.budget)}</b></div>
         </div>
       </article>
     </div>
+    ${kl ? `<article class="card">
+      <div class="card-head"><h3>${kl ? '승격 · 강등' : ''}</h3><span class="pill">${done ? '확정' : '예상'} · 1↔2↔3↔4부</span></div>
+      <ul class="promo-list">${promoRows(w, moves, done) || '<li class="muted sm">아직 결정된 이동이 없습니다.</li>'}</ul>
+      ${done ? `<p class="hint">다음 시즌 ${esc(W.divName(w, nextDiv))}에서 시작합니다. 승격하면 예산·주급 상한·스폰서 수입이 함께 커집니다.</p>` : '<p class="hint">다음 시즌을 시작하면 승격·강등이 확정되고 예산·주급 상한이 새 디비전 기준으로 다시 잡힙니다.</p>'}
+    </article>` : ''}
+    ${s.divs?.length ? `<article class="card"><div class="card-head"><h3>디비전별 최종 순위</h3><span class="pill">${esc(r.seasonLabel || r.label || W.seasonLabel(w))}</span></div>
+      <div class="div-finals">${s.divs.map((d) => `<div class="df-col"><h4>${esc(d.name)}</h4><ol>${d.table.slice(0, 6).map((x) => `<li class="${x.id === w.myTeamId ? 'on' : ''}"><span>${x.rank}</span>${teamLine(w, x.id)}<b>${x.pts}</b></li>`).join('')}</ol></div>`).join('')}</div>
+    </article>` : ''}
     ${done ? `<article class="card"><h3>선수 성장 · 노쇠</h3>
       <ul class="growth">${r.growth.map((g) => `<li>${teamLine(w, g.teamId)}<span>${esc(g.name)}</span><b class="${g.to >= g.from ? 'up' : 'down'}">${g.from} → ${g.to}</b></li>`).join('') || '<li class="muted sm">큰 변화가 없습니다.</li>'}</ul>
-      ${r.retired?.length ? `<p class="hint">은퇴: ${r.retired.map(esc).join(', ')}</p>` : ''}
+      ${r.retired?.length ? `<p class="hint">은퇴: ${r.retired.slice(0, 12).map(esc).join(', ')}${r.retired.length > 12 ? ` 외 ${r.retired.length - 12}명` : ''}</p>` : ''}
     </article>` : '<p class="hint">다음 시즌을 시작하면 상금 정산과 함께 선수들이 한 살씩 먹고 성장·노쇠합니다.</p>'}
     <div class="actions center"><button class="btn primary big" data-act="${done ? 'close-season' : 'next-season'}" type="button">${done ? '새 시즌 시작 →' : '다음 시즌 시작 →'}</button></div>
   </section>`;
 }
+
 
 /* ── 확인 모달 ── */
 export function renderModal(app) {
@@ -819,18 +1002,78 @@ export function renderModal(app) {
       <div class="actions">${opts}<button class="btn ghost" data-act="modal-close" type="button">닫기</button></div>
     </div></div>`;
   }
+  if (m.kind === 'club') {
+    const w = app.world;
+    const t = w?.teams?.[m.team];
+    if (!t) return '';
+    const squad = W.squadOf(w, m.team).slice().sort((a, b) => b.ovr - a.ovr);
+    const kl = W.isKL(w);
+    const table = W.standingsFor(w, kl ? t.div : null);
+    const row = table.find((r) => r.id === t.id);
+    const rows = squad.map((p) => {
+      const st = p.season || {};
+      return `<tr class="prow" data-act="player-modal" data-pid="${p.id}" data-team="${t.id}" tabindex="0">
+        <td>${p.num}</td>
+        <td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs">부상</span>' : ''}${p.loan ? ' <span class="pill xs">임대</span>' : ''}</td>
+        <td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td>
+        <td>${st.apps || 0}</td><td>${st.goals || 0}</td><td>${st.assists || 0}</td>
+        <td>${st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(2) : '—'}</td>
+      </tr>`;
+    }).join('');
+    return `<div class="modal-back" data-act="modal-close"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="modal-head">${badge(t, 'mid')}
+        <div><h3 id="m-title">${esc(t.name)}</h3><p class="sm">${kl ? `<span class="divtag k${t.div}">${esc(W.divName(w, t.div))}</span> · ` : ''}${esc(t.nick)} · ${esc(t.stadium)}</p></div>
+        <button class="btn small ghost modal-x" data-act="modal-close" type="button">닫기</button>
+      </div>
+      <div class="money-row">
+        <div><small>리그 순위</small><b>${row && row.play > 0 ? `${row.rank}위` : '—'}</b></div>
+        <div><small>전력</small><b>${W.teamPower(w, t.id)}</b></div>
+        <div><small>이적 자금</small><b>${won(t.budget)}</b></div>
+        <div><small>주급 합계</small><b>${W.fmt(W.teamWageTotal(w, t.id))}<span class="unit">만/주</span></b></div>
+        <div><small>평균 나이</small><b>${squad.length ? (squad.reduce((a, p) => a + p.age, 0) / squad.length).toFixed(1) : '—'}</b></div>
+      </div>
+      <p class="sm">${esc(t.bio)}</p>
+      <h4 class="sub">선수단 ${squad.length}명 <span class="muted xs">— 선수를 누르면 상세 기록이 열립니다</span></h4>
+      <div class="table-wrap"><table class="tbl club-squad">
+        <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>잠재</th><th>출전</th><th>골</th><th>도움</th><th>평점</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </div></div>`;
+  }
+  if (m.kind === 'player') {
+    const w = app.world;
+    const p = w?.players?.[m.pid];
+    if (!p) return '';
+    const t = w.teams[m.team || p.teamId];
+    return `<div class="modal-back" data-act="modal-close"><div class="modal wide player-modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <div class="modal-head">${t ? badge(t, 'mid') : ''}
+        <div><h3 id="m-title">${esc(p.name)} <span class="muted">#${p.num}</span></h3>
+        <p class="sm">${t ? `${esc(t.name)} · ${esc(W.divName(w, t.div))}` : '자유계약'} · ${p.pos} · ${p.age}세</p></div>
+        <button class="btn small ghost modal-x" data-act="modal-close" type="button">닫기</button>
+      </div>
+      ${playerCard(w, p, { full: true })}
+      <div class="actions">
+        ${m.back === 'club' && t ? `<button class="btn" data-act="club" data-team="${t.id}" type="button">← ${esc(t.short)} 선수단</button>` : ''}
+        <button class="btn ghost" data-act="modal-close" type="button">닫기</button>
+      </div>
+    </div></div>`;
+  }
   if (m.kind === 'team') {
     const t = app.defs[m.team];
+    const kl = !!t.div;
+    const roster = kl ? (KL_ROSTERS[t.id] || []).slice(0, 6) : [];
     return `<div class="modal-back" data-act="modal-close"><div class="modal wide" role="dialog" aria-modal="true" aria-labelledby="m-title">
-      <div class="modal-head">${badge(t, 'mid')}<div><h3 id="m-title">${esc(t.name)}</h3><p class="sm">${esc(t.nick)} · ${esc(t.stadium)} (${W.fmtWon(t.capacity)}석)</p></div></div>
+      <div class="modal-head">${badge(t, 'mid')}<div><h3 id="m-title">${esc(t.name)}</h3><p class="sm">${kl ? `<span class="divtag k${t.div}">${esc(W.divName({ divisions: KL_DIVISIONS }, t.div))}</span> · ` : ''}${esc(t.nick)} · ${esc(t.stadium)} (${W.fmtWon(t.capacity)}석)</p></div></div>
       <p>${esc(t.bio)}</p>
       <div class="money-row">
-        <div><small>이적 자금</small><b>${won(t.budget)}</b></div>
-        <div><small>주급 예산</small><b>${W.fmt(t.wage)}만/주</b></div>
+        ${kl ? '' : `<div><small>이적 자금</small><b>${won(t.budget)}</b></div>
+        <div><small>주급 예산</small><b>${W.fmt(t.wage)}만/주</b></div>`}
         <div><small>전력</small><b>${t.power}</b></div>
         <div><small>포메이션</small><b>${esc(t.formation)}</b></div>
+        ${kl ? `<div><small>홈구장</small><b>${esc(t.stadium)}</b></div>` : ''}
       </div>
       <p class="sm"><b>주 전술</b> ${esc(tacticWords(t.tactic))}</p>
+      ${roster.length ? `<h4 class="sub">주요 선수</h4><ul class="roster-preview">${roster.map(([name, pos, age, num, ovr]) => `<li><span class="rn">${num || '—'}</span><b>${esc(name)}</b><small>${pos} · ${age ? age + '세' : '나이 미상'} · 종합 <b>${ovr}</b></small></li>`).join('')}</ul>` : ''}
       <div class="actions"><button class="btn primary" data-act="team-sign" data-team="${t.id}" type="button">이 구단으로 시작</button><button class="btn" data-act="modal-close" type="button">다른 구단 보기</button></div>
     </div></div>`;
   }

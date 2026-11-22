@@ -1,0 +1,8255 @@
+{
+ "gangneung": {
+  "helper": "FC강릉",
+  "league": "K3리그",
+  "count": 35,
+  "picked": [
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "김연수",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "GK",
+    "name": "한지율",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "황한준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 91,
+    "pos": "DF",
+    "name": "김훈민",
+    "age": 24,
+    "mv": 100000
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "심정용",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이주영",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "이성윤",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 34,
+    "pos": "DF",
+    "name": "김재봉",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 36,
+    "pos": "DF",
+    "name": "손민범",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "황정욱",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "송태성",
+    "age": 25,
+    "mv": 150000
+   },
+   {
+    "num": 40,
+    "pos": "MF",
+    "name": "권순호",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "송영민",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "장동혁",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "박하빈",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "손정민",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "김성현",
+    "age": 21,
+    "mv": 100000
+   },
+   {
+    "num": 33,
+    "pos": "FW",
+    "name": "김진현",
+    "age": 30,
+    "mv": 75000
+   },
+   {
+    "num": 23,
+    "pos": "FW",
+    "name": "이현규",
+    "age": 23,
+    "mv": 10000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "우병철",
+    "age": 25,
+    "mv": 0
+   }
+  ],
+  "matched": 23
+ },
+ "yangpyeong": {
+  "helper": "양평FC",
+  "league": "K3리그",
+  "count": 51,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "심민",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 41,
+    "pos": "GK",
+    "name": "신재민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "박다니엘",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "조영진",
+    "age": 29,
+    "mv": 25000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김병수",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "이태형",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "차인석",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "곽래승",
+    "age": 35,
+    "mv": 0
+   },
+   {
+    "num": 55,
+    "pos": "DF",
+    "name": "성민준",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 74,
+    "pos": "DF",
+    "name": "김재영",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "윤병우",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "유청인",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "김동욱",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "김대협",
+    "age": 33,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "MF",
+    "name": "장동혁",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "천세윤",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "덴젤",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "김형겸",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "이도영",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "FW",
+    "name": "이민혁",
+    "age": 18,
+    "mv": 0
+   }
+  ],
+  "matched": 26
+ },
+ "mokpo": {
+  "helper": "FC목포",
+  "league": "K3리그",
+  "count": 29,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "최성겸",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "박종건",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "한승협",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "이제승",
+    "age": 34,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "이규석",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이건웅",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "심원성",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "김규민",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "이중호",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이태윤",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "오승진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "안성주",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "MF",
+    "name": "이찬울",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "공용훈",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "이현탁",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "차승규",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 72,
+    "pos": "FW",
+    "name": "서명식",
+    "age": 19,
+    "mv": 75000
+   },
+   {
+    "num": 33,
+    "pos": "FW",
+    "name": "박정우",
+    "age": 19,
+    "mv": 50000
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "전보민",
+    "age": 25,
+    "mv": 25000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "장한영",
+    "age": 26,
+    "mv": 0
+   }
+  ],
+  "matched": 22
+ },
+ "yeoju": {
+  "helper": "여주FC",
+  "league": "K3리그",
+  "count": 42,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김형수",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "GK",
+    "name": "서원",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김상재",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "정기현",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이해담",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "이동건",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "장재원",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "김준서",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "최정훈",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "김진성",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "MF",
+    "name": "오상준",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "이승민",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "최형우",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "ISHII KAISEI",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "MF",
+    "name": "임규현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "조성우",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 70,
+    "pos": "FW",
+    "name": "정인증",
+    "age": 21,
+    "mv": 25000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "김도형",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "정종근",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "홍동관",
+    "age": 26,
+    "mv": 0
+   }
+  ],
+  "matched": 33
+ },
+ "dangjin": {
+  "helper": "당진시민축구단",
+  "league": "K3리그",
+  "count": 35,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "최영은",
+    "age": 30,
+    "mv": 175000
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "임준석",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김세형",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 62,
+    "pos": "DF",
+    "name": "김영선",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "이건",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이한빈",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "신재욱",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "김주형",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "DF",
+    "name": "임동주",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 42,
+    "pos": "DF",
+    "name": "이현조",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이은재",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 4,
+    "pos": "MF",
+    "name": "최시온",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "류연준",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "서도협",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김세웅",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "MF",
+    "name": "정영웅",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "FW",
+    "name": "지상욱",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "강현종",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "곽승조",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "한준영",
+    "age": 23,
+    "mv": 0
+   }
+  ],
+  "matched": 27
+ },
+ "korail": {
+  "helper": "대전코레일FC",
+  "league": "K3리그",
+  "count": 28,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "백경인",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "김철호",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "배서준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "전인규",
+    "age": 32,
+    "mv": 125000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "황준석",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김윤진",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "손경환",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "남윤재",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김광희",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "김현우",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "박승렬",
+    "age": 31,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "박찬빈",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "MF",
+    "name": "김동섭",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "MF",
+    "name": "이관표",
+    "age": 31,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "유지민",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "강효온",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "김정주",
+    "age": 34,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "이인규",
+    "age": 33,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "김동욱",
+    "age": 35,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "FW",
+    "name": "송민종",
+    "age": 24,
+    "mv": 0
+   }
+  ],
+  "matched": 20
+ },
+ "gyeongju": {
+  "helper": "경주한수원FC",
+  "league": "K3리그",
+  "count": 32,
+  "picked": [
+   {
+    "num": 12,
+    "pos": "GK",
+    "name": "이성주",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "GK",
+    "name": "김정호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 81,
+    "pos": "GK",
+    "name": "최철원",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "이종현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "장효강",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "황명현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "박성원",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "류승범",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "장지성",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "정호근",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "하재진",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "임대준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "정상규",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "안수민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "주한성",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "전정호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "이형경",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "빅토르",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "황대영",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "문승원",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 0
+ },
+ "ulsancitizen": {
+  "helper": "울산시민축구단",
+  "league": "K3리그",
+  "count": 27,
+  "picked": [
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "이선일",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "유영서",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "노우석",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "김재현",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "김민기",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "DF",
+    "name": "박동혁",
+    "age": 33,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "김기영",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "김동윤",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "김유성",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "신성학",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "부성혁",
+    "age": 31,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "윤대원",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "이한새",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "MF",
+    "name": "이준영",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "MF",
+    "name": "강민재",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "권혁찬",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "손민영",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "이기운",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이기준",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "FW",
+    "name": "김용민",
+    "age": 21,
+    "mv": 0
+   }
+  ],
+  "matched": 24
+ },
+ "siheung": {
+  "helper": "시흥시민축구단",
+  "league": "K3리그",
+  "count": 34,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김동건",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "강성혁",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "주현성",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "권완규",
+    "age": 34,
+    "mv": 350000
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "박형진",
+    "age": 35,
+    "mv": 75000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "신일수",
+    "age": 31,
+    "mv": 50000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "이남규",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "안지호",
+    "age": 38,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "여재욱",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "오창권",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 42,
+    "pos": "MF",
+    "name": "양준영",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 36,
+    "pos": "MF",
+    "name": "조민호",
+    "age": 21,
+    "mv": 25000
+   },
+   {
+    "num": 4,
+    "pos": "MF",
+    "name": "김효찬",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "황신중",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "MF",
+    "name": "박한결",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "이민영",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "김다원",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "김태헌",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "정현우",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "FW",
+    "name": "이선유",
+    "age": 24,
+    "mv": 0
+   }
+  ],
+  "matched": 28
+ },
+ "busantrans": {
+  "helper": "부산교통공사축구단",
+  "league": "K3리그",
+  "count": 26,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "최원우",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "이민수",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "최진백",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "박재우",
+    "age": 27,
+    "mv": 100000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "오현교",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김민수",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "홍종민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "지의수",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "조우현",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "김준섭",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "안치우",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "하용주",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "김도훈",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "조용준",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 66,
+    "pos": "MF",
+    "name": "배수민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "이윤재",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "얀",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "김양우",
+    "age": 31,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "박희수",
+    "age": 22,
+    "mv": 0
+   }
+  ],
+  "matched": 23
+ },
+ "jeonbukn": {
+  "helper": "전북현대모터스",
+  "league": "K3리그",
+  "count": 37,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이주현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 51,
+    "pos": "GK",
+    "name": "이한결",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 71,
+    "pos": "GK",
+    "name": "전지완",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "김하준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김준영",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "이상명",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "황승준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "한재빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 39,
+    "pos": "DF",
+    "name": "서정혁",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 44,
+    "pos": "DF",
+    "name": "김주형",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "감보아",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "이수빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "진태호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "MF",
+    "name": "문준혁",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "김영환",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 36,
+    "pos": "MF",
+    "name": "장남웅",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "박주영",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "츄마시",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "FW",
+    "name": "한석진",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 34,
+    "pos": "FW",
+    "name": "엄승민",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 0
+ },
+ "geoje": {
+  "helper": "거제시민축구단",
+  "league": "K4리그",
+  "count": 35,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "이준",
+    "age": 28,
+    "mv": 125000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "신지훈",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김승준",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이주원",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "손혜창",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "김환",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "윤여준",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "정상",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "황태현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "문영준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "최재훈",
+    "age": 30,
+    "mv": 325000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "박한빈",
+    "age": 28,
+    "mv": 175000
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "김경환",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "김현민",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "박정훈",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김세윤",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "김영준",
+    "age": 25,
+    "mv": 50000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "노의왕",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "김민창",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "김태형",
+    "age": 21,
+    "mv": 0
+   }
+  ],
+  "matched": 22
+ },
+ "seosan": {
+  "helper": "서산에프씨",
+  "league": "K4리그",
+  "count": 48,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "조지웅",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "박원철",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김진화",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "원기연",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "DF",
+    "name": "권승현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "김기환",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이유재",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "양효종",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 36,
+    "pos": "DF",
+    "name": "강진웅",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "구본준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "윤동권",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "이진석",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 42,
+    "pos": "MF",
+    "name": "김대원",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 43,
+    "pos": "MF",
+    "name": "송병규",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김이근",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "백상훈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "변재영",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김훈옥",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "박지열",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "FW",
+    "name": "안기훈",
+    "age": 23,
+    "mv": 0
+   }
+  ],
+  "matched": 16
+ },
+ "pocheon": {
+  "helper": "포천시민축구단",
+  "league": "K3리그",
+  "count": 31,
+  "picked": [
+   {
+    "num": 25,
+    "pos": "GK",
+    "name": "김종혁",
+    "age": 23,
+    "mv": 25000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김준성",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "DF",
+    "name": "김수안",
+    "age": 32,
+    "mv": 50000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김태은",
+    "age": 36,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "서찬욱",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "심현민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "서도현",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "이영규",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "박관우",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "전산해",
+    "age": 26,
+    "mv": 50000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "정현식",
+    "age": 35,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "MF",
+    "name": "이서준",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "유용현",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "김현중",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "한규진",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "김정현",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "이재건",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이태민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "유선우",
+    "age": 21,
+    "mv": 0
+   }
+  ],
+  "matched": 22
+ },
+ "geumsan": {
+  "helper": "금산인삼FC",
+  "league": "K4리그",
+  "count": 41,
+  "picked": [
+   {
+    "num": 33,
+    "pos": "GK",
+    "name": "성윤수",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "박희근",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김현우",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김민재",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이충",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "이우진",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "권민우",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 50,
+    "pos": "DF",
+    "name": "정한철",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "문요한",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김지민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "양세영",
+    "age": 23,
+    "mv": 125000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "박준하",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "이민재",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "MF",
+    "name": "서경주",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "백승우",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "심현욱",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "FW",
+    "name": "장시헌",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이인학",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "FW",
+    "name": "문슬범",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "FW",
+    "name": "류수혁",
+    "age": 24,
+    "mv": 0
+   }
+  ],
+  "matched": 20
+ },
+ "gijang": {
+  "helper": "기장군민축구단",
+  "league": "K4리그",
+  "count": 33,
+  "picked": [
+   {
+    "num": 6,
+    "pos": "GK",
+    "name": "김대원",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "김민근",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "이민혁",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "박진배",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "박현응",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "전효석",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "최현빈",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "장원별",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 41,
+    "pos": "DF",
+    "name": "이호준",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 55,
+    "pos": "DF",
+    "name": "권경륜",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "신윤호",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김현범",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "김준수",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 71,
+    "pos": "MF",
+    "name": "김민결",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "고동현",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "김기찬",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김하준",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "김동현",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "이정훈",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "오승현",
+    "age": 24,
+    "mv": 0
+   }
+  ],
+  "matched": 20
+ },
+ "changwon": {
+  "helper": "창원FC",
+  "league": "K3리그",
+  "count": 29,
+  "picked": [
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "임채훈",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "GK",
+    "name": "손재혁",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 88,
+    "pos": "DF",
+    "name": "정성우",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 18,
+    "pos": "DF",
+    "name": "신승민",
+    "age": 22,
+    "mv": 50000
+   },
+   {
+    "num": 11,
+    "pos": "DF",
+    "name": "김우홍",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "김원준",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "한재훈",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 40,
+    "pos": "DF",
+    "name": "김원균",
+    "age": 33,
+    "mv": 0
+   },
+   {
+    "num": 47,
+    "pos": "DF",
+    "name": "이재민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "노건우",
+    "age": 25,
+    "mv": 125000
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "박진홍",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "예병원",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "곽성욱",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "전승민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "MF",
+    "name": "장영기",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "FW",
+    "name": "이종훈",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "고병범",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "태현찬",
+    "age": 35,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "홍정훈",
+    "age": 22,
+    "mv": 0
+   }
+  ],
+  "matched": 21
+ },
+ "chuncheon": {
+  "helper": "춘천시민축구단",
+  "league": "K3리그",
+  "count": 34,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "박민선",
+    "age": 34,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "GK",
+    "name": "김도현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김성민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "한용수",
+    "age": 35,
+    "mv": 100000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "박현우",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "김승찬",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "박선용",
+    "age": 36,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "DF",
+    "name": "윤성한",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "권진영",
+    "age": 34,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "마지강",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 39,
+    "pos": "MF",
+    "name": "KOBAYASHI KAN",
+    "age": 26,
+    "mv": 100000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "신상휘",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "오형택",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "김민수",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 61,
+    "pos": "MF",
+    "name": "허동호",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "이성민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김민우",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "Devellard Ferreira F Goncalves matheus",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "FW",
+    "name": "Oliveira Parente lucas",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이광재",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 19
+ },
+ "namyangju": {
+  "helper": "남양주시민축구단",
+  "league": "K4리그",
+  "count": 36,
+  "picked": [
+   {
+    "num": 29,
+    "pos": "GK",
+    "name": "김민재",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김민서",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "박한근",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "유영재",
+    "age": 27,
+    "mv": 50000
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "안재준",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "조경찬",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "이태극",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "유수환",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "김승진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "고태규",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김태영",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "서여준",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김경환",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "박제영",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "김유빈",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "김효기",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이새한",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "FW",
+    "name": "강민승",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "김진환",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "최준영",
+    "age": 22,
+    "mv": 0
+   }
+  ],
+  "matched": 23
+ },
+ "jungnang": {
+  "helper": "서울중랑축구단",
+  "league": "K4리그",
+  "count": 43,
+  "picked": [
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "노승준",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "GK",
+    "name": "박지석",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "백영빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "김재성",
+    "age": 26,
+    "mv": 175000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "전이찬",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "선예준",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "전병진",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "방우진",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "이제욱",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "김지훈",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "이풍범",
+    "age": 29,
+    "mv": 25000
+   },
+   {
+    "num": 9,
+    "pos": "MF",
+    "name": "이채운",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "MF",
+    "name": "최민서",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "나동욱",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 37,
+    "pos": "MF",
+    "name": "이은재",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 91,
+    "pos": "MF",
+    "name": "송재호",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "한서진",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이종욱",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 90,
+    "pos": "FW",
+    "name": "김민겸",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "이동현",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 18
+ },
+ "sejong": {
+  "helper": "세종SA축구단",
+  "league": "K4리그",
+  "count": 50,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이재훈",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 81,
+    "pos": "GK",
+    "name": "강대규",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "심지섭",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "DF",
+    "name": "곽승민",
+    "age": 21,
+    "mv": 50000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "정용수",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이민형",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "조민재",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 76,
+    "pos": "DF",
+    "name": "이병훈",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김용환",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "우민걸",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "장성재",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "MF",
+    "name": "김지한",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "하용민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김도헌",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "성기완",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "김원형",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "민동후",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 71,
+    "pos": "FW",
+    "name": "승준서",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "김태윤",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "FW",
+    "name": "김우진",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 15
+ },
+ "haman": {
+  "helper": "함안군민축구단",
+  "league": "K4리그",
+  "count": 39,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "권재현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "오찬식",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "GK",
+    "name": "이제민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "윤정민",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "서준우",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "최용준",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "채희서",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "이한주",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "DF",
+    "name": "전우진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "전지훈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "양유민",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "신지훈",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "김진현",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "MF",
+    "name": "태현진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "MF",
+    "name": "김희건",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "MF",
+    "name": "박세호",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김성준",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "FW",
+    "name": "서예준",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "하재현",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "이인규",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 19
+ },
+ "jinju": {
+  "helper": "진주시민축구단",
+  "league": "K4리그",
+  "count": 32,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김원중",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "GK",
+    "name": "김희수",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "GK",
+    "name": "배준호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "DF",
+    "name": "김진래",
+    "age": 28,
+    "mv": 150000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김지운",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "박시율",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "서태경",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "김호영",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "DF",
+    "name": "장효준",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "윤도원",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "임민혁",
+    "age": 28,
+    "mv": 300000
+   },
+   {
+    "num": 71,
+    "pos": "MF",
+    "name": "정우빈",
+    "age": 24,
+    "mv": 125000
+   },
+   {
+    "num": 72,
+    "pos": "MF",
+    "name": "천지현",
+    "age": 26,
+    "mv": 125000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "김성현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "구본준",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "최민서",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 81,
+    "pos": "FW",
+    "name": "김도윤",
+    "age": 27,
+    "mv": 125000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "전용준",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "이동규",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "김소웅",
+    "age": 26,
+    "mv": 0
+   }
+  ],
+  "matched": 28
+ },
+ "pyeongtaek": {
+  "helper": "평택시티즌FC",
+  "league": "K4리그",
+  "count": 40,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "권태욱",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "GK",
+    "name": "박지현",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "이정안",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "심영서",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "홍성민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "변우석",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "정희성",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "허태양",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "이훈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "DF",
+    "name": "김민준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김백천",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "최성호",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "MF",
+    "name": "김민수",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 72,
+    "pos": "MF",
+    "name": "정태율",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 73,
+    "pos": "MF",
+    "name": "박준수",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "이민혁",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "박중현",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "FW",
+    "name": "이한빈",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "이도안",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "FW",
+    "name": "조영민",
+    "age": 25,
+    "mv": 0
+   }
+  ],
+  "matched": 19
+ },
+ "jecheon": {
+  "helper": "제천시민축구단",
+  "league": "K4리그",
+  "count": 39,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "홍진웅",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "남윤성",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "주호연",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "노윤상",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이태인",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "DF",
+    "name": "김태훈",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "이진웅",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "양현진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 36,
+    "pos": "DF",
+    "name": "이승빈",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "정윤서",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "장현수",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "정혁",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "안태욱",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "천은원",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "안영",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 34,
+    "pos": "MF",
+    "name": "노승기",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "박시언",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "김건남",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "박태원",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "FW",
+    "name": "이차민",
+    "age": 18,
+    "mv": 0
+   }
+  ],
+  "matched": 19
+ },
+ "jincheon": {
+  "helper": "진천HRFC",
+  "league": "K4리그",
+  "count": 38,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "임채권",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김성훈",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "김승우",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 12,
+    "pos": "DF",
+    "name": "이현규",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "김우석",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "장현호",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "DF",
+    "name": "유종우",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "신원호",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "김강연",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "이준석",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "김강국",
+    "age": 28,
+    "mv": 400000
+   },
+   {
+    "num": 33,
+    "pos": "MF",
+    "name": "이환희",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "최산",
+    "age": 19,
+    "mv": 25000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "송홍민",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "홍기욱",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "홍수호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "박민서",
+    "age": 27,
+    "mv": 225000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김태양",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "김상경",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "FW",
+    "name": "김강호",
+    "age": 23,
+    "mv": 0
+   }
+  ],
+  "matched": 19
+ },
+ "pyeongchang": {
+  "helper": "평창유나이티드축구클럽",
+  "league": "K4리그",
+  "count": 34,
+  "picked": [
+   {
+    "num": 41,
+    "pos": "GK",
+    "name": "이상형",
+    "age": 23,
+    "mv": 25000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "유승완",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "유종민",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "DF",
+    "name": "김용태",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "DF",
+    "name": "정민우",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "김시온",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "DF",
+    "name": "정재훈",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "김재현",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "이동은",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "양희도",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "김세호",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "신지훈",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "양군호",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "김도윤",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "김희재",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "배현세",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "Hassen Martin Dominic Martin",
+    "age": 26,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "정성준",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "FW",
+    "name": "조정빈",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "최민혁",
+    "age": 22,
+    "mv": 0
+   }
+  ],
+  "matched": 24
+ },
+ "gangwon": {
+  "helper": "강원 FC",
+  "league": "K리그1",
+  "count": 55,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "박청효",
+    "age": 35,
+    "mv": 150000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김정훈",
+    "age": 21,
+    "mv": 100000
+   },
+   {
+    "num": 51,
+    "pos": "GK",
+    "name": "조민규",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "이기혁",
+    "age": 25,
+    "mv": 600000
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "강투지",
+    "age": 27,
+    "mv": 600000
+   },
+   {
+    "num": 47,
+    "pos": "DF",
+    "name": "신민하",
+    "age": 20,
+    "mv": 600000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "카림",
+    "age": 29,
+    "mv": 400000
+   },
+   {
+    "num": 99,
+    "pos": "DF",
+    "name": "강준혁",
+    "age": 26,
+    "mv": 350000
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "홍철",
+    "age": 35,
+    "mv": 275000
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "박호영",
+    "age": 26,
+    "mv": 200000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김동현",
+    "age": 28,
+    "mv": 800000
+   },
+   {
+    "num": 4,
+    "pos": "MF",
+    "name": "서민우",
+    "age": 27,
+    "mv": 650000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이승원",
+    "age": 22,
+    "mv": 450000
+   },
+   {
+    "num": 11,
+    "pos": "MF",
+    "name": "고영준",
+    "age": 24,
+    "mv": 450000
+   },
+   {
+    "num": 97,
+    "pos": "MF",
+    "name": "이유현",
+    "age": 28,
+    "mv": 375000
+   },
+   {
+    "num": 75,
+    "pos": "MF",
+    "name": "김이석",
+    "age": 27,
+    "mv": 300000
+   },
+   {
+    "num": 70,
+    "pos": "FW",
+    "name": "제시",
+    "age": 29,
+    "mv": 900000
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "모재현",
+    "age": 29,
+    "mv": 750000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "김대원",
+    "age": 28,
+    "mv": 700000
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "박상혁",
+    "age": 23,
+    "mv": 450000
+   }
+  ],
+  "matched": 43
+ },
+ "gwangju": {
+  "helper": "광주 FC",
+  "league": "K리그1",
+  "count": 36,
+  "picked": [
+   {
+    "num": 23,
+    "pos": "GK",
+    "name": "김동화",
+    "age": 22,
+    "mv": 50000
+   },
+   {
+    "num": 71,
+    "pos": "GK",
+    "name": "이윤성",
+    "age": 20,
+    "mv": 25000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김경민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이민기",
+    "age": 32,
+    "mv": 225000
+   },
+   {
+    "num": 39,
+    "pos": "DF",
+    "name": "민상기",
+    "age": 34,
+    "mv": 225000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "안영규",
+    "age": 36,
+    "mv": 200000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "장석환",
+    "age": 21,
+    "mv": 125000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "임승겸",
+    "age": 30,
+    "mv": 75000
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "김용혁",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "공배현",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "최경록",
+    "age": 30,
+    "mv": 450000
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "김종석",
+    "age": 31,
+    "mv": 250000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "주세종",
+    "age": 35,
+    "mv": 225000
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "유제호",
+    "age": 25,
+    "mv": 200000
+   },
+   {
+    "num": 37,
+    "pos": "MF",
+    "name": "리영직",
+    "age": 34,
+    "mv": 100000
+   },
+   {
+    "num": 99,
+    "pos": "MF",
+    "name": "홍용준",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 50,
+    "pos": "FW",
+    "name": "바 루아",
+    "age": 29,
+    "mv": 650000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "사이토스키",
+    "age": 22,
+    "mv": 350000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "프리드욘슨",
+    "age": 32,
+    "mv": 250000
+   },
+   {
+    "num": 16,
+    "pos": "FW",
+    "name": "정지훈",
+    "age": 21,
+    "mv": 225000
+   }
+  ],
+  "matched": 26
+ },
+ "gimcheon": {
+  "helper": "김천 상무",
+  "league": "K리그1",
+  "count": 37,
+  "picked": [
+   {
+    "num": 41,
+    "pos": "GK",
+    "name": "박만호",
+    "age": 21,
+    "mv": 100000
+   },
+   {
+    "num": 51,
+    "pos": "GK",
+    "name": "안준수",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 61,
+    "pos": "GK",
+    "name": "안찬기",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 44,
+    "pos": "DF",
+    "name": "박민서",
+    "age": 25,
+    "mv": 375000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "김민규",
+    "age": 27,
+    "mv": 250000
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "박진성",
+    "age": 24,
+    "mv": 175000
+   },
+   {
+    "num": 42,
+    "pos": "DF",
+    "name": "홍시후",
+    "age": 24,
+    "mv": 175000
+   },
+   {
+    "num": 43,
+    "pos": "DF",
+    "name": "김서진",
+    "age": 20,
+    "mv": 125000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "민경현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김현우",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 54,
+    "pos": "MF",
+    "name": "윤재석",
+    "age": 22,
+    "mv": 325000
+   },
+   {
+    "num": 15,
+    "pos": "MF",
+    "name": "임덕근",
+    "age": 25,
+    "mv": 275000
+   },
+   {
+    "num": 46,
+    "pos": "MF",
+    "name": "정마호",
+    "age": 20,
+    "mv": 250000
+   },
+   {
+    "num": 53,
+    "pos": "MF",
+    "name": "노경호",
+    "age": 25,
+    "mv": 250000
+   },
+   {
+    "num": 55,
+    "pos": "MF",
+    "name": "박태준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 56,
+    "pos": "MF",
+    "name": "이강현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 47,
+    "pos": "FW",
+    "name": "이상헌",
+    "age": 27,
+    "mv": 700000
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "김인균",
+    "age": 27,
+    "mv": 375000
+   },
+   {
+    "num": 49,
+    "pos": "FW",
+    "name": "강민규",
+    "age": 27,
+    "mv": 300000
+   },
+   {
+    "num": 57,
+    "pos": "FW",
+    "name": "정재민",
+    "age": 24,
+    "mv": 175000
+   }
+  ],
+  "matched": 16
+ },
+ "daejeon": {
+  "helper": "대전 하나 시티즌",
+  "league": "K리그1",
+  "count": 41,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이창근",
+    "age": 32,
+    "mv": 600000
+   },
+   {
+    "num": 25,
+    "pos": "GK",
+    "name": "이준서",
+    "age": 27,
+    "mv": 175000
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김민수",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "김문환",
+    "age": 30,
+    "mv": 800000
+   },
+   {
+    "num": 45,
+    "pos": "DF",
+    "name": "하창래",
+    "age": 31,
+    "mv": 800000
+   },
+   {
+    "num": 98,
+    "pos": "DF",
+    "name": "안톤",
+    "age": 27,
+    "mv": 700000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "김민덕",
+    "age": 29,
+    "mv": 600000
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "이명재",
+    "age": 32,
+    "mv": 450000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "강윤성",
+    "age": 28,
+    "mv": 400000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "박규현",
+    "age": 24,
+    "mv": 375000
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "김봉수",
+    "age": 26,
+    "mv": 1000000
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "루빅손",
+    "age": 32,
+    "mv": 850000
+   },
+   {
+    "num": 11,
+    "pos": "MF",
+    "name": "엄원상",
+    "age": 26,
+    "mv": 800000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "밥신",
+    "age": 25,
+    "mv": 600000
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "마사",
+    "age": 30,
+    "mv": 550000
+   },
+   {
+    "num": 44,
+    "pos": "MF",
+    "name": "이순민",
+    "age": 31,
+    "mv": 500000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "디오고",
+    "age": 29,
+    "mv": 900000
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "주민규",
+    "age": 35,
+    "mv": 700000
+   },
+   {
+    "num": 77,
+    "pos": "FW",
+    "name": "주앙 빅토르",
+    "age": 26,
+    "mv": 350000
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "서진수",
+    "age": 25,
+    "mv": 325000
+   }
+  ],
+  "matched": 27
+ },
+ "bucheon": {
+  "helper": "부천 FC 1995",
+  "league": "K리그1",
+  "count": 36,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김현엽",
+    "age": 24,
+    "mv": 100000
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "이상현",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김형근",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "안태현",
+    "age": 32,
+    "mv": 225000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "정호진",
+    "age": 26,
+    "mv": 200000
+   },
+   {
+    "num": 93,
+    "pos": "DF",
+    "name": "이재원",
+    "age": 23,
+    "mv": 150000
+   },
+   {
+    "num": 83,
+    "pos": "DF",
+    "name": "조성준",
+    "age": 35,
+    "mv": 125000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김종민",
+    "age": 24,
+    "mv": 75000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "유승현",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 44,
+    "pos": "DF",
+    "name": "이예찬",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "윤빛가람",
+    "age": 35,
+    "mv": 400000
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "카즈",
+    "age": 29,
+    "mv": 350000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김상준",
+    "age": 24,
+    "mv": 150000
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "김동현",
+    "age": 23,
+    "mv": 125000
+   },
+   {
+    "num": 19,
+    "pos": "MF",
+    "name": "성신",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 25,
+    "pos": "MF",
+    "name": "여봉훈",
+    "age": 31,
+    "mv": 50000
+   },
+   {
+    "num": 13,
+    "pos": "FW",
+    "name": "김민준",
+    "age": 25,
+    "mv": 300000
+   },
+   {
+    "num": 71,
+    "pos": "FW",
+    "name": "김승빈",
+    "age": 25,
+    "mv": 250000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "박정인",
+    "age": 25,
+    "mv": 175000
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "이의형",
+    "age": 27,
+    "mv": 150000
+   }
+  ],
+  "matched": 23
+ },
+ "seoul": {
+  "helper": "FC 서울",
+  "league": "K리그1",
+  "count": 36,
+  "picked": [
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "강현무",
+    "age": 30,
+    "mv": 500000
+   },
+   {
+    "num": 26,
+    "pos": "GK",
+    "name": "백종범",
+    "age": 24,
+    "mv": 350000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "임준섭",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "야잔",
+    "age": 29,
+    "mv": 900000
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "로스",
+    "age": 29,
+    "mv": 850000
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "최준",
+    "age": 26,
+    "mv": 650000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "박수일",
+    "age": 29,
+    "mv": 450000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김진수",
+    "age": 33,
+    "mv": 350000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이한도",
+    "age": 31,
+    "mv": 300000
+   },
+   {
+    "num": 40,
+    "pos": "DF",
+    "name": "박성훈",
+    "age": 22,
+    "mv": 250000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "바베츠",
+    "age": 26,
+    "mv": 800000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이승모",
+    "age": 27,
+    "mv": 450000
+   },
+   {
+    "num": 41,
+    "pos": "MF",
+    "name": "황도윤",
+    "age": 22,
+    "mv": 350000
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "박장한결",
+    "age": 21,
+    "mv": 50000
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "정하원",
+    "age": 16,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "고필관",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "안데르손",
+    "age": 27,
+    "mv": 750000
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "조영욱",
+    "age": 26,
+    "mv": 550000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "클리말라",
+    "age": 27,
+    "mv": 500000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "후이즈",
+    "age": 29,
+    "mv": 450000
+   }
+  ],
+  "matched": 34
+ },
+ "anyang": {
+  "helper": "FC 안양",
+  "league": "K리그1",
+  "count": 34,
+  "picked": [
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김다솔",
+    "age": 36,
+    "mv": 125000
+   },
+   {
+    "num": 42,
+    "pos": "GK",
+    "name": "김성동",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "정민재",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "대니 바커",
+    "age": 30,
+    "mv": 450000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김동진",
+    "age": 33,
+    "mv": 250000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "김영찬",
+    "age": 32,
+    "mv": 200000
+   },
+   {
+    "num": 99,
+    "pos": "DF",
+    "name": "주현우",
+    "age": 35,
+    "mv": 200000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "김지훈",
+    "age": 21,
+    "mv": 75000
+   },
+   {
+    "num": 25,
+    "pos": "DF",
+    "name": "김재현",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "이창용",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "MF",
+    "name": "크네제비치",
+    "age": 23,
+    "mv": 800000
+   },
+   {
+    "num": 26,
+    "pos": "MF",
+    "name": "이진용",
+    "age": 24,
+    "mv": 400000
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "강지훈",
+    "age": 28,
+    "mv": 225000
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "김보경",
+    "age": 36,
+    "mv": 175000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "한가람",
+    "age": 27,
+    "mv": 150000
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "장정우",
+    "age": 21,
+    "mv": 25000
+   },
+   {
+    "num": 27,
+    "pos": "FW",
+    "name": "최건주",
+    "age": 26,
+    "mv": 350000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "아일톤",
+    "age": 26,
+    "mv": 300000
+   },
+   {
+    "num": 28,
+    "pos": "FW",
+    "name": "블레이즈",
+    "age": 25,
+    "mv": 275000
+   },
+   {
+    "num": 71,
+    "pos": "FW",
+    "name": "채현우",
+    "age": 21,
+    "mv": 250000
+   }
+  ],
+  "matched": 23
+ },
+ "ulsan": {
+  "helper": "울산 HD",
+  "league": "K리그1",
+  "count": 36,
+  "picked": [
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "황병근",
+    "age": 31,
+    "mv": 100000
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "류성민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "최주호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "강상우",
+    "age": 32,
+    "mv": 650000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "윤종규",
+    "age": 27,
+    "mv": 450000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "트로야크",
+    "age": 31,
+    "mv": 350000
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "심상민",
+    "age": 32,
+    "mv": 325000
+   },
+   {
+    "num": 28,
+    "pos": "DF",
+    "name": "이재익",
+    "age": 26,
+    "mv": 250000
+   },
+   {
+    "num": 96,
+    "pos": "DF",
+    "name": "최석현",
+    "age": 22,
+    "mv": 250000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "정성빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이희균",
+    "age": 27,
+    "mv": 300000
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "PIMENTEL FERREIRA PE",
+    "age": 23,
+    "mv": 275000
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "페드링요",
+    "age": 23,
+    "mv": 275000
+   },
+   {
+    "num": 72,
+    "pos": "MF",
+    "name": "백인우",
+    "age": 19,
+    "mv": 250000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "박우진",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 43,
+    "pos": "MF",
+    "name": "조민서",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "말컹",
+    "age": 31,
+    "mv": 800000
+   },
+   {
+    "num": 91,
+    "pos": "FW",
+    "name": "벤지",
+    "age": 28,
+    "mv": 400000
+   },
+   {
+    "num": 20,
+    "pos": "FW",
+    "name": "정재상",
+    "age": 21,
+    "mv": 125000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "에릭",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 17
+ },
+ "incheon": {
+  "helper": "인천 유나이티드",
+  "league": "K리그1",
+  "count": 37,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "이태희",
+    "age": 30,
+    "mv": 250000
+   },
+   {
+    "num": 74,
+    "pos": "GK",
+    "name": "왕민준",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김동헌",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "박경섭",
+    "age": 21,
+    "mv": 300000
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "최승구",
+    "age": 20,
+    "mv": 275000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이상기",
+    "age": 29,
+    "mv": 175000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "고정민",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "이준섭",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "DF",
+    "name": "김연수",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "후안 이비자",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이케르",
+    "age": 30,
+    "mv": 500000
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "정원진",
+    "age": 31,
+    "mv": 300000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "문지환",
+    "age": 31,
+    "mv": 250000
+   },
+   {
+    "num": 23,
+    "pos": "MF",
+    "name": "정치인",
+    "age": 28,
+    "mv": 250000
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "김영환",
+    "age": 23,
+    "mv": 200000
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "김훈",
+    "age": 23,
+    "mv": 200000
+   },
+   {
+    "num": 77,
+    "pos": "FW",
+    "name": "박승호",
+    "age": 22,
+    "mv": 350000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "오후성",
+    "age": 26,
+    "mv": 225000
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "이동률",
+    "age": 25,
+    "mv": 225000
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "김성민",
+    "age": 25,
+    "mv": 175000
+   }
+  ],
+  "matched": 20
+ },
+ "jeonbuk": {
+  "helper": "전북 현대 모터스",
+  "league": "K리그1",
+  "count": 64,
+  "picked": [
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "송범근",
+    "age": 28,
+    "mv": 1000000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이주현",
+    "age": 27,
+    "mv": 200000
+   },
+   {
+    "num": 91,
+    "pos": "GK",
+    "name": "정대영",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "김태현",
+    "age": 29,
+    "mv": 750000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "박지수",
+    "age": 31,
+    "mv": 550000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김영빈",
+    "age": 34,
+    "mv": 400000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "조위제",
+    "age": 24,
+    "mv": 400000
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "김태환",
+    "age": 36,
+    "mv": 400000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "연제운",
+    "age": 31,
+    "mv": 325000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "최우진",
+    "age": 21,
+    "mv": 325000
+   },
+   {
+    "num": 97,
+    "pos": "MF",
+    "name": "김진규",
+    "age": 28,
+    "mv": 1200000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "맹성웅",
+    "age": 27,
+    "mv": 600000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "강상윤",
+    "age": 21,
+    "mv": 550000
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "이영재",
+    "age": 31,
+    "mv": 550000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "감보아",
+    "age": 29,
+    "mv": 500000
+   },
+   {
+    "num": 70,
+    "pos": "MF",
+    "name": "박현민",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 96,
+    "pos": "FW",
+    "name": "콤파뇨",
+    "age": 29,
+    "mv": 2500000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "티아고",
+    "age": 32,
+    "mv": 700000
+   },
+   {
+    "num": 30,
+    "pos": "FW",
+    "name": "도도",
+    "age": 24,
+    "mv": 700000
+   },
+   {
+    "num": 95,
+    "pos": "FW",
+    "name": "이탈로",
+    "age": 23,
+    "mv": 600000
+   }
+  ],
+  "matched": 32
+ },
+ "jeju": {
+  "helper": "제주 SK FC",
+  "league": "K리그1",
+  "count": 32,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김동준",
+    "age": 31,
+    "mv": 550000
+   },
+   {
+    "num": 81,
+    "pos": "GK",
+    "name": "허자웅",
+    "age": 27,
+    "mv": 125000
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "주승민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "토비아스",
+    "age": 31,
+    "mv": 750000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "유인수",
+    "age": 31,
+    "mv": 325000
+   },
+   {
+    "num": 40,
+    "pos": "DF",
+    "name": "김륜성",
+    "age": 23,
+    "mv": 325000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "세레스틴",
+    "age": 28,
+    "mv": 300000
+   },
+   {
+    "num": 41,
+    "pos": "DF",
+    "name": "김재우",
+    "age": 27,
+    "mv": 275000
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "정운",
+    "age": 36,
+    "mv": 175000
+   },
+   {
+    "num": 88,
+    "pos": "DF",
+    "name": "조인정",
+    "age": 20,
+    "mv": 25000
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "이탈로",
+    "age": 28,
+    "mv": 450000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "이창민",
+    "age": 31,
+    "mv": 450000
+   },
+   {
+    "num": 55,
+    "pos": "MF",
+    "name": "강동휘",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "구본서",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "MF",
+    "name": "박수빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 39,
+    "pos": "MF",
+    "name": "김재민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 94,
+    "pos": "FW",
+    "name": "네게바",
+    "age": 25,
+    "mv": 1000000
+   },
+   {
+    "num": 22,
+    "pos": "FW",
+    "name": "치나리",
+    "age": 29,
+    "mv": 700000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "아이아스",
+    "age": 29,
+    "mv": 400000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "박창준",
+    "age": 29,
+    "mv": 325000
+   }
+  ],
+  "matched": 22
+ },
+ "pohang": {
+  "helper": "포항 스틸러스",
+  "league": "K리그1",
+  "count": 36,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "황인재",
+    "age": 31,
+    "mv": 500000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "윤평국",
+    "age": 33,
+    "mv": 200000
+   },
+   {
+    "num": 29,
+    "pos": "GK",
+    "name": "홍성민",
+    "age": 19,
+    "mv": 75000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "박찬용",
+    "age": 29,
+    "mv": 750000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "전민광",
+    "age": 32,
+    "mv": 350000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "김예성",
+    "age": 29,
+    "mv": 300000
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "강민준",
+    "age": 22,
+    "mv": 275000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "진시우",
+    "age": 23,
+    "mv": 225000
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "이창우",
+    "age": 19,
+    "mv": 175000
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "완델손",
+    "age": 36,
+    "mv": 150000
+   },
+   {
+    "num": 31,
+    "pos": "MF",
+    "name": "니시야 켄토",
+    "age": 26,
+    "mv": 600000
+   },
+   {
+    "num": 40,
+    "pos": "MF",
+    "name": "기성용",
+    "age": 36,
+    "mv": 400000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "김동진",
+    "age": 22,
+    "mv": 350000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "김승호",
+    "age": 27,
+    "mv": 325000
+   },
+   {
+    "num": 70,
+    "pos": "MF",
+    "name": "황서웅",
+    "age": 20,
+    "mv": 125000
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "이수아",
+    "age": 20,
+    "mv": 75000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "주닝요",
+    "age": 28,
+    "mv": 350000
+   },
+   {
+    "num": 25,
+    "pos": "FW",
+    "name": "조르지",
+    "age": 26,
+    "mv": 350000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "원기종",
+    "age": 29,
+    "mv": 300000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "안재준",
+    "age": 24,
+    "mv": 225000
+   }
+  ],
+  "matched": 32
+ },
+ "gyeongnam": {
+  "helper": "경남 FC",
+  "league": "K리그2",
+  "count": 43,
+  "picked": [
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "이기현",
+    "age": 32,
+    "mv": 100000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "신준서",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "GK",
+    "name": "안호진",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 18,
+    "pos": "DF",
+    "name": "김선호",
+    "age": 24,
+    "mv": 225000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "배현서",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 14,
+    "pos": "DF",
+    "name": "전민수",
+    "age": 20,
+    "mv": 10000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "조우영",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "최성훈",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "김규민",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "DF",
+    "name": "알렉스",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "김준호",
+    "age": 23,
+    "mv": 275000
+   },
+   {
+    "num": 28,
+    "pos": "MF",
+    "name": "최민서",
+    "age": 23,
+    "mv": 275000
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "김하민",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "김영재",
+    "age": 32,
+    "mv": 100000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "임현섭",
+    "age": 19,
+    "mv": 75000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "임은수",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "이중민",
+    "age": 26,
+    "mv": 150000
+   },
+   {
+    "num": 21,
+    "pos": "FW",
+    "name": "조진혁",
+    "age": 25,
+    "mv": 100000
+   },
+   {
+    "num": 70,
+    "pos": "FW",
+    "name": "펠리페",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김수민",
+    "age": 0,
+    "mv": 0
+   }
+  ],
+  "matched": 18
+ },
+ "gimpo": {
+  "helper": "김포 FC",
+  "league": "K리그2",
+  "count": 35,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "윤보상",
+    "age": 32,
+    "mv": 150000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이상민",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "손정현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김태한",
+    "age": 29,
+    "mv": 325000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "박경록",
+    "age": 31,
+    "mv": 275000
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "채프먼",
+    "age": 31,
+    "mv": 275000
+   },
+   {
+    "num": 47,
+    "pos": "DF",
+    "name": "김동민",
+    "age": 31,
+    "mv": 250000
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "이인재",
+    "age": 33,
+    "mv": 175000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "임창석",
+    "age": 26,
+    "mv": 175000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "윤재운",
+    "age": 23,
+    "mv": 175000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "루안",
+    "age": 28,
+    "mv": 450000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "디자우마",
+    "age": 25,
+    "mv": 250000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "최재영",
+    "age": 27,
+    "mv": 225000
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "김도혁",
+    "age": 33,
+    "mv": 225000
+   },
+   {
+    "num": 11,
+    "pos": "MF",
+    "name": "이시헌",
+    "age": 27,
+    "mv": 200000
+   },
+   {
+    "num": 70,
+    "pos": "MF",
+    "name": "조관우",
+    "age": 24,
+    "mv": 150000
+   },
+   {
+    "num": 33,
+    "pos": "FW",
+    "name": "무신",
+    "age": 28,
+    "mv": 450000
+   },
+   {
+    "num": 96,
+    "pos": "FW",
+    "name": "파울리뇨",
+    "age": 29,
+    "mv": 275000
+   },
+   {
+    "num": 50,
+    "pos": "FW",
+    "name": "박동진",
+    "age": 31,
+    "mv": 225000
+   },
+   {
+    "num": 70,
+    "pos": "FW",
+    "name": "최성범",
+    "age": 24,
+    "mv": 150000
+   }
+  ],
+  "matched": 31
+ },
+ "gimhae": {
+  "helper": "김해 FC",
+  "league": "K리그2",
+  "count": 34,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "정진욱",
+    "age": 28,
+    "mv": 125000
+   },
+   {
+    "num": 91,
+    "pos": "GK",
+    "name": "최필수",
+    "age": 34,
+    "mv": 125000
+   },
+   {
+    "num": 25,
+    "pos": "GK",
+    "name": "한준성",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "DF",
+    "name": "홍욱현",
+    "age": 21,
+    "mv": 175000
+   },
+   {
+    "num": 98,
+    "pos": "DF",
+    "name": "미겔 바지오",
+    "age": 27,
+    "mv": 150000
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "박재현",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "최준영",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이슬찬",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "차준영",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "여재율",
+    "age": 30,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "최원철",
+    "age": 30,
+    "mv": 175000
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "이준규",
+    "age": 22,
+    "mv": 175000
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "박상준",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "문승민",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "표건희",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 34,
+    "pos": "MF",
+    "name": "곽성욱",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "마이사 폴",
+    "age": 30,
+    "mv": 350000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "베카",
+    "age": 28,
+    "mv": 200000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "이승재",
+    "age": 27,
+    "mv": 100000
+   },
+   {
+    "num": 94,
+    "pos": "FW",
+    "name": "우제욱",
+    "age": 31,
+    "mv": 100000
+   }
+  ],
+  "matched": 25
+ },
+ "daegu": {
+  "helper": "대구 FC",
+  "league": "K리그2",
+  "count": 47,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "고동민",
+    "age": 26,
+    "mv": 125000
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "박성수",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "한태희",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "김강산",
+    "age": 27,
+    "mv": 550000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "장성원",
+    "age": 28,
+    "mv": 300000
+   },
+   {
+    "num": 72,
+    "pos": "DF",
+    "name": "최강민",
+    "age": 23,
+    "mv": 225000
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "정헌택",
+    "age": 23,
+    "mv": 150000
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "이원우",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "이림",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "황인택",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 25,
+    "pos": "MF",
+    "name": "김대우",
+    "age": 25,
+    "mv": 250000
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "한종무",
+    "age": 22,
+    "mv": 200000
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "손승민",
+    "age": 20,
+    "mv": 75000
+   },
+   {
+    "num": 39,
+    "pos": "MF",
+    "name": "권광덕",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "한국영",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "MF",
+    "name": "류재문",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "세라핌",
+    "age": 27,
+    "mv": 600000
+   },
+   {
+    "num": 34,
+    "pos": "FW",
+    "name": "박기현",
+    "age": 21,
+    "mv": 175000
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "박인혁",
+    "age": 30,
+    "mv": 175000
+   },
+   {
+    "num": 16,
+    "pos": "FW",
+    "name": "데커스",
+    "age": 22,
+    "mv": 150000
+   }
+  ],
+  "matched": 21
+ },
+ "busan": {
+  "helper": "부산 아이파크",
+  "league": "K리그2",
+  "count": 32,
+  "picked": [
+   {
+    "num": 34,
+    "pos": "GK",
+    "name": "박지민",
+    "age": 25,
+    "mv": 200000
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김유래",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 70,
+    "pos": "GK",
+    "name": "송안톤",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "김진혁",
+    "age": 32,
+    "mv": 450000
+   },
+   {
+    "num": 11,
+    "pos": "DF",
+    "name": "안현범",
+    "age": 31,
+    "mv": 400000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "아하도프",
+    "age": 21,
+    "mv": 300000
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "장호익",
+    "age": 32,
+    "mv": 300000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "우주성",
+    "age": 32,
+    "mv": 225000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "전성진",
+    "age": 24,
+    "mv": 225000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "조동재",
+    "age": 22,
+    "mv": 175000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "이동수",
+    "age": 31,
+    "mv": 300000
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "사비에르",
+    "age": 24,
+    "mv": 275000
+   },
+   {
+    "num": 97,
+    "pos": "MF",
+    "name": "손준석",
+    "age": 25,
+    "mv": 200000
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "손휘",
+    "age": 21,
+    "mv": 100000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "김민혁",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 72,
+    "pos": "MF",
+    "name": "김동윤",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "김찬",
+    "age": 25,
+    "mv": 275000
+   },
+   {
+    "num": 13,
+    "pos": "FW",
+    "name": "김현민",
+    "age": 19,
+    "mv": 200000
+   },
+   {
+    "num": 18,
+    "pos": "FW",
+    "name": "백가온",
+    "age": 19,
+    "mv": 175000
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "가브리엘",
+    "age": 29,
+    "mv": 0
+   }
+  ],
+  "matched": 26
+ },
+ "seoulland": {
+  "helper": "서울 이랜드",
+  "league": "K리그2",
+  "count": 34,
+  "picked": [
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "엄예훈",
+    "age": 23,
+    "mv": 10000
+   },
+   {
+    "num": 71,
+    "pos": "GK",
+    "name": "김태산",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "민성준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "박재환",
+    "age": 25,
+    "mv": 325000
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "배서준",
+    "age": 22,
+    "mv": 150000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "강민재",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "최랑",
+    "age": 23,
+    "mv": 0
+   },
+   {
+    "num": 28,
+    "pos": "DF",
+    "name": "정연원",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "손혁찬",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "오인표",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "오스마르",
+    "age": 37,
+    "mv": 350000
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "서진석",
+    "age": 21,
+    "mv": 125000
+   },
+   {
+    "num": 15,
+    "pos": "MF",
+    "name": "강영석",
+    "age": 23,
+    "mv": 75000
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "조준현",
+    "age": 21,
+    "mv": 75000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "백지웅",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "윤석주",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 90,
+    "pos": "FW",
+    "name": "가브리엘",
+    "age": 26,
+    "mv": 250000
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "강현제",
+    "age": 23,
+    "mv": 175000
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "김우빈",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 27,
+    "pos": "FW",
+    "name": "박선우",
+    "age": 21,
+    "mv": 0
+   }
+  ],
+  "matched": 17
+ },
+ "seongnam": {
+  "helper": "성남 FC",
+  "league": "K리그2",
+  "count": 35,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이광연",
+    "age": 26,
+    "mv": 400000
+   },
+   {
+    "num": 28,
+    "pos": "GK",
+    "name": "정명제",
+    "age": 23,
+    "mv": 100000
+   },
+   {
+    "num": 41,
+    "pos": "GK",
+    "name": "최서준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이상민",
+    "age": 26,
+    "mv": 325000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "정승용",
+    "age": 34,
+    "mv": 275000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "베니시오",
+    "age": 31,
+    "mv": 250000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "유선",
+    "age": 21,
+    "mv": 125000
+   },
+   {
+    "num": 19,
+    "pos": "DF",
+    "name": "양태양",
+    "age": 21,
+    "mv": 125000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "박병규",
+    "age": 21,
+    "mv": 100000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "황석기",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "류준선",
+    "age": 22,
+    "mv": 200000
+   },
+   {
+    "num": 36,
+    "pos": "MF",
+    "name": "이재욱",
+    "age": 24,
+    "mv": 100000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "홍석현",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "홍창범",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "박상혁",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 34,
+    "pos": "MF",
+    "name": "이수윤",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "빌레로",
+    "age": 27,
+    "mv": 400000
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "프레이타스",
+    "age": 28,
+    "mv": 350000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이준상",
+    "age": 22,
+    "mv": 175000
+   },
+   {
+    "num": 32,
+    "pos": "FW",
+    "name": "윤민호",
+    "age": 30,
+    "mv": 175000
+   }
+  ],
+  "matched": 24
+ },
+ "suwonsamsung": {
+  "helper": "수원 삼성 블루윙즈",
+  "league": "K리그2",
+  "count": 43,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "양형모",
+    "age": 34,
+    "mv": 275000
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "이경준",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김민준",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "박대원",
+    "age": 27,
+    "mv": 350000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "한현서",
+    "age": 21,
+    "mv": 325000
+   },
+   {
+    "num": 11,
+    "pos": "DF",
+    "name": "이준재",
+    "age": 22,
+    "mv": 275000
+   },
+   {
+    "num": 32,
+    "pos": "DF",
+    "name": "정동윤",
+    "age": 31,
+    "mv": 250000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "모경빈",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "송주훈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "고종현",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "고승범",
+    "age": 31,
+    "mv": 700000
+   },
+   {
+    "num": 66,
+    "pos": "MF",
+    "name": "문형진",
+    "age": 21,
+    "mv": 325000
+   },
+   {
+    "num": 19,
+    "pos": "MF",
+    "name": "김성주",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 80,
+    "pos": "MF",
+    "name": "김지성",
+    "age": 17,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "임지훈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "헤이스",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "페신",
+    "age": 26,
+    "mv": 550000
+   },
+   {
+    "num": 8,
+    "pos": "FW",
+    "name": "르본",
+    "age": 28,
+    "mv": 300000
+   },
+   {
+    "num": 22,
+    "pos": "FW",
+    "name": "강성진",
+    "age": 22,
+    "mv": 300000
+   },
+   {
+    "num": 71,
+    "pos": "FW",
+    "name": "김지호",
+    "age": 22,
+    "mv": 75000
+   }
+  ],
+  "matched": 16
+ },
+ "suwonfc": {
+  "helper": "수원 FC",
+  "league": "K리그2",
+  "count": 50,
+  "picked": [
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "정민기",
+    "age": 29,
+    "mv": 200000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이윤오",
+    "age": 26,
+    "mv": 50000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "양한빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "델란",
+    "age": 29,
+    "mv": 400000
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "조진우",
+    "age": 26,
+    "mv": 350000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "이현용",
+    "age": 22,
+    "mv": 275000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이지솔",
+    "age": 26,
+    "mv": 250000
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "이시영",
+    "age": 28,
+    "mv": 250000
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "강윤구",
+    "age": 32,
+    "mv": 175000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "김지훈",
+    "age": 25,
+    "mv": 150000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "프리조",
+    "age": 27,
+    "mv": 2000000
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "이재원",
+    "age": 28,
+    "mv": 400000
+   },
+   {
+    "num": 22,
+    "pos": "MF",
+    "name": "서재민",
+    "age": 28,
+    "mv": 300000
+   },
+   {
+    "num": 11,
+    "pos": "MF",
+    "name": "김정환",
+    "age": 28,
+    "mv": 250000
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "구본철",
+    "age": 26,
+    "mv": 250000
+   },
+   {
+    "num": 18,
+    "pos": "MF",
+    "name": "코키",
+    "age": 31,
+    "mv": 200000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "마테우스 바비",
+    "age": 28,
+    "mv": 400000
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "김경민",
+    "age": 28,
+    "mv": 150000
+   },
+   {
+    "num": 29,
+    "pos": "FW",
+    "name": "최기윤",
+    "age": 23,
+    "mv": 150000
+   },
+   {
+    "num": 70,
+    "pos": "FW",
+    "name": "정승배",
+    "age": 22,
+    "mv": 100000
+   }
+  ],
+  "matched": 30
+ },
+ "ansan": {
+  "helper": "안산 그리너스",
+  "league": "K리그2",
+  "count": 39,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김도담",
+    "age": 27,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "김민재",
+    "age": 22,
+    "mv": 0
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "이승빈",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "오브라도비치",
+    "age": 26,
+    "mv": 300000
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "박시화",
+    "age": 21,
+    "mv": 175000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "송범",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "DF",
+    "name": "김요셉",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 29,
+    "pos": "DF",
+    "name": "김준형",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "DF",
+    "name": "이서진",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 42,
+    "pos": "DF",
+    "name": "최단",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "류승우",
+    "age": 32,
+    "mv": 175000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "김건오",
+    "age": 24,
+    "mv": 150000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "정현우",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 32,
+    "pos": "MF",
+    "name": "김승현",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 66,
+    "pos": "MF",
+    "name": "김백민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 87,
+    "pos": "MF",
+    "name": "도승우",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 17,
+    "pos": "FW",
+    "name": "류승완",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "정건욱",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "이재환",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 22,
+    "pos": "FW",
+    "name": "진호진",
+    "age": 22,
+    "mv": 0
+   }
+  ],
+  "matched": 22
+ },
+ "yongin": {
+  "helper": "용인 FC",
+  "league": "K리그2",
+  "count": 29,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "노보",
+    "age": 33,
+    "mv": 0
+   },
+   {
+    "num": 23,
+    "pos": "GK",
+    "name": "김민준",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "황성민",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 26,
+    "pos": "DF",
+    "name": "임채민",
+    "age": 35,
+    "mv": 250000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김한길",
+    "age": 30,
+    "mv": 225000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "임형진",
+    "age": 24,
+    "mv": 50000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "강신명",
+    "age": 28,
+    "mv": 0
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "조현우",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 77,
+    "pos": "DF",
+    "name": "이재준",
+    "age": 19,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "곽윤호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "최영준",
+    "age": 34,
+    "mv": 375000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "신진호",
+    "age": 37,
+    "mv": 250000
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "진태호",
+    "age": 19,
+    "mv": 175000
+   },
+   {
+    "num": 66,
+    "pos": "MF",
+    "name": "김한서",
+    "age": 22,
+    "mv": 175000
+   },
+   {
+    "num": 12,
+    "pos": "MF",
+    "name": "조재훈",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 30,
+    "pos": "MF",
+    "name": "이규동",
+    "age": 21,
+    "mv": 75000
+   },
+   {
+    "num": 27,
+    "pos": "FW",
+    "name": "김보섭",
+    "age": 27,
+    "mv": 300000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "비티뉴",
+    "age": 27,
+    "mv": 200000
+   },
+   {
+    "num": 20,
+    "pos": "FW",
+    "name": "최치웅",
+    "age": 24,
+    "mv": 100000
+   },
+   {
+    "num": 19,
+    "pos": "FW",
+    "name": "유동규",
+    "age": 30,
+    "mv": 75000
+   }
+  ],
+  "matched": 20
+ },
+ "jeonnam": {
+  "helper": "전남 드래곤즈",
+  "league": "K리그2",
+  "count": 36,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "최봉진",
+    "age": 33,
+    "mv": 150000
+   },
+   {
+    "num": 88,
+    "pos": "GK",
+    "name": "이준희",
+    "age": 32,
+    "mv": 0
+   },
+   {
+    "num": 31,
+    "pos": "GK",
+    "name": "조민협",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "구현준",
+    "age": 32,
+    "mv": 175000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "홍석현",
+    "age": 23,
+    "mv": 175000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "장순혁",
+    "age": 32,
+    "mv": 100000
+   },
+   {
+    "num": 44,
+    "pos": "DF",
+    "name": "노동건",
+    "age": 26,
+    "mv": 100000
+   },
+   {
+    "num": 75,
+    "pos": "DF",
+    "name": "류광현",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "조영광",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "유지하",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "박태용",
+    "age": 24,
+    "mv": 200000
+   },
+   {
+    "num": 21,
+    "pos": "MF",
+    "name": "양지산",
+    "age": 26,
+    "mv": 75000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "송호",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 20,
+    "pos": "MF",
+    "name": "정태인",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 7,
+    "pos": "MF",
+    "name": "최한솔",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 14,
+    "pos": "MF",
+    "name": "윤민호",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "하남",
+    "age": 27,
+    "mv": 325000
+   },
+   {
+    "num": 27,
+    "pos": "FW",
+    "name": "이라클리",
+    "age": 27,
+    "mv": 175000
+   },
+   {
+    "num": 96,
+    "pos": "FW",
+    "name": "김경준",
+    "age": 29,
+    "mv": 175000
+   },
+   {
+    "num": 32,
+    "pos": "FW",
+    "name": "추상훈",
+    "age": 25,
+    "mv": 100000
+   }
+  ],
+  "matched": 19
+ },
+ "cheonan": {
+  "helper": "천안 시티 FC",
+  "league": "K리그2",
+  "count": 36,
+  "picked": [
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "박대한",
+    "age": 29,
+    "mv": 200000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "박주원",
+    "age": 35,
+    "mv": 100000
+   },
+   {
+    "num": 33,
+    "pos": "GK",
+    "name": "이승규",
+    "age": 33,
+    "mv": 50000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "최규백",
+    "age": 31,
+    "mv": 225000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "고태원",
+    "age": 32,
+    "mv": 200000
+   },
+   {
+    "num": 27,
+    "pos": "DF",
+    "name": "박창우",
+    "age": 22,
+    "mv": 200000
+   },
+   {
+    "num": 16,
+    "pos": "DF",
+    "name": "김성주",
+    "age": 26,
+    "mv": 150000
+   },
+   {
+    "num": 3,
+    "pos": "DF",
+    "name": "이광준",
+    "age": 29,
+    "mv": 100000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "이상용",
+    "age": 31,
+    "mv": 100000
+   },
+   {
+    "num": 23,
+    "pos": "DF",
+    "name": "이동협",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 4,
+    "pos": "MF",
+    "name": "최준혁",
+    "age": 31,
+    "mv": 150000
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "이지승",
+    "age": 26,
+    "mv": 150000
+   },
+   {
+    "num": 19,
+    "pos": "MF",
+    "name": "진의준",
+    "age": 22,
+    "mv": 75000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "허동민",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "툰가라",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 99,
+    "pos": "FW",
+    "name": "라마스",
+    "age": 31,
+    "mv": 500000
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "구종욱",
+    "age": 29,
+    "mv": 150000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "이상준",
+    "age": 26,
+    "mv": 125000
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "이지훈",
+    "age": 23,
+    "mv": 125000
+   }
+  ],
+  "matched": 26
+ },
+ "asan": {
+  "helper": "충남아산 FC",
+  "league": "K리그2",
+  "count": 43,
+  "picked": [
+   {
+    "num": 18,
+    "pos": "GK",
+    "name": "신송훈",
+    "age": 23,
+    "mv": 375000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "김진영",
+    "age": 33,
+    "mv": 75000
+   },
+   {
+    "num": 26,
+    "pos": "GK",
+    "name": "서주환",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "정우재",
+    "age": 33,
+    "mv": 200000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "변준영",
+    "age": 24,
+    "mv": 175000
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "최희원",
+    "age": 26,
+    "mv": 175000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "김주성",
+    "age": 23,
+    "mv": 150000
+   },
+   {
+    "num": 13,
+    "pos": "DF",
+    "name": "김영남",
+    "age": 34,
+    "mv": 100000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "최보경",
+    "age": 37,
+    "mv": 75000
+   },
+   {
+    "num": 37,
+    "pos": "DF",
+    "name": "김민호",
+    "age": 22,
+    "mv": 25000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "손준호",
+    "age": 33,
+    "mv": 550000
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "박세직",
+    "age": 36,
+    "mv": 125000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "최치원",
+    "age": 32,
+    "mv": 75000
+   },
+   {
+    "num": 88,
+    "pos": "MF",
+    "name": "정세준",
+    "age": 23,
+    "mv": 50000
+   },
+   {
+    "num": 33,
+    "pos": "MF",
+    "name": "김혜성",
+    "age": 29,
+    "mv": 0
+   },
+   {
+    "num": 71,
+    "pos": "MF",
+    "name": "이유민",
+    "age": 18,
+    "mv": 0
+   },
+   {
+    "num": 84,
+    "pos": "FW",
+    "name": "나임",
+    "age": 29,
+    "mv": 800000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "한교원",
+    "age": 35,
+    "mv": 400000
+   },
+   {
+    "num": 39,
+    "pos": "FW",
+    "name": "문성민",
+    "age": 24,
+    "mv": 300000
+   },
+   {
+    "num": 39,
+    "pos": "FW",
+    "name": "비티뇨",
+    "age": 24,
+    "mv": 300000
+   }
+  ],
+  "matched": 29
+ },
+ "cheongju": {
+  "helper": "충북청주 FC",
+  "league": "K리그2",
+  "count": 32,
+  "picked": [
+   {
+    "num": 32,
+    "pos": "GK",
+    "name": "이승환",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "조성훈",
+    "age": 27,
+    "mv": 75000
+   },
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "노동건",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 25,
+    "pos": "DF",
+    "name": "반데이라",
+    "age": 24,
+    "mv": 700000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "조윤성",
+    "age": 26,
+    "mv": 175000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "이강한",
+    "age": 25,
+    "mv": 175000
+   },
+   {
+    "num": 99,
+    "pos": "DF",
+    "name": "이창훈",
+    "age": 30,
+    "mv": 175000
+   },
+   {
+    "num": 8,
+    "pos": "DF",
+    "name": "박건우",
+    "age": 24,
+    "mv": 125000
+   },
+   {
+    "num": 18,
+    "pos": "DF",
+    "name": "조주영",
+    "age": 31,
+    "mv": 125000
+   },
+   {
+    "num": 20,
+    "pos": "DF",
+    "name": "윤석영",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "MF",
+    "name": "김선민",
+    "age": 34,
+    "mv": 225000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "허승찬",
+    "age": 22,
+    "mv": 125000
+   },
+   {
+    "num": 17,
+    "pos": "MF",
+    "name": "이동원",
+    "age": 23,
+    "mv": 100000
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "민지훈",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 42,
+    "pos": "MF",
+    "name": "정진우",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 47,
+    "pos": "MF",
+    "name": "주나무",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 11,
+    "pos": "FW",
+    "name": "가르시아",
+    "age": 27,
+    "mv": 600000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "엔조",
+    "age": 21,
+    "mv": 250000
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "서재원",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 13,
+    "pos": "FW",
+    "name": "이종언",
+    "age": 24,
+    "mv": 75000
+   }
+  ],
+  "matched": 21
+ },
+ "paju": {
+  "helper": "파주 프론티어",
+  "league": "K리그2",
+  "count": 37,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "류원우",
+    "age": 35,
+    "mv": 100000
+   },
+   {
+    "num": 13,
+    "pos": "GK",
+    "name": "김민승",
+    "age": 20,
+    "mv": 0
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "황준모",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 6,
+    "pos": "DF",
+    "name": "전현병",
+    "age": 25,
+    "mv": 125000
+   },
+   {
+    "num": 88,
+    "pos": "DF",
+    "name": "이택근",
+    "age": 24,
+    "mv": 125000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "이민기",
+    "age": 24,
+    "mv": 100000
+   },
+   {
+    "num": 33,
+    "pos": "DF",
+    "name": "보닐라",
+    "age": 29,
+    "mv": 100000
+   },
+   {
+    "num": 17,
+    "pos": "DF",
+    "name": "박수빈",
+    "age": 20,
+    "mv": 50000
+   },
+   {
+    "num": 2,
+    "pos": "DF",
+    "name": "김민성",
+    "age": 25,
+    "mv": 0
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "심민용",
+    "age": 24,
+    "mv": 0
+   },
+   {
+    "num": 27,
+    "pos": "MF",
+    "name": "바에즈",
+    "age": 25,
+    "mv": 350000
+   },
+   {
+    "num": 40,
+    "pos": "MF",
+    "name": "루크",
+    "age": 28,
+    "mv": 350000
+   },
+   {
+    "num": 4,
+    "pos": "MF",
+    "name": "김현태",
+    "age": 31,
+    "mv": 150000
+   },
+   {
+    "num": 77,
+    "pos": "MF",
+    "name": "이찬호",
+    "age": 21,
+    "mv": 0
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "최범경",
+    "age": 0,
+    "mv": 0
+   },
+   {
+    "num": 92,
+    "pos": "FW",
+    "name": "보르하 바스톤",
+    "age": 33,
+    "mv": 450000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "아리아스",
+    "age": 30,
+    "mv": 300000
+   },
+   {
+    "num": 10,
+    "pos": "FW",
+    "name": "이준석",
+    "age": 25,
+    "mv": 125000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "바우텔손",
+    "age": 31,
+    "mv": 0
+   }
+  ],
+  "matched": 22
+ },
+ "hwaseong": {
+  "helper": "화성 FC",
+  "league": "K리그2",
+  "count": 40,
+  "picked": [
+   {
+    "num": 1,
+    "pos": "GK",
+    "name": "김승건",
+    "age": 26,
+    "mv": 200000
+   },
+   {
+    "num": 38,
+    "pos": "GK",
+    "name": "박의정",
+    "age": 21,
+    "mv": 50000
+   },
+   {
+    "num": 21,
+    "pos": "GK",
+    "name": "강성국",
+    "age": 24,
+    "mv": 25000
+   },
+   {
+    "num": 15,
+    "pos": "DF",
+    "name": "보이노비치",
+    "age": 29,
+    "mv": 600000
+   },
+   {
+    "num": 22,
+    "pos": "DF",
+    "name": "김대환",
+    "age": 21,
+    "mv": 225000
+   },
+   {
+    "num": 4,
+    "pos": "DF",
+    "name": "장민준",
+    "age": 23,
+    "mv": 200000
+   },
+   {
+    "num": 24,
+    "pos": "DF",
+    "name": "최예훈",
+    "age": 22,
+    "mv": 200000
+   },
+   {
+    "num": 44,
+    "pos": "DF",
+    "name": "함선우",
+    "age": 20,
+    "mv": 150000
+   },
+   {
+    "num": 66,
+    "pos": "DF",
+    "name": "정용희",
+    "age": 23,
+    "mv": 125000
+   },
+   {
+    "num": 5,
+    "pos": "DF",
+    "name": "양시후",
+    "age": 25,
+    "mv": 75000
+   },
+   {
+    "num": 10,
+    "pos": "MF",
+    "name": "데메트리우스",
+    "age": 26,
+    "mv": 400000
+   },
+   {
+    "num": 8,
+    "pos": "MF",
+    "name": "전성진",
+    "age": 22,
+    "mv": 225000
+   },
+   {
+    "num": 24,
+    "pos": "MF",
+    "name": "정병희",
+    "age": 22,
+    "mv": 200000
+   },
+   {
+    "num": 6,
+    "pos": "MF",
+    "name": "김정민",
+    "age": 26,
+    "mv": 125000
+   },
+   {
+    "num": 13,
+    "pos": "MF",
+    "name": "박재성",
+    "age": 22,
+    "mv": 100000
+   },
+   {
+    "num": 16,
+    "pos": "MF",
+    "name": "최명희",
+    "age": 35,
+    "mv": 100000
+   },
+   {
+    "num": 9,
+    "pos": "FW",
+    "name": "페트로프",
+    "age": 27,
+    "mv": 500000
+   },
+   {
+    "num": 90,
+    "pos": "FW",
+    "name": "일류첸코",
+    "age": 35,
+    "mv": 400000
+   },
+   {
+    "num": 7,
+    "pos": "FW",
+    "name": "제갈재민",
+    "age": 25,
+    "mv": 100000
+   },
+   {
+    "num": 14,
+    "pos": "FW",
+    "name": "김병오",
+    "age": 36,
+    "mv": 100000
+   }
+  ],
+  "matched": 28
+ }
+}

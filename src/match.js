@@ -3134,11 +3134,14 @@ export function applyResult(world, m) {
   for (const s of ['home', 'away']) {
     const teamId = s === 'home' ? m.homeId : m.awayId;
     const perf = [];
+    const started = new Set((m.sides[s].players || []).map((e) => e.id));
     for (const e of m.sides[s].appeared) {
       played.add(e.id);
       const p = world.players[e.id];
       if (!p) continue;
       p.season.apps += 1;
+      if (started.has(p.id)) p.season.starts = (p.season.starts || 0) + 1;
+      else p.season.subs = (p.season.subs || 0) + 1;
       p.season.goals += e.st.goals;
       p.season.assists += e.st.assists;
       p.season.shots += e.st.shots;
@@ -3150,6 +3153,7 @@ export function applyResult(world, m) {
       const r = clamp(6.0 + e.rd, 4.2, 10);
       p.season.ratingSum += r;
       p.season.ratingCount += 1;
+      p.recent = [...(p.recent || []), Math.round(r * 10) / 10].slice(-5);
       perf.push({ pid: p.id, rating: r, goals: e.st.goals, assists: e.st.assists });
       // 퇴장 → 다음 경기 출전 정지
       if (e.st.red > 0) p.bans = (p.bans || 0) + 1;

@@ -955,3 +955,140 @@ html[data-theme="night"] .ovg-num.down { color: #ff8a76; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }
+
+/* ==========================================================================
+   2026 K리그 모드 — 리그 선택 · 디비전 탭 · 선수 상세
+   ========================================================================== */
+.mode-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 4px; }
+.mode-tab {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer;
+  padding: 11px 13px; border: var(--bw) solid var(--line); background: var(--paper);
+  box-shadow: var(--shadow-sm); color: var(--ink);
+}
+.mode-tab b { font-size: 15.5px; }
+.mode-tab small { font-size: 11.5px; color: var(--soft); font-weight: 800; }
+.mode-tab:hover { background: var(--paper2); }
+.mode-tab.on { background: var(--yellow); color: #101014; }
+.mode-tab.on small { color: #4a4419; }
+
+.div-tabs { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 2px; scrollbar-width: thin; }
+.div-tabs.inline { margin-bottom: 10px; }
+.div-tab {
+  flex: none; display: flex; flex-direction: column; gap: 1px; text-align: left; cursor: pointer;
+  padding: 7px 11px; border: var(--bw) solid var(--line); background: var(--paper);
+  box-shadow: 2px 2px 0 var(--line); color: var(--ink);
+}
+.div-tab b { font-size: 12.5px; }
+.div-tab small { font-size: 10px; color: var(--soft); font-weight: 800; }
+.div-tab.on { background: var(--ink); color: var(--bg); }
+.div-tab.on small { color: var(--muted); }
+.divtag {
+  display: inline-block; padding: 1px 6px; border: 1.5px solid var(--line);
+  font-size: 10.5px; font-weight: 900; background: var(--paper2); color: var(--ink); vertical-align: middle;
+}
+.divtag.k1 { background: #ffd0d6; color: #5a0010; }
+.divtag.k2 { background: #d6e6ff; color: #00295a; }
+.divtag.k3 { background: #d9f7e0; color: #00391b; }
+.divtag.k4 { background: #f3e8c8; color: #3a2c00; }
+.rec-tag {
+  margin-left: auto; background: var(--green); color: #04220f; border: 1.5px solid var(--line);
+  font-size: 10px; font-weight: 900; padding: 1px 6px; white-space: nowrap;
+}
+.tc-stadium { font-size: 11.5px; color: var(--muted); }
+button.tl { background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); font: inherit; font-weight: 800; }
+button.tl:hover b { text-decoration: underline; text-underline-offset: 2px; }
+
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 2px 0 8px; }
+.filter-bar .seg { display: inline-flex; border: 1.5px solid var(--line); }
+.filter-bar .seg button {
+  padding: 5px 9px; border: 0; border-right: 1.5px solid var(--line); background: var(--paper);
+  color: var(--ink); font: inherit; font-size: 11.5px; font-weight: 900; cursor: pointer; white-space: nowrap;
+}
+.filter-bar .seg button:last-child { border-right: 0; }
+.filter-bar .seg button.on { background: var(--ink); color: var(--bg); }
+.filter-bar .seg button.on.k1 { background: #C8102E; color: #fff; }
+.filter-bar .seg button.on.k2 { background: #0055A5; color: #fff; }
+.filter-bar .seg button.on.k3 { background: #1B5E20; color: #fff; }
+.filter-bar .seg button.on.k4 { background: #8a6d1f; color: #fff; }
+.filter-bar .search {
+  flex: 1 1 150px; min-width: 130px; padding: 6px 10px; border: 1.5px solid var(--line);
+  background: var(--paper); color: var(--ink); font: inherit; font-size: 12.5px; font-weight: 700;
+}
+.filter-bar .search::placeholder { color: var(--soft); }
+.linkname { background: none; border: 0; padding: 0; font: inherit; color: inherit; font-weight: 800; cursor: pointer; }
+.linkname:hover b { text-decoration: underline; text-underline-offset: 2px; }
+
+.modal-x { margin-left: auto; }
+.modal-head > div { min-width: 0; }
+.prow { cursor: pointer; }
+.prow:hover { background: var(--paper2); }
+.prow:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.club-squad td, .club-squad th { font-size: 12px; }
+
+.zchip { display: inline-block; font-size: 9.5px; font-weight: 900; padding: 0 4px; border: 1px solid var(--line); margin-left: 4px; vertical-align: 1px; }
+.zchip.champ { background: var(--yellow); color: #101014; }
+.zchip.up { background: var(--green); color: #04220f; }
+.zchip.down { background: var(--coral); color: #2a0a04; }
+.zchip.po { background: var(--cyan); color: #062a33; }
+
+/* 코리아컵 — 단계별 접이식 대진 */
+.bracket { display: flex; flex-direction: column; gap: 6px; overflow: visible; max-height: 560px; overflow-y: auto; }
+.cup-stage { min-width: 0; width: 100%; border: 1.5px solid var(--line); background: var(--paper2); }
+.cup-stage + .cup-stage { margin-top: 0; }
+.cup-stage > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer;
+  padding: 6px 9px; font-size: 12.5px; font-weight: 900; list-style: none;
+}
+.cup-stage > summary::-webkit-details-marker { display: none; }
+.cup-stage > summary::before { content: "▸"; font-size: 10px; margin-right: 2px; }
+.cup-stage[open] > summary::before { content: "▾"; }
+.cup-stage .cup-n { margin-left: auto; font-size: 10.5px; font-weight: 800; color: var(--soft); }
+.cup-stage ul { padding: 0 9px 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 4px; }
+.cup-match.mine { background: var(--yellow); color: #101014; }
+
+.promo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; font-weight: 800; }
+.promo-list li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1.5px solid var(--line); background: var(--paper2); }
+.promo-list li.on { background: var(--yellow); color: #101014; }
+.promo-list .up { color: #0a6b2a; font-weight: 900; }
+.promo-list .down { color: #b3241a; font-weight: 900; }
+.move-tag { font-size: 13px; padding: 1px 8px; border: 2px solid var(--line); vertical-align: 6px; font-weight: 900; }
+.move-tag.up { background: var(--green); color: #04220f; }
+.move-tag.down { background: var(--coral); color: #2a0a04; }
+.div-finals { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 10px; }
+.div-finals h4 { font-size: 12.5px; color: var(--soft); border-bottom: 1.5px solid var(--line); padding-bottom: 3px; margin-bottom: 5px; }
+.div-finals ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; font-weight: 800; }
+.div-finals li { display: flex; align-items: center; gap: 6px; }
+.div-finals li > span:first-child { width: 15px; text-align: center; color: var(--soft); font-weight: 900; }
+.div-finals li.on { background: var(--yellow); color: #101014; }
+.div-finals li b { margin-left: auto; }
+
+.roster-preview { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 4px; font-size: 12px; }
+.roster-preview li { display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--line); padding: 4px 6px; background: var(--paper2); }
+.roster-preview .rn { flex: none; min-width: 21px; text-align: center; background: var(--ink); color: var(--bg); font-size: 10px; font-weight: 900; }
+.roster-preview small { color: var(--soft); font-weight: 800; font-size: 10.5px; }
+
+.pc-recent { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; color: var(--soft); flex-wrap: wrap; }
+.ratings { display: flex; gap: 4px; }
+.rt { font-style: normal; font-weight: 900; font-size: 11px; padding: 1px 5px; border: 1.5px solid var(--line); background: var(--paper2); color: var(--ink); }
+.rt.hot { background: var(--green); color: #04220f; }
+.rt.cold { background: var(--coral); color: #2a0a04; }
+.pcard.full .stats8 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.player-modal .pcard { border: 0; box-shadow: none; padding: 0; background: transparent; }
+
+@media (max-width: 640px) {
+  .mode-tabs { grid-template-columns: 1fr; }
+  .cup-stage ul { grid-template-columns: 1fr; }
+  .pcard.full .stats8 { grid-template-columns: 1fr; }
+  .filter-bar .seg { flex-wrap: wrap; }
+  .div-tabs .div-tab { padding: 6px 9px; }
+  .club-stats > div { padding: 0 7px; }
+  .pipe { display: none; }
+}
+
+.pc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 6px; border-bottom: 1.5px dashed color-mix(in srgb, var(--line) 35%, transparent); }
+.pc-label { font-size: 11px; font-weight: 800; color: var(--soft); margin-right: 8px; }
+.pc-ovr.sm { font-size: 22px; }
+@media (max-width: 720px) {
+  .tabs { flex-wrap: wrap; overflow-x: visible; }
+  .tab { flex: 1 1 calc(50% - 6px); }
+}

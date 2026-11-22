@@ -5,7 +5,7 @@
 import { FORMATIONS, POS_LABEL, STAT_LABEL } from './data.js';
 import { AXES, stepLabel, tacticWords, mentalityOf, roleLabel, defaultRole, roleShort, resolveSetPiece, setPieceLabel } from './tactics.js';
 import { lineupFor } from './match.js';
-import { standings, teamPower } from './world.js';
+import { standings, standingsFor, teamPower } from './world.js';
 
 const STAT_ORDER = ['spd', 'sho', 'pas', 'dri', 'def', 'vis', 'sta'];
 
@@ -149,7 +149,7 @@ export function scoutReport(w, teamId) {
       stats, mark: markHint(x.p, stats[0]),
     };
   });
-  const table = standings(w);
+  const table = standingsFor(w, w.teams[teamId]?.div || null);
   const row = table.find((r) => r.id === teamId);
   const hints = [
     ...axisHints(tactic),

@@ -1,11 +1,27 @@
 // 세계(커리어) 상태 — 저장·일정·순위·컵·이적·시즌 진행
 import { local } from './store.js';
 import { makeRng, rint, pick, clamp, gauss, shuffle } from './rng.js';
-import { TEAM_DEFS, FORMATIONS, FORMATION_IDS, overall, valueOf, wageOf, buildSquad, freshSeasonStats, STAT_KEYS } from './data.js';
+import { TEAM_DEFS, FORMATIONS, FORMATION_IDS, overall, valueOf, wageOf, buildSquad, freshSeasonStats, STAT_KEYS, statsFor, randomName } from './data.js';
+import { KL_TEAMS, KL_ROSTERS, KL_DIVISIONS, KL_BY_ID, KL_SEASON } from './kleague2026.js';
 import { defaultRoles, resolveRoles, roleFor, resolveSetPiece } from './tactics.js';
 
 export const SAVE_KEY = 'career';
 export const SAVE_VERSION = 1;
+
+/* 리그 모드 — 'custom'(기존 가상 충남·전북 리그) · 'kleague'(2026 K리그 1~4부 승강제) */
+export const MODES = {
+  custom: { id: 'custom', name: '커스텀 리그', note: '금산 유나이티드·별무리 FC 등 10개 구단, 단일 리그 18라운드 + 컵대회' },
+  kleague: { id: 'kleague', name: 'K리그 2026', note: '실제 56개 구단, K4→K1 4부 승강제 + 코리아컵' },
+};
+export const isKL = (w) => w?.mode === 'kleague';
+/* 팀이 속한 디비전 — 커스텀 리그는 모두 1부로 봅니다. */
+export const divOf = (w, teamId) => w?.teams?.[teamId]?.div || 1;
+export function divisionalTeams(w, div) {
+  return Object.keys(w.teams).filter((id) => divOf(w, id) === div);
+}
+export function divisionsOf(w) {
+  return (w.divisions || KL_DIVISIONS.map((d) => ({ ...d }))).map((d) => ({ ...d, teams: divisionalTeams(w, d.id) }));
+}
 
 /* ─────────────────────────── 유틸 ─────────────────────────── */
 const sum = (a) => a.reduce((x, y) => x + y, 0);
@@ -76,67 +92,177 @@ export function lineupInfo(w) {
 }
 
 /* ─────────────────────────── 새 커리어 ─────────────────────────── */
-export function createWorld(teamId, seed = Date.now()) {
+/* K리그 모드 구단 — 디비전별 예산·주급 상한·스폰서를 함께 잡습니다. */
+const DIV_ECON = {
+  1: { budget: 9, wage: 1.5, sponsor: 130 },
+  2: { budget: 6, wage: 1.3, sponsor: 46 },
+  3: { budget: 4.5, wage: 1.18, sponsor: 13 },
+  4: { budget: 3.4, wage: 1.1, sponsor: 5 },
+};
+export function divisionEcon(div) { return DIV_ECON[div] || DIV_ECON[4]; }
+
+export function buildKLeagueTeams(w, rng) {
+  for (const def of KL_TEAMS) {
+    const rows = KL_ROSTERS[def.id] || [];
+    const used = new Set();
+    const squad = [];
+    for (const [name, pos, age, num, ovr] of rows) {
+      const a = Number(age) > 0 ? Number(age) : rint(rng, pos === 'GK' ? 21 : 19, pos === 'GK' ? 34 : 33);
+      const target = clamp(Number(ovr) || 50, 28, 94);
+      const stats = statsFor(rng, pos, target, a);
+      const p = {
+        id: `p${w.pidSeq++}`, name, pos, age: a, num: 0, stats, teamId: def.id, form: 0,
+        season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [],
+      };
+      p.ovr = overall(p);
+      p.pot = clamp(p.ovr + rint(rng, 0, a <= 21 ? 16 : a <= 24 ? 11 : a <= 27 ? 5 : 1), p.ovr, 97);
+      p.value = valueOf(p);
+      p.wage = wageOf(p);
+      const n = Number(num) || 0;
+      if (n > 0 && !used.has(n)) { p.num = n; used.add(n); }
+      squad.push(p);
+      w.players[p.id] = p;
+    }
+    // 공개 자료에 등번호가 없거나 겹친 선수에게 빈 번호를 줍니다 (GK 는 1번 먼저)
+    for (const p of squad) {
+      if (p.num) continue;
+      const start = p.pos === 'GK' ? 1 : 2;
+      let n = start;
+      while (used.has(n) && n < 60) n += 1;
+      p.num = n; used.add(n);
+    }
+    w.teams[def.id] = {
+      ...clone(def), squad: squad.map((p) => p.id), recent: [], training: 'balanced',
+    };
+    w.teams[def.id].powerNow = teamPower(w, def.id);
+    const econ = divisionEcon(def.div);
+    const valueSum = squad.reduce((a, p) => a + p.value, 0);
+    w.teams[def.id].budget = Math.max(2, Math.round((valueSum * econ.budget) / 10) * 10);
+    w.teams[def.id].wage = Math.round((teamWageTotal(w, def.id) * econ.wage) / 100) * 100;
+    w.teams[def.id].sponsor = econ.sponsor;
+    w.teams[def.id].pull = 5 - def.div;
+  }
+  w.divisions = KL_DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short, rounds: d.rounds }));
+  w.year = KL_SEASON;
+}
+
+export function createWorld(teamId, seed = Date.now(), opts = {}) {
   const rng = makeRng(String(seed));
   const usedNames = new Set();
+  const mode = opts.mode || (KL_BY_ID[teamId] ? 'kleague' : 'custom');
   const w = {
-    version: SAVE_VERSION, seed, season: 1, myTeamId: teamId,
+    version: SAVE_VERSION, mode, seed, season: 1, myTeamId: teamId,
     teams: {}, players: {}, calendar: [], cup: { stages: [] },
     myLineup: null, market: [], history: [], news: [], finance: { income: 0, spent: 0 },
     pidSeq: 1, createdAt: Date.now(), form: {},
     // 4단계 — 성장 기록·AI 이적·영입 오퍼·임대
     offers: [], offerSeq: 1, loans: [], transfers: [], lastGrowth: null,
   };
-  for (const def of TEAM_DEFS) {
-    const squad = buildSquad(rng, { ...def, power: def.power }, usedNames);
-    w.teams[def.id] = {
-      ...clone(def), squad: squad.map((p) => p.id), recent: [], training: 'balanced',
-    };
-    for (const p of squad) {
-      p.id = `p${w.pidSeq++}`;
-      p.teamId = def.id;
-      p.pot = clamp(p.ovr + rint(rng, 0, p.age <= 23 ? 14 : p.age <= 27 ? 7 : 2), p.ovr, 97);
-      p.season = freshSeasonStats();
-      p.career = { apps: 0, goals: 0, assists: 0, seasons: 0 };
-      p.growthLog = [];
-      w.players[p.id] = p;
+  if (mode === 'kleague') {
+    buildKLeagueTeams(w, rng);
+    if (!w.teams[teamId]) w.myTeamId = teamId = KL_TEAMS[0].id;
+  } else {
+    for (const def of TEAM_DEFS) {
+      const squad = buildSquad(rng, { ...def, power: def.power }, usedNames);
+      w.teams[def.id] = {
+        ...clone(def), squad: squad.map((p) => p.id), recent: [], training: 'balanced',
+      };
+      for (const p of squad) {
+        p.id = `p${w.pidSeq++}`;
+        p.teamId = def.id;
+        p.pot = clamp(p.ovr + rint(rng, 0, p.age <= 23 ? 14 : p.age <= 27 ? 7 : 2), p.ovr, 97);
+        p.season = freshSeasonStats();
+        p.career = { apps: 0, goals: 0, assists: 0, seasons: 0 };
+        p.growthLog = [];
+        w.players[p.id] = p;
+      }
+      // 팀 내 등번호·id 재정리
+      w.teams[def.id].squad = squad.map((p) => p.id);
+      w.teams[def.id].powerNow = teamPower(w, def.id);
+      // 주급 예산은 실제 선수단 주급에 여유를 더해 잡는다
+      w.teams[def.id].wage = Math.round((teamWageTotal(w, def.id) * 1.15) / 100) * 100;
     }
-    // 팀 내 등번호·id 재정리
-    w.teams[def.id].squad = squad.map((p) => p.id);
-    w.teams[def.id].powerNow = teamPower(w, def.id);
-    // 주급 예산은 실제 선수단 주급에 여유를 더해 잡는다
-    w.teams[def.id].wage = Math.round((teamWageTotal(w, def.id) * 1.15) / 100) * 100;
   }
   buildCalendar(w);
   buildCupStage(w, 0);
   w.myLineup = autoLineup(w, teamId, w.teams[teamId].formation);
   w.market = buildMarket(w);
-  addNews(w, `${w.teams[teamId].name} 감독으로 취임했습니다. ${w.season}시즌 리그가 시작됩니다.`);
+  addNews(w, `${w.teams[teamId].name} 감독으로 취임했습니다. ${seasonLabel(w)}가 시작됩니다.`);
+  if (mode === 'kleague') {
+    addNews(w, `K리그 2026 — K1 12팀 · K2 17팀 · K3 14팀 · K4 13팀, 시즌 끝에 승격·강등이 결정됩니다.`);
+  }
   return w;
 }
 
 /* ─────────────────────────── 일정 ─────────────────────────── */
-function roundRobin(ids, rng) {
-  const arr = shuffle(rng, ids);
+/* 조 편성 방식(원형 로테이션). 홀수 팀이면 빈자리(부전승)를 넣어 한 팀씩 쉽니다.
+   times=2 더블 라운드 로빈, times=3 트리플(1부는 33라운드). */
+function roundRobin(ids, rng, times = 2) {
+  const base = shuffle(rng, ids);
+  const odd = base.length % 2 === 1;
+  const arr = odd ? [...base, null] : base.slice();
   const n = arr.length;
   const first = [];
   for (let r = 0; r < n - 1; r++) {
     const pairs = [];
     for (let i = 0; i < n / 2; i++) {
       const a = arr[i], b = arr[n - 1 - i];
+      if (a == null || b == null) continue; // 쉬는 팀
       pairs.push((r + i) % 2 === 0 ? { home: a, away: b } : { home: b, away: a });
     }
     first.push(pairs);
     arr.splice(1, 0, arr.pop());
   }
-  const second = first.map((pairs) => pairs.map((p) => ({ home: p.away, away: p.home })));
-  return [...first, ...second];
+  const rounds = [...first];
+  if (times >= 2) rounds.push(...first.map((pairs) => pairs.map((p) => ({ home: p.away, away: p.home }))));
+  if (times >= 3) rounds.push(...first.map((pairs) => pairs.map((p) => ({ home: p.home, away: p.away }))));
+  return rounds;
 }
 
-const CUP_SLOTS = [4, 9, 14, 20]; // 캘린더에서 컵 경기가 들어가는 순번
+const CUP_SLOTS = [4, 9, 14, 20]; // 커스텀 리그에서 컵 경기가 들어가는 순번
+
+/* 2026 K리그 — 디비전별 일정을 라운드 번호로 묶고, 그 사이에 코리아컵을 넣습니다. */
+const KL_CUP_STAGES = 6;
+function buildKLCalendar(w, rng) {
+  const legs = { 1: 3, 2: 2, 3: 2, 4: 2 };
+  const byDiv = new Map();
+  for (const d of w.divisions) {
+    const ids = divisionalTeams(w, d.id);
+    const rounds = roundRobin(ids, rng, legs[d.id] || 2);
+    byDiv.set(d.id, rounds.map((fx, i) => ({
+      type: 'league', div: d.id, leagueRound: i + 1, played: false,
+      fixtures: fx.map((f) => ({ home: f.home, away: f.away, played: false, hg: 0, ag: 0 })),
+    })));
+  }
+  const maxR = Math.max(...[...byDiv.values()].map((r) => r.length));
+  const cupAt = new Map();
+  for (let k = 0; k < KL_CUP_STAGES; k++) {
+    const at = Math.max(2, Math.round(3 + (k * (maxR - 6)) / (KL_CUP_STAGES - 1)));
+    cupAt.set(at, k);
+  }
+  const cal = [];
+  let no = 0;
+  for (let r = 1; r <= maxR; r++) {
+    const stage = cupAt.get(r);
+    if (stage != null) cal.push({ no: ++no, type: 'cup', stage, played: false, fixtures: [] });
+    for (const d of w.divisions) {
+      const rd = byDiv.get(d.id)[r - 1];
+      if (!rd) continue;
+      cal.push({ no: ++no, ...rd });
+    }
+  }
+  // 마지막 컵 단계가 비어 있으면 달력 끝에 붙입니다
+  for (let k = 0; k < KL_CUP_STAGES; k++) {
+    if (!cal.some((r) => r.type === 'cup' && r.stage === k)) cal.push({ no: ++no, type: 'cup', stage: k, played: false, fixtures: [] });
+  }
+  cal.sort((a, b) => a.no - b.no);
+  w.calendar = cal;
+  w.cup.stages = [];
+}
 
 export function buildCalendar(w) {
   const rng = makeRng(`cal-${w.seed}-${w.season}`);
+  if (isKL(w)) return buildKLCalendar(w, rng);
   const ids = Object.keys(w.teams);
   const rounds = roundRobin(ids, rng);
   const cal = [];
@@ -162,9 +288,18 @@ export function buildCalendar(w) {
 /* ─────────────────────────── 컵대회 ─────────────────────────── */
 export const CUP_NAMES = ['예선', '8강', '4강', '결승'];
 export const CUP_LABEL = ['컵 예선', '컵 8강', '컵 4강', '컵 결승'];
+/* K리그 모드 코리아컵 — K1~K4 56개 구단 전체가 참가하는 6단계 토너먼트 */
+export const KL_CUP_NAMES = ['1라운드', '32강', '16강', '8강', '4강', '결승'];
+export const KL_CUP_LABEL = ['코리아컵 1R', '코리아컵 32강', '코리아컵 16강', '코리아컵 8강', '코리아컵 4강', '코리아컵 결승'];
+export const cupNamesOf = (w) => (isKL(w) ? KL_CUP_NAMES : CUP_NAMES);
+export const cupLabelOf = (w, stage) => (isKL(w) ? KL_CUP_LABEL : CUP_LABEL)[stage] || '컵';
+export const cupStageCount = (w) => (isKL(w) ? KL_CUP_STAGES : CUP_NAMES.length);
+/* 시즌 표기 — K리그 모드는 실제 연도(2026)를 씁니다. */
+export const seasonLabel = (w) => (isKL(w) ? `${w.year || KL_SEASON} 시즌` : `${w.season}시즌`);
 
 export function buildCupStage(w, stage) {
   if (w.cup.stages[stage]) return;
+  if (isKL(w)) return buildKLCupStage(w, stage);
   const rng = makeRng(`cup-${w.seed}-${w.season}-${stage}`);
   const teams = Object.keys(w.teams);
   let entrants;
@@ -184,6 +319,31 @@ export function buildCupStage(w, stage) {
     matches.push({ home: order[i], away: order[i + 1], played: false, hg: 0, ag: 0, pens: null, winner: null });
   }
   w.cup.stages[stage] = { stage, name: CUP_NAMES[stage], matches };
+}
+
+/* K리그 모드 — 상위 8팀은 2라운드에 합류하고, 나머지 48팀이 1라운드를 치릅니다.
+   이후 단계는 이긴 팀끼리 계속 2의 거듭제곱으로 줄어 결승까지 갑니다. */
+function buildKLCupStage(w, stage) {
+  const rng = makeRng(`cup-${w.seed}-${w.season}-${stage}`);
+  const teams = Object.keys(w.teams);
+  let entrants;
+  if (stage === 0) {
+    const byPower = teams.slice().sort((a, b) => teamPower(w, b) - teamPower(w, a));
+    const byeN = teams.length % 2 === 0 ? Math.max(0, 64 - teams.length > 8 ? 8 : 64 - teams.length) : 8;
+    w.cup.byes = byPower.slice(0, byeN);
+    entrants = byPower.slice(byeN);
+  } else {
+    const prev = w.cup.stages[stage - 1];
+    const winners = prev.matches.map((m) => m.winner).filter(Boolean);
+    entrants = [...winners, ...(stage === 1 ? (w.cup.byes || []) : [])];
+  }
+  const order = shuffle(rng, entrants);
+  const matches = [];
+  for (let i = 0; i < order.length; i += 2) {
+    if (!order[i] || !order[i + 1]) continue;
+    matches.push({ home: order[i], away: order[i + 1], played: false, hg: 0, ag: 0, pens: null, winner: null });
+  }
+  w.cup.stages[stage] = { stage, name: KL_CUP_NAMES[stage], matches };
 }
 
 export function cupFixtures(w, stage) {
@@ -228,11 +388,15 @@ export function seasonOver(w) {
 }
 
 /* ─────────────────────────── 순위표 ─────────────────────────── */
-export function standings(w) {
+export function standingsFor(w, div) {
   const rows = {};
-  for (const id of Object.keys(w.teams)) rows[id] = { id, play: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, pts: 0, gd: 0, form: [] };
+  for (const id of Object.keys(w.teams)) {
+    if (div != null && (w.teams[id].div || 1) !== div) continue;
+    rows[id] = { id, play: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, pts: 0, gd: 0, form: [] };
+  }
   for (const r of w.calendar) {
     if (r.type !== 'league') continue;
+    if (div != null && r.div != null && r.div !== div) continue;
     for (const f of r.fixtures) {
       if (!f.played) continue;
       const H = rows[f.home], A = rows[f.away];
@@ -250,8 +414,15 @@ export function standings(w) {
   return list;
 }
 
+/* div 를 생략하면(K리그 모드) 내 팀의 디비전 순위를 돌려줍니다. */
+export function standings(w, div) {
+  const d = div != null ? div : (isKL(w) ? divOf(w, w.myTeamId) : null);
+  return standingsFor(w, d);
+}
+
 export function leagueRoundOf(w) {
-  const done = w.calendar.filter((r) => r.type === 'league' && r.played).length;
+  const div = isKL(w) ? divOf(w, w.myTeamId) : null;
+  const done = w.calendar.filter((r) => r.type === 'league' && r.played && (div == null || r.div === div)).length;
   return done + 1;
 }
 
@@ -328,6 +499,7 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
     const perf = [];
     for (const p of sq) {
       p.season.apps += 1;
+      p.season.starts = (p.season.starts || 0) + 1;
       let r = 6.2 + gauss(rng) * 0.42 + (p.ovr - 70) * 0.012;
       const g = picked.filter((x) => x.scorer?.id === p.id).length;
       const a = picked.filter((x) => x.assist?.id === p.id).length;
@@ -336,6 +508,7 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
       const rating = clamp(r, 4.2, 9.8);
       p.season.ratingSum += rating;
       p.season.ratingCount += 1;
+      p.recent = [...(p.recent || []), Math.round(rating * 10) / 10].slice(-5);
       perf.push({ pid: p.id, rating, goals: g, assists: a });
     }
     if (conceded === 0) {
@@ -343,18 +516,27 @@ export function simMatchQuick(w, homeId, awayId, opts = {}) {
       if (gk) gk.season.cleanSheets = (gk.season.cleanSheets || 0) + 1;
     }
     // 라운드마다 AI 선수도 실제 출전·평점만큼 성장합니다 (내 경기는 applyResult 가 처리)
-    growTeamFromMatch(w, teamId, perf, `${opts.stamp || 'q'}-${homeId}-${awayId}`);
+    if (opts.grow !== false) growTeamFromMatch(w, teamId, perf, `${opts.stamp || 'q'}-${homeId}-${awayId}`);
   }
   return { hg, ag, events };
 }
 
 /* 한 라운드의 나머지 경기 처리 */
+/* K리그 모드에서는 56개 구단 전체를 매 라운드 성장시키면 너무 무거워지므로,
+   내 디비전과 컵 경기만 선수 성장을 반영합니다. (다른 디비전은 결과·기록만 갱신) */
+function growHere(w, round) {
+  if (!isKL(w)) return true;
+  if (round.type === 'cup') return true;
+  return round.div == null || round.div === divOf(w, w.myTeamId);
+}
+
 export function playOtherFixtures(w, round, skipUser = true) {
+  const grow = growHere(w, round);
   if (round.type === 'league') {
     for (const f of round.fixtures) {
       if (f.played) continue;
       if (skipUser && (f.home === w.myTeamId || f.away === w.myTeamId)) continue;
-      const r = simMatchQuick(w, f.home, f.away, { stamp: `l${round.no}` });
+      const r = simMatchQuick(w, f.home, f.away, { stamp: `l${round.no}`, grow });
       f.played = true; f.hg = r.hg; f.ag = r.ag; f.events = r.events;
       pushRecent(w, f.home, r.hg > r.ag ? 'W' : r.hg < r.ag ? 'L' : 'D');
       pushRecent(w, f.away, r.ag > r.hg ? 'W' : r.ag < r.hg ? 'L' : 'D');
@@ -367,7 +549,7 @@ export function playOtherFixtures(w, round, skipUser = true) {
     for (const m of stage.matches) {
       if (m.played) continue;
       if (skipUser && (m.home === w.myTeamId || m.away === w.myTeamId)) continue;
-      const r = simMatchQuick(w, m.home, m.away, { stamp: `c${round.stage}` });
+      const r = simMatchQuick(w, m.home, m.away, { stamp: `c${round.stage}`, grow });
       let hg = r.hg, ag = r.ag;
       const draw = hg === ag;
       if (draw) hg += 1; // 연장 승부 (표시용)
@@ -376,7 +558,7 @@ export function playOtherFixtures(w, round, skipUser = true) {
     }
     round.played = stage.matches.every((m) => m.played);
     const next = round.stage + 1;
-    if (round.played && next < CUP_NAMES.length) buildCupStage(w, next);
+    if (round.played && next < cupStageCount(w)) buildCupStage(w, next);
     if (round.played) settleRound(w, round);
   }
 }
@@ -398,7 +580,7 @@ export function finishRound(w, round) {
     const stage = w.cup.stages[round.stage];
     if (stage) {
       round.played = stage.matches.every((m) => m.played);
-      if (round.played && round.stage + 1 < CUP_NAMES.length) buildCupStage(w, round.stage + 1);
+      if (round.played && round.stage + 1 < cupStageCount(w)) buildCupStage(w, round.stage + 1);
     }
   }
   if (round.played) settleRound(w, round);
@@ -553,7 +735,8 @@ export function setRole(w, slotIdx, role) {
 /* ─────────────────────────── 이적 시장 ─────────────────────────── */
 export function loanFee(p) { return Math.max(0.2, Math.round(valueOf(p) * 0.06 * 10) / 10); }
 
-function freeName(rng, used) {
+function freeName(rng, used, wide = false) {
+  if (wide) return randomName(rng, used);
   const pool = ['문태호', '류재성', '백승주', '허정욱', '남기훈', '심우재', '노현석', '하민철', '곽동현', '성지훈', '차우빈', '주태건'];
   const free = pool.filter((n) => !used.has(n));
   return free.length ? pick(rng, free) : `${pick(rng, pool)}${rint(rng, 2, 9)}`;
@@ -561,7 +744,9 @@ function freeName(rng, used) {
 
 function freeAgent(w, rng) {
   const used = new Set(Object.values(w.players).map((p) => p.name));
-  const ovr = rint(rng, 62, 78);
+  // K리그 모드는 1~4부가 섞여 있어 자유계약 선수의 수준도 넓게 퍼집니다.
+  const myPower = teamPower(w, w.myTeamId);
+  const ovr = isKL(w) ? clamp(Math.round(myPower + gauss(rng) * 6 - 2), 35, 80) : rint(rng, 62, 78);
   const pos = pick(rng, ['DF', 'MF', 'FW', 'GK']);
   const stats = {};
   for (const k of STAT_KEYS) stats[k] = clamp(Math.round(ovr - 8 + gauss(rng) * 6 + (k === 'gk' && pos !== 'GK' ? -45 : 0)), 25, 95);
@@ -569,7 +754,7 @@ function freeAgent(w, rng) {
     id: `p${w.pidSeq++}`, name: '', pos, age: rint(rng, 19, 34), num: 0, stats, teamId: null,
     form: 0, season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [],
   };
-  p.name = freeName(rng, used);
+  p.name = freeName(rng, used, isKL(w));
   p.ovr = overall(p);
   p.pot = clamp(p.ovr + rint(rng, 0, p.age < 24 ? 12 : 3), p.ovr, 95);
   p.value = valueOf(p);
@@ -582,9 +767,47 @@ function listing(w, p, rng) {
   return { pid: p.id, from: p.teamId, price: Math.round(valueOf(p) * (1.05 + rng() * 0.5) * 10) / 10 };
 }
 
+/* K리그 모드 이적 시장 — 내 디비전과 위·아래 디비전에서 골고루 매물이 나옵니다.
+   위 디비전 선수는 더 비싸고, 아래 디비전 선수는 싸게 노려볼 수 있습니다. */
+function buildKLMarket(w, rng, out) {
+  const myDiv = divOf(w, w.myTeamId);
+  const chosen = new Set();
+  const pickFrom = (div, n) => {
+    const clubs = Object.values(w.teams).filter((t) => t.id !== w.myTeamId && t.div === div && t.squad.length > 17);
+    for (let i = 0; i < n && clubs.length; i++) {
+      const club = pick(rng, clubs);
+      const pool = squadOf(w, club.id).filter((p) => !chosen.has(p.id)).sort((a, b) => b.ovr - a.ovr).slice(2);
+      if (!pool.length) continue;
+      const p = pick(rng, pool);
+      chosen.add(p.id);
+      out.push(listing(w, p, rng));
+    }
+  };
+  pickFrom(myDiv, 4);
+  if (myDiv > 1) pickFrom(myDiv - 1, 2);
+  if (myDiv < 4) pickFrom(myDiv + 1, 2);
+  // 임대 매물 2명 — 출전 시간이 필요한 젊은 백업 (같은 디비전·아래 디비전)
+  const loanPool = [];
+  for (const t of Object.values(w.teams)) {
+    if (t.id === w.myTeamId || t.div < myDiv - 1) continue;
+    const sq = squadOf(w, t.id).filter((p) => p.age <= 25 && !chosen.has(p.id)).sort((a, b) => a.ovr - b.ovr);
+    for (const p of sq.slice(0, 2)) loanPool.push(p);
+  }
+  for (const p of shuffle(rng, loanPool).slice(0, 2)) {
+    chosen.add(p.id);
+    out.push({ pid: p.id, from: p.teamId, price: 0, loan: true, fee: loanFee(p) });
+  }
+  for (let i = 0; i < 3; i++) {
+    const p = freeAgent(w, rng);
+    out.push({ pid: p.id, from: null, price: 0 });
+  }
+  return shuffle(rng, out);
+}
+
 export function buildMarket(w) {
   const rng = makeRng(`market-${w.seed}-${w.season}`);
   const out = [];
+  if (isKL(w)) return buildKLMarket(w, rng, out);
   for (const t of Object.values(w.teams)) {
     if (t.id === w.myTeamId) continue;
     const sq = squadOf(w, t.id).slice().sort((a, b) => b.ovr - a.ovr);
@@ -1201,38 +1424,146 @@ export function settleRound(w, round) {
 }
 
 /* ─────────────────────────── 시즌 종료·다음 시즌 ─────────────────────────── */
+/* 시즌 마지막에 남은 경기를 모두 치릅니다 (내 경기가 남아 있으면 거기서 멈춤). */
+export function completeSeason(w) {
+  let guard = 0;
+  let changed = true;
+  while (changed && guard < 400) {
+    changed = false;
+    for (const r of w.calendar) {
+      if (r.played) continue;
+      if (r.type === 'cup' && !w.cup.stages[r.stage]) {
+        if (r.stage > 0 && !w.cup.stages[r.stage - 1]) continue;
+        buildCupStage(w, r.stage);
+        changed = true;
+      }
+      if (r.type === 'cup' && !w.cup.stages[r.stage]) continue;
+      const fx = r.type === 'league' ? r.fixtures : w.cup.stages[r.stage].matches;
+      if (fx.some((f) => !f.played && (f.home === w.myTeamId || f.away === w.myTeamId))) continue;
+      playOtherFixtures(w, r, true);
+      finishRound(w, r);
+      changed = true;
+    }
+    guard += 1;
+  }
+  return w;
+}
+
 export function seasonSummary(w) {
+  if (isKL(w) && !userNextMatch(w)) completeSeason(w);
   const table = standings(w);
   const myRank = table.findIndex((r) => r.id === w.myTeamId) + 1;
-  const cup = w.cup.stages.map((s) => ({ name: s.name, matches: s.matches }));
-  const final = w.cup.stages[CUP_NAMES.length - 1];
+  const final = w.cup.stages[cupStageCount(w) - 1];
   const cupWinner = final?.matches?.[0]?.winner ?? null;
   const cupOut = (() => {
     if (cupWinner === w.myTeamId) return '우승';
     for (let s = w.cup.stages.length - 1; s >= 0; s--) {
       const st = w.cup.stages[s];
+      if (!st) continue;
       const mine = st.matches.find((m) => m.home === w.myTeamId || m.away === w.myTeamId);
       if (mine) return `${st.name} 탈락`;
     }
     return '참가';
   })();
-  return { table, myRank, cupWinner, cupOut, champion: table[0]?.id };
+  const divs = isKL(w)
+    ? divisionsOf(w).map((d) => ({ ...d, table: standingsFor(w, d.id) }))
+    : [];
+  return {
+    table, myRank, cupWinner, cupOut, champion: table[0]?.id,
+    divs, myDiv: isKL(w) ? divOf(w, w.myTeamId) : 1,
+    moves: isKL(w) ? (w.lastMoves || promotionPlan(w)) : [],
+  };
+}
+
+/* ── 승강제 ──────────────────────────────────────────────────────
+   경계마다 두 자리가 오갑니다. ① 꼴찌 ↔ 1위 맞교대 ② 각각 2번째끼리
+   단판 승강 플레이오프(상위 리그 팀 홈 이점) — 이기면 상위, 지면 하위.
+   한 팀이 올라가면 한 팀이 내려오므로 디비전 팀 수는 그대로 유지됩니다. */
+export function promotionPlan(w) {
+  const plan = [];
+  const rng = makeRng(`promo-${w.seed}-${w.season}`);
+  for (const [upper, lower] of [[1, 2], [2, 3], [3, 4]]) {
+    const hi = standingsFor(w, upper);
+    const lo = standingsFor(w, lower);
+    if (hi.length < 2 || lo.length < 2) continue;
+    const down = hi[hi.length - 1];
+    const up = lo[0];
+    plan.push({ kind: 'direct', up: up.id, down: down.id, upDiv: upper, loDiv: lower, upName: w.teams[up.id].name, downName: w.teams[down.id].name });
+    const a = hi[hi.length - 2];
+    const b = lo[1];
+    const sa = teamPower(w, a.id) + 3.5; // 상위 리그 홈 이점
+    const sb = teamPower(w, b.id);
+    const pw = 1 / (1 + Math.pow(10, (sb - sa) / 11));
+    const upperWins = rng() < pw;
+    plan.push({
+      kind: 'playoff', upper: a.id, lower: b.id, upDiv: upper, loDiv: lower,
+      winner: upperWins ? a.id : b.id, loser: upperWins ? b.id : a.id,
+      score: upperWins ? '2-1' : '1-2', prob: pw,
+    });
+  }
+  return plan;
+}
+
+function refreshEconomy(w, teamId) {
+  const t = w.teams[teamId];
+  const econ = divisionEcon(t.div);
+  const valueSum = squadOf(w, teamId).reduce((a, p) => a + p.value, 0);
+  const base = Math.round((valueSum * econ.budget) / 10) * 10;
+  t.budget = Math.max(Math.round(t.budget * 10) / 10, Math.round(base * 0.55));
+  t.wage = Math.max(t.wage, Math.round((teamWageTotal(w, teamId) * econ.wage) / 100) * 100);
+  t.sponsor = Math.round(econ.sponsor * (0.8 + (t.power || 60) / 200));
+  t.pull = 5 - t.div;
+}
+
+export function applyPromotion(w) {
+  const plan = promotionPlan(w);
+  w.lastMoves = plan;
+  for (const m of plan) {
+    const pairs = m.kind === 'direct'
+      ? [[m.up, m.upDiv], [m.down, m.loDiv]]
+      : [[m.winner, m.upDiv], [m.loser, m.loDiv]];
+    for (const [teamId, div] of pairs) {
+      const t = w.teams[teamId];
+      if (!t || t.div === div) continue;
+      const up = div < t.div;
+      const before = t.div;
+      t.div = div;
+      refreshEconomy(w, teamId);
+      addNews(w, `${t.name} — ${divName(w, before)} → ${divName(w, div)} ${up ? '승격' : '강등'}`);
+    }
+  }
+  return plan;
+}
+
+export function divName(w, div) {
+  const d = (w.divisions || KL_DIVISIONS).find((x) => x.id === div);
+  return d ? d.name : `${div}부`;
 }
 
 const PRIZE = [62, 48, 38, 30, 24, 19, 15, 12, 10, 8];
 
+function prizeFor(w, div, rank, count) {
+  if (!isKL(w)) return PRIZE[rank - 1] || 6;
+  const base = { 1: 62, 2: 24, 3: 9, 4: 3.5 }[div] || 3;
+  const frac = count > 1 ? (rank - 1) / (count - 1) : 0;
+  return Math.round(base * (1 - frac * 0.72) * 10) / 10;
+}
+
 export function advanceSeason(w) {
   const s = seasonSummary(w);
   const myRow = s.table.find((r) => r.id === w.myTeamId);
-  const myPrize = PRIZE[(myRow?.rank ?? 10) - 1] || 6;
-  const cupPrize = s.cupWinner === w.myTeamId ? 24 : 0;
+  const myDiv = isKL(w) ? divOf(w, w.myTeamId) : 1;
+  const myPrize = prizeFor(w, myDiv, myRow?.rank ?? s.table.length, s.table.length);
+  const cupPrize = s.cupWinner === w.myTeamId ? (isKL(w) ? 40 : 24) : 0;
   const my = myTeam(w);
-  my.budget = Math.round((my.budget + myPrize + cupPrize) * 10) / 10;
+  const sponsor = isKL(w) ? (my.sponsor || 0) : 0;
+  my.budget = Math.round((my.budget + myPrize + cupPrize + sponsor) * 10) / 10;
   // 임대 선수는 원소속으로 돌려보낸 뒤 나이·성장 정산을 합니다.
   const loansBack = returnLoans(w);
   w.history.push({
-    season: w.season, rank: s.myRank, pts: myRow?.pts ?? 0, gf: myRow?.gf ?? 0, ga: myRow?.ga ?? 0,
-    champion: s.champion, cupWinner: s.cupWinner, cupOut: s.cupOut, prize: myPrize + cupPrize,
+    season: w.season, year: isKL(w) ? w.year : null, div: isKL(w) ? myDiv : null,
+    rank: s.myRank, pts: myRow?.pts ?? 0, gf: myRow?.gf ?? 0, ga: myRow?.ga ?? 0,
+    champion: s.champion, cupWinner: s.cupWinner, cupOut: s.cupOut, prize: myPrize + cupPrize + sponsor,
   });
   const growth = [];
   for (const p of Object.values(w.players)) {
@@ -1271,10 +1602,12 @@ export function advanceSeason(w) {
     while (t.squad.length < 20) {
       const rng = makeRng(`youth-${w.seed}-${w.season}-${t.id}-${t.squad.length}`);
       const pos = pick(rng, ['DF', 'MF', 'FW', 'GK']);
-      const ovr = rint(rng, 55, 68);
+      const ovr = isKL(w)
+        ? clamp(teamPower(w, t.id) - 10 + Math.round(gauss(rng) * 4), 30, 70)
+        : rint(rng, 55, 68);
       const stats = {};
       for (const k of STAT_KEYS) stats[k] = clamp(Math.round(ovr - 6 + gauss(rng) * 6 + (k === 'gk' && pos !== 'GK' ? -45 : 0)), 25, 95);
-      const p = { id: `p${w.pidSeq++}`, name: freeName(rng, new Set(Object.values(w.players).map((x) => x.name))), pos, age: rint(rng, 18, 19), num: 0, stats, teamId: t.id, form: 0, season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [] };
+      const p = { id: `p${w.pidSeq++}`, name: freeName(rng, new Set(Object.values(w.players).map((x) => x.name)), isKL(w)), pos, age: rint(rng, 18, 19), num: 0, stats, teamId: t.id, form: 0, season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [] };
       p.ovr = overall(p); p.pot = clamp(p.ovr + rint(rng, 8, 20), p.ovr, 95);
       p.value = valueOf(p); p.wage = wageOf(p);
       w.players[p.id] = p;
@@ -1287,7 +1620,9 @@ export function advanceSeason(w) {
     t.wage = Math.max(t.wage, Math.round((teamWageTotal(w, t.id) * 1.15) / 100) * 100);
   }
   const keepTactic = { ...w.myLineup.tactic };
+  const promo = isKL(w) ? applyPromotion(w) : [];
   w.season += 1;
+  if (isKL(w)) w.year = (w.year || KL_SEASON) + 1;
   w.cup = { stages: [] };
   buildCalendar(w);
   buildCupStage(w, 0);
@@ -1304,8 +1639,8 @@ export function advanceSeason(w) {
   w.offerSeq = 1;
   w.loans = [];
   w.lastGrowth = null;
-  addNews(w, `${w.season}시즌 개막. 이적 시장이 열렸습니다.`);
-  return { summary: s, prize: myPrize + cupPrize, cupPrize, growth: growth.sort((a, b) => (b.to - b.from) - (a.to - a.from)).slice(0, 8), retired, loansBack };
+  addNews(w, `${seasonLabel(w)} 개꾸. 이적 시장이 열렸습니다.`);
+  return { summary: s, prize: myPrize + cupPrize + sponsor, cupPrize, sponsor, promo, growth: growth.sort((a, b) => (b.to - b.from) - (a.to - a.from)).slice(0, 8), retired, loansBack };
 }
 
 export function addNews(w, text) {
@@ -1321,6 +1656,13 @@ export function loadWorld() {
   const w = local.get(SAVE_KEY, null);
   if (!w || w.version !== SAVE_VERSION) return null;
   if (!w.myTeamId || !w.teams?.[w.myTeamId]) return null;
+  // 모드·디비전 정보가 없는 세이브 = 기존 커스텀 리그 세이브 (그대로 이어집니다)
+  if (!w.mode) w.mode = 'custom';
+  if (isKL(w)) {
+    if (!Array.isArray(w.divisions)) w.divisions = KL_DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short, rounds: d.rounds }));
+    if (!Number.isFinite(w.year)) w.year = KL_SEASON;
+    for (const t of Object.values(w.teams)) if (!t.div) t.div = KL_BY_ID[t.id]?.div || 1;
+  }
   // 구버전 필드 보정
   for (const t of Object.values(w.teams)) if (!t.recent) t.recent = [];
   for (const p of Object.values(w.players)) if (!p.season) p.season = freshSeasonStats();

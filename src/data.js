@@ -175,6 +175,8 @@ const uniqueName = (rng, used) => {
   }
   return pick(rng, SURNAMES) + pick(rng, GIVEN) + (used.size % 9);
 };
+/* 다른 모듈(세계 생성·시즌 유스)이 같은 이름 규칙을 쓰도록 열어 둡니다. */
+export const randomName = (rng, used) => uniqueName(rng, used);
 
 /* ─────────────────────────── 능력치 ─────────────────────────── */
 export const STAT_KEYS = ['spd', 'sho', 'pas', 'dri', 'def', 'vis', 'sta', 'gk'];
@@ -207,7 +209,7 @@ export function wageOf(p) {
   return Math.round((valueOf(p) * 16 + Math.pow(Math.max(o - 45, 1), 1.55) * 1.6) / 10) * 10;
 }
 
-function genStats(rng, pos, target) {
+export function genStats(rng, pos, target) {
   const st = {};
   for (const k of STAT_KEYS) {
     const emphasis = WEIGHTS[pos][k] ?? 0.02;
@@ -217,6 +219,23 @@ function genStats(rng, pos, target) {
     st[k] = Math.round(clamp(v, 25, 99));
   }
   return st;
+}
+
+/* 목표 종합에 맞춘 능력치 — 포지션 강조 항목을 키우되, 종합이 target 이 되도록
+   가중 능력치를 한꺼번에 보정합니다. (실제 선수 데이터를 그대로 싣기 위해) */
+export function statsFor(rng, pos, target, age = 25) {
+  const stats = genStats(rng, pos, target);
+  const w = WEIGHTS[pos] || WEIGHTS.MF;
+  for (let i = 0; i < 6; i++) {
+    const o = overall({ pos, age, stats });
+    const diff = Math.round(target - o);
+    if (!diff) break;
+    for (const k of STAT_KEYS) {
+      if ((w[k] || 0) <= 0.02) continue;
+      stats[k] = clamp(stats[k] + diff, 25, 99);
+    }
+  }
+  return stats;
 }
 
 let PID = 0;
@@ -264,5 +283,5 @@ export function buildSquad(rng, team, usedNames) {
 }
 
 export function freshSeasonStats() {
-  return { apps: 0, goals: 0, assists: 0, shots: 0, onTarget: 0, saves: 0, tackles: 0, ratingSum: 0, ratingCount: 0, cleanSheets: 0, yellow: 0, red: 0 };
+  return { apps: 0, starts: 0, subs: 0, goals: 0, assists: 0, shots: 0, onTarget: 0, saves: 0, tackles: 0, ratingSum: 0, ratingCount: 0, cleanSheets: 0, yellow: 0, red: 0 };
 }

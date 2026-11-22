@@ -20,11 +20,12 @@
 //   24) 가격 협상·FA·시즌 임대(임대 종료 반환)
 //   25) 4단계 필드가 없는 구버전 세이브 호환
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam } from '../src/world.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
-import { FORMATIONS, overall, valueOf } from '../src/data.js';
+import { FORMATIONS, overall, valueOf, TEAM_DEFS } from '../src/data.js';
+import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
 import { roleFor, resolveRoles, defaultRole, rolesForLabel, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf, SET_PIECES, resolveSetPiece, setPieceLabel } from '../src/tactics.js';
-import { boardPos } from '../src/views.js';
+import { boardPos, renderSeason, renderHub, renderSelect, renderModal } from '../src/views.js';
 import { staminaColor, STAMINA_COLORS } from '../src/matchview.js';
 import { scoutReport, threatOf } from '../src/scout.js';
 
@@ -1704,6 +1705,146 @@ console.log('\n[26] 포지셔닝 — 공격 지원 · 수비 블록 · 몰림');
   ok(lineGap >= 8, '수비 라인과 2선 사이에 간격이 있습니다(두 줄 블록)', `간격 ${lineGap.toFixed(1)}u`);
   ok(crowd < 45, '한 구역(24x18u)에 10명 이상 몰리는 시간이 절반 아래입니다', `전체 틱의 ${crowd.toFixed(1)}% (개선 전 44%)`);
   ok(crowd6 < 45, '좁은 구역(15x11u)에 6명 이상 몰리지 않습니다', `${crowd6.toFixed(1)}%`);
+}
+
+/* ── 27. K리그 2026 모드 — 실제 56개 구단 · K4→K1 승강제 · 코리아컵 ── */
+console.log('\n[27] K리그 2026 모드 — 실제 구단·선수, 4부 승강제, 코리아컵');
+{
+  const kl = createWorld('geumsan', 20261201, { mode: 'kleague' });
+  const app = { world: kl, savedGame: null, defs: Object.fromEntries([...TEAM_DEFS.map((t) => [t.id, t]), ...KL_TEAMS.map((t) => [t.id, t])]), state: { tab: 'records', pickMode: 'kleague', pickDiv: 4, divTab: 4, posFilter: 'ALL', sortKey: 'ovr', sortDir: -1, marketDiv: 0, seasonPhase: 'preview', seasonResult: null } };
+  ok(kl.mode === 'kleague' && kl.year === 2026, 'K리그 모드로 2026 시즌이 열립니다', `mode=${kl.mode} year=${kl.year}`);
+  ok(Object.keys(kl.teams).length === 56, '56개 구단이 들어 있습니다', `${Object.keys(kl.teams).length}팀`);
+  const divs = divisionsOf(kl).map((d) => d.teams.length);
+  ok(divs.join(',') === '12,17,14,13', 'K1 12 · K2 17 · K3 14 · K4 13 로 나뉩니다', divs.join(' / '));
+
+  // 실제 선수 데이터 — 한글 이름·등번호·나이·포지션
+  const geum = squadOf(kl, 'geumsan');
+  ok(geum.length === 20 && geum.every((p) => p.name && p.num > 0 && p.age >= 16 && ['GK', 'DF', 'MF', 'FW'].includes(p.pos)),
+    '금산 인삼 FC 20명이 이름·등번호·나이·포지션을 갖습니다', geum.slice(0, 3).map((p) => `${p.num} ${p.name} ${p.pos} ${p.age}`).join(' / '));
+  const seoulSquad = squadOf(kl, 'seoul');
+  const seoulReal = new Set((KL_ROSTERS.seoul || []).map(([name]) => name));
+  ok(seoulSquad.length === 20 && seoulSquad.every((p) => seoulReal.has(p.name)), 'FC 서울 선수 20명이 실제 2026 명단에서 그대로 들어옵니다', seoulSquad.slice(0, 4).map((p) => p.name).join(', '));
+  ok(seoulSquad.some((p) => p.name === '야잔' || p.name === '바베츠'), '외국인 선수 이름도 실제 명단 그대로입니다');
+  const dupNum = squadOf(kl, 'seoul').map((p) => p.num).filter((n, i, a) => a.indexOf(n) !== i);
+  ok(dupNum.length === 0, '한 구단 안에서 등번호가 겹치지 않습니다');
+
+  // 디비전 격차
+  const avgOvr = (id) => { const s = squadOf(kl, id); return Math.round(s.reduce((a, p) => a + p.ovr, 0) / s.length); };
+  const k1 = Math.round(divisionsOf(kl)[0].teams.reduce((a, id) => a + avgOvr(id), 0) / 12);
+  const k4 = Math.round(divisionsOf(kl)[3].teams.reduce((a, id) => a + avgOvr(id), 0) / 13);
+  ok(k1 - k4 >= 18 && k1 >= 68 && k4 <= 52, '리그 티어만큼 전력 격차가 있습니다', `K1 평균 ${k1} · K4 평균 ${k4}`);
+
+  // 경기 수 — K4 24경기, K3 26, K2 32, K1 33
+  const gamesOf = (div) => {
+    const counts = {};
+    for (const r of kl.calendar) {
+      if (r.type !== 'league' || r.div !== div) continue;
+      for (const f of r.fixtures) { counts[f.home] = (counts[f.home] || 0) + 1; counts[f.away] = (counts[f.away] || 0) + 1; }
+    }
+    const vals = [...new Set(Object.values(counts))];
+    return vals.length === 1 ? vals[0] : vals.join('/');
+  };
+  ok(gamesOf(4) === 24 && gamesOf(3) === 26 && gamesOf(2) === 32 && gamesOf(1) === 33,
+    '디비전별 더블 라운드 로빈(1부는 33라운드) 일정이 짜집니다', `K1 ${gamesOf(1)} · K2 ${gamesOf(2)} · K3 ${gamesOf(3)} · K4 ${gamesOf(4)}경기`);
+  const cross = kl.calendar.filter((r) => r.type === 'league' && r.fixtures.some((f) => kl.teams[f.home].div !== r.div || kl.teams[f.away].div !== r.div));
+  ok(cross.length === 0, '다른 디비전 팀끼리 리그 경기를 치르지 않습니다');
+
+  // 순위표 — 디비전별
+  ok(standingsFor(kl, 4).length === 13 && standingsFor(kl, 1).length === 12, '디비전별 순위표를 따로 볼 수 있습니다',
+    `K1 ${standingsFor(kl, 1).length} · K4 ${standingsFor(kl, 4).length}`);
+  ok(standings(kl).length === 13 && standings(kl).every((r) => kl.teams[r.id].div === 4), '기본 순위표는 내 디비전(K4)입니다');
+
+  // 코리아컵 — 56팀 6단계
+  ok(cupStageCount(kl) === 6, '코리아컵은 6단계입니다');
+  ok(kl.cup.stages[0].matches.length === 24 && (kl.cup.byes || []).length === 8, '1라운드는 48팀(24경기), 상위 8팀은 32강부터 합류합니다',
+    `${kl.cup.stages[0].matches.length}경기 · 부전승 ${(kl.cup.byes || []).length}`);
+  const cupTeams = new Set();
+  for (const s of kl.cup.stages) for (const m of s.matches) { cupTeams.add(m.home); cupTeams.add(m.away); }
+  ok(cupTeams.size + (kl.cup.byes || []).length >= 56, 'K1~K4 전체 구단이 컵대회에 참가합니다', `${cupTeams.size + (kl.cup.byes || []).length}팀`);
+
+  // 내 경기를 3라운드 치르고 선수 상세 기록이 쌓이는지
+  const played = playUserRounds(kl, 3);
+  const some = squadOf(kl, 'geumsan').filter((p) => p.season.apps > 0);
+  ok(played === 3 && some.length >= 11 && some.length <= 14, '내 경기가 실제로 진행되고 11명 이상 출전 기록이 남습니다', `${played}경기 · ${some.length}명`);
+  ok(some.every((p) => p.season.starts >= 1) && some.every((p) => Array.isArray(p.recent) && p.recent.length > 0),
+    '선발 출전 수와 최근 평점이 선수별로 기록됩니다', some.slice(0, 3).map((p) => `${p.name} 선발${p.season.starts} 최근${p.recent.join(',')}`).join(' / '));
+  ok(some.some((p) => Number.isFinite(p.season.ratingSum / Math.max(1, p.season.ratingCount))), '평균 평점을 계산할 수 있습니다');
+
+  // 세이브/로드 — 56개 구단 전체 저장
+  const raw = JSON.stringify(kl);
+  ok(raw.length < 2 * 1024 * 1024, '56개 구단 전체 세이브가 2MB 안에 들어갑니다', `${(raw.length / 1024).toFixed(0)}KB`);
+  const bak = globalThis.localStorage;
+  globalThis.localStorage = {
+    s: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this.s, k) ? this.s[k] : null; },
+    setItem(k, v) { this.s[k] = String(v); },
+    removeItem(k) { delete this.s[k]; },
+    key(i) { return Object.keys(this.s)[i] ?? null; },
+    get length() { return Object.keys(this.s).length; },
+  };
+  saveWorld(kl);
+  const back = loadWorld();
+  ok(!!back && back.mode === 'kleague' && Object.keys(back.teams).length === 56 && back.divisions.length === 4,
+    'K리그 세이브를 그대로 다시 엽니다', back ? `${Object.keys(back.teams).length}팀 · ${back.divisions.map((d) => d.teams).length}부` : '실패');
+  ok(!!back && squadOf(back, 'geumsan').every((p) => p.name && p.num > 0), '불러온 뒤에도 선수 명단이 그대로입니다');
+  globalThis.localStorage = bak;
+
+  // 시즌 결산 · 승격/강등
+  const beforeDiv = Object.fromEntries(Object.entries(kl.teams).map(([id, t]) => [id, t.div]));
+  completeSeason(kl);
+  const s = seasonSummary(kl);
+  ok(s.table.length === 13 && s.divs.length === 4, '시즌 결산에 내 디비전 순위와 4개 디비전이 모두 나옵니다');
+  ok(s.moves.filter((m) => m.kind === 'direct').length === 3 && s.moves.filter((m) => m.kind === 'playoff').length === 3,
+    '세 경계에서 맞교대 3건 + 승강 플레이오프 3건이 잡힙니다');
+  const plan = promotionPlan(kl);
+  const counts0 = divisionsOf(kl).map((d) => d.teams.length).join(',');
+  applyPromotion(kl);
+  const counts1 = divisionsOf(kl).map((d) => d.teams.length).join(',');
+  ok(counts1 === counts0, '승격·강등 뒤에도 디비전 팀 수가 유지됩니다', `${counts0} → ${counts1}`);
+  const moved = Object.values(kl.teams).filter((t) => t.div !== beforeDiv[t.id]).length;
+  const directOk = plan.filter((m) => m.kind === 'direct').every((m) => kl.teams[m.up].div === m.upDiv && kl.teams[m.down].div === m.loDiv);
+  ok(directOk && moved >= 4, '맞교대 구단이 실제로 디비전을 옮겼습니다', `${moved}팀 이동`);
+  ok(plan.some((m) => m.kind === 'playoff' && m.winner && m.loser), '승강 플레이오프 승자가 정해집니다',
+    plan.filter((m) => m.kind === 'playoff').map((m) => `${kl.teams[m.upper].short} vs ${kl.teams[m.lower].short}`).join(', '));
+
+  // 1부 꼴찌는 2부로 내려갑니다
+  const kl2 = createWorld('gwangju', 20261202, { mode: 'kleague' });
+  completeSeason(kl2);
+  const k1Table = standingsFor(kl2, 1);
+  const bottom = k1Table[k1Table.length - 1].id;
+  const bottomName = kl2.teams[bottom].name;
+  applyPromotion(kl2);
+  ok(kl2.teams[bottom].div === 2, '1부 꼴찌 구단이 2부로 강등됩니다', bottomName);
+  const promoted = Object.keys(kl2.teams).filter((id) => kl2.teams[id].div === 1 && Object.values(kl2.teams).find((t) => t.id === id));
+  ok(promoted.length === 12, '1부는 그대로 12팀입니다', `${promoted.length}팀`);
+
+  // 다음 시즌 — 새 일정, 이전 이동 반영
+  const r = advanceSeason(kl);
+  ok(kl.year === 2027 && kl.calendar.length > 100, '다음 시즌(2027) 일정이 새로 짜집니다', `year=${kl.year} · ${kl.calendar.length}매치데이`);
+  ok(r.promo.length === 6, '시즌 결산에 승격·강등 6건이 실립니다');
+  const myDiv2 = divOf(kl, 'geumsan');
+  ok([1, 2, 3, 4].includes(myDiv2), '내 팀도 새 디비전에서 시작합니다', `${kl.teams.geumsan.name} → ${myDiv2}부`);
+  ok(squadOf(kl, 'geumsan').length >= 20, '새 시즌에도 선수단이 20명 이상 유지됩니다', `${squadOf(kl, 'geumsan').length}명`);
+
+  // 화면 렌더 — 시즌 결산·허브·선수 상세가 K리그 데이터로도 그려지는지 (렌더 예외 0)
+  app.state.seasonResult = { ...r, season: r.summary ? kl.season - 1 : kl.season };
+  app.state.seasonPhase = 'done';
+  let html = '';
+  try { html = renderSeason(app); } catch (e) { html = 'ERR ' + e.message; }
+  ok(html.includes('승격') || html.includes('강등'), '시즌 결산 화면에 승격·강등 결과가 그려집니다', html.startsWith('ERR') ? html : `${html.length}자`);
+  let hub = '';
+  try { hub = renderHub(app); } catch (e) { hub = 'ERR ' + e.message; }
+  ok(hub.includes('K4리그') || hub.includes('K3리그') || hub.includes('K2리그') || hub.includes('K리그1'), '허브 화면이 새 디비전으로 그려집니다', hub.startsWith('ERR') ? hub : `${hub.length}자`);
+  let sel = '';
+  try { sel = renderSelect({ ...app, world: null, savedGame: null }); } catch (e) { sel = 'ERR ' + e.message; }
+  ok(sel.includes('K리그 2026') && sel.includes('금산 인삼 FC'), '구단 선택 화면에 K리그 2026 과 금산 인삼 FC 가 나옵니다', sel.startsWith('ERR') ? sel : `${sel.length}자`);
+  const anyPid = squadOf(kl, 'seoul')[0].id;
+  let pm = '';
+  try { pm = renderModal({ ...app, state: { ...app.state, modal: { kind: 'player', pid: anyPid, team: 'seoul', back: 'club' } } }); } catch (e) { pm = 'ERR ' + e.message; }
+  ok(pm.includes('stats8') && pm.includes('최근 평점'), '선수 상세 모달에 8개 능력치와 최근 평점이 그려집니다', pm.startsWith('ERR') ? pm : `${pm.length}자`);
+  let cm = '';
+  try { cm = renderModal({ ...app, state: { ...app.state, modal: { kind: 'club', team: 'jinju' } } }); } catch (e) { cm = 'ERR ' + e.message; }
+  ok(cm.includes('club-squad') && /jinju|진주/.test(cm), '구단 모달에 선수단 표가 그려집니다', cm.startsWith('ERR') ? cm : `${cm.length}자`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

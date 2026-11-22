@@ -1,5 +1,6 @@
 // 앱 셸 — 상태·화면 전환·감독 조작
 import { TEAM_DEFS, FORMATIONS } from './data.js';
+import { KL_TEAMS, KL_BY_ID } from './kleague2026.js';
 import * as W from './world.js';
 import { local } from './store.js';
 import { renderSelect, renderHub, renderSeason, renderModal, applyTeamColors } from './views.js';
@@ -9,11 +10,15 @@ import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect, setPiece
 
 const defs = {};
 for (const t of TEAM_DEFS) defs[t.id] = t;
+for (const t of KL_TEAMS) defs[t.id] = t;
 
 const state = {
   world: null, savedGame: null, view: 'select', tab: 'schedule',
   selSlot: 0, selPid: null, selBench: null, modal: null, roleSlot: null,
   seasonResult: null, seasonPhase: 'preview', pending: null,
+  // 구단 선택 · 디비전 탭 · 선수단 필터
+  pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
+  posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
 };
 
 const api = {
@@ -35,7 +40,12 @@ export function init() {
   const theme = local.get('theme', 'day');
   document.documentElement.setAttribute('data-theme', theme === 'night' ? 'night' : 'day');
   state.savedGame = W.loadWorld();
+  if (state.savedGame && W.isKL(state.savedGame)) {
+    state.pickMode = 'kleague';
+    state.pickDiv = W.divOf(state.savedGame, state.savedGame.myTeamId) || 1;
+  }
   document.addEventListener('click', onClick);
+  document.addEventListener('input', onFilterInput);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.modal) { state.modal = null; render(); }
   });
@@ -66,7 +76,7 @@ function render() {
     const modal = renderModal(api);
     if (modal) root.insertAdjacentHTML('beforeend', modal);
   }
-  applyTeamColors(root, state.world);
+  applyTeamColors(root, state.world || { teams: defs });
   updateHeader();
   if (state.view !== 'match') window.scrollTo(0, Math.min(y, root.scrollHeight));
 }
@@ -78,7 +88,7 @@ function updateHeader() {
   if (state.world) {
     const t = W.myTeam(state.world);
     nameEl.textContent = t.name;
-    subEl.textContent = `GOODWAY APPS · FOOTBALL MANAGER · ${state.world.season}시즌`;
+    subEl.textContent = `GOODWAY APPS · FOOTBALL MANAGER · ${W.seasonLabel(state.world)}${W.isKL(state.world) ? ` · ${W.divName(state.world, W.divOf(state.world, state.world.myTeamId))}` : ''}`;
   } else {
     nameEl.textContent = 'Football Manager';
     subEl.textContent = 'GOODWAY APPS · FM';
@@ -102,6 +112,18 @@ function toast(msg, kind = 'info') {
 }
 
 /* ─────────────────────────── 클릭 처리 ─────────────────────────── */
+/* 검색 입력은 화면을 다시 그리지 않고 줄만 숨깁니다 (입력 중 포커스 유지). */
+function onFilterInput(e) {
+  const el = e.target.closest('[data-filter-input]');
+  if (!el) return;
+  const q = el.value.trim().toLowerCase();
+  const scope = el.closest('.card') || document;
+  scope.querySelectorAll('[data-fname]').forEach((row) => {
+    const name = (row.getAttribute('data-fname') || '').toLowerCase();
+    row.hidden = !!q && !name.includes(q);
+  });
+}
+
 function onClick(e) {
   const el = e.target.closest('[data-act]');
   if (!el) return;
@@ -110,6 +132,35 @@ function onClick(e) {
   const keepScroll = () => window.scrollTo(0, window.scrollY);
 
   switch (act) {
+    case 'pick-mode':
+      state.pickMode = el.dataset.mode === 'kleague' ? 'kleague' : 'custom';
+      state.pickDiv = state.pickMode === 'kleague' ? 4 : 1;
+      render(); break;
+    case 'pick-div':
+      state.pickDiv = Number(el.dataset.div) || 1;
+      render(); break;
+    case 'divtab':
+      state.divTab = Number(el.dataset.div) || 1;
+      keepScroll(); render(); break;
+    case 'pos-filter':
+      state.posFilter = el.dataset.pos || 'ALL';
+      keepScroll(); render(); break;
+    case 'sort': {
+      const k = el.dataset.key || 'ovr';
+      if (state.sortKey === k) state.sortDir = state.sortDir === 1 ? -1 : 1;
+      else { state.sortKey = k; state.sortDir = k === 'name' || k === 'age' ? 1 : -1; }
+      keepScroll(); render(); break;
+    }
+    case 'market-div':
+      state.marketDiv = Number(el.dataset.div) || 0;
+      keepScroll(); render(); break;
+    case 'club':
+      if (w) state.modal = { kind: 'club', team: el.dataset.team };
+      else state.modal = { kind: 'team', team: el.dataset.team };
+      render(); break;
+    case 'player-modal':
+      if (w) state.modal = { kind: 'player', pid: el.dataset.pid, team: el.dataset.team || null, back: 'club' };
+      render(); break;
     case 'team': state.modal = { kind: 'team', team: el.dataset.team }; render(); break;
     case 'team-sign':
       if (state.world || state.savedGame) { state.modal = { kind: 'overwrite', team: el.dataset.team }; render(); }
@@ -271,13 +322,15 @@ function onClick(e) {
     case 'instant': startMatch(true); break;
     case 'season-end':
       if (!w) break;
-      state.seasonResult = { summary: W.seasonSummary(w), season: w.season };
+      state.seasonResult = { summary: W.seasonSummary(w), season: w.season, year: w.year, label: W.seasonLabel(w) };
       state.seasonPhase = 'preview'; state.view = 'season'; render(); break;
     case 'next-season': {
       if (!w) break;
       const seasonNo = w.season;
+      const prevYear = w.year;
+      const prevLabel = W.seasonLabel(w);
       const r = W.advanceSeason(w);
-      state.seasonResult = { ...r, season: seasonNo };
+      state.seasonResult = { ...r, season: seasonNo, seasonYear: prevYear, seasonLabel: prevLabel };
       state.seasonPhase = 'done';
       api.save(); window.scrollTo(0, 0); render(); break;
     }
@@ -290,8 +343,10 @@ function onClick(e) {
 
 /* ─────────────────────────── 커리어 ─────────────────────────── */
 function newGame(teamId) {
-  if (!defs[teamId]) return;
-  state.world = W.createWorld(teamId, Date.now());
+  const def = defs[teamId];
+  if (!def) return;
+  const mode = def.div ? 'kleague' : 'custom';
+  state.world = W.createWorld(teamId, Date.now(), { mode });
   state.view = 'hub'; state.tab = 'schedule'; state.modal = null; state.selSlot = 0; state.selPid = null;
   W.saveWorld(state.world);
   render();
@@ -324,7 +379,7 @@ function startMatch(instant) {
     seed, cup: round.type === 'cup', userSide,
   });
   const meta = {
-    label: round.type === 'cup' ? (W.CUP_LABEL[round.stage] || '컵') : `리그 ${round.leagueRound}R`,
+    label: round.type === 'cup' ? W.cupLabelOf(w, round.stage) : `리그 ${round.leagueRound}R`,
     cup: round.type === 'cup', round, fixture,
   };
   if (instant) {
