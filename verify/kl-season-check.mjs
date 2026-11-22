@@ -69,8 +69,13 @@ await page.locator('[data-act="close-season"]').click();
 await sleep(800);
 const header = await page.locator('.brand small').innerText();
 ok(header.includes('2027'), '새 시즌은 2027 시즌으로 시작합니다', header);
-const rounds = await page.locator('.club-stats > div').last().innerText();
+const rounds = await page.locator('.club-stats > div').last().locator('b').innerText();
 ok(/^\d+ \/ \d+R$/.test(rounds.trim()), '리그 라운드가 새 시즌 라운드로 시작합니다', rounds.replace(/\n/g, ' '));
+// 새 시즌 소식 — 오타('개꾸' → '개막')
+await page.locator('.tabs [data-act="tab"][data-tab="records"]').click();
+await sleep(600);
+const news = await page.locator('.news').first().innerText().catch(() => '');
+ok(news.includes('개막') && !news.includes('개꾸'), '구단 소식이 새 시즌 "개막"으로 시작합니다', news.split('\n').slice(0, 3).join(' / '));
 await page.screenshot({ path: '/workspace/downloads/fm-kleague-newseason.png' });
 ok(errs.length === 0, '콘솔 오류 0건', errs.slice(0, 3).join(' | '));
 await b.close();

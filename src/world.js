@@ -102,6 +102,25 @@ const DIV_ECON = {
 };
 export function divisionEcon(div) { return DIV_ECON[div] || DIV_ECON[4]; }
 
+/* 유스 아카데미 등급 — 디비전이 높을수록 좋은 유망주가 들어옵니다.
+   base(신인 OVR 중심값) · lo/hi(들어오는 신인의 범위) · pot(잠재력 상한) · ref(그 디비전의 기준 명성).
+   강등된 강팀도 초기 명성(prestige)만큼 아카데미가 남아 있어 곧바로 회복할 수 있습니다. */
+export const KL_ACADEMY = {
+  1: { base: 63, lo: 57, hi: 69, pot: 92, ref: 75 },
+  2: { base: 54, lo: 48, hi: 60, pot: 82, ref: 64 },
+  3: { base: 46, lo: 41, hi: 52, pot: 73, ref: 54 },
+  4: { base: 38, lo: 33, hi: 44, pot: 64, ref: 47 },
+};
+export function academyOf(w, teamId) {
+  const div = divOf(w, teamId);
+  const g = KL_ACADEMY[div] || KL_ACADEMY[4];
+  const t = w?.teams?.[teamId];
+  const prestige = Number.isFinite(t?.prestige) ? t.prestige : (KL_BY_ID[teamId]?.power ?? g.ref);
+  // 초기 명성 − 디비전 기준 명성 → 아카데미 보정 (−3 ~ +4). 명문이 잠시 내려가도 유스는 덜 무너집니다.
+  const bias = clamp(Math.round((prestige - g.ref) * 0.3), -3, 4);
+  return { div, bias, base: g.base + bias, lo: g.lo + bias, hi: g.hi + bias, pot: clamp(g.pot + bias, g.hi, 96) };
+}
+
 export function buildKLeagueTeams(w, rng) {
   for (const def of KL_TEAMS) {
     const rows = KL_ROSTERS[def.id] || [];
@@ -142,6 +161,8 @@ export function buildKLeagueTeams(w, rng) {
     w.teams[def.id].wage = Math.round((teamWageTotal(w, def.id) * econ.wage) / 100) * 100;
     w.teams[def.id].sponsor = econ.sponsor;
     w.teams[def.id].pull = 5 - def.div;
+    // 초기 명성(2026 전력) — 디비전을 오가도 아카데미·재정 회복력의 바탕이 됩니다.
+    w.teams[def.id].prestige = Number(def.power) || 60;
   }
   w.divisions = KL_DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short, rounds: d.rounds }));
   w.year = KL_SEASON;
@@ -1125,10 +1146,17 @@ export function pushTransfer(w, entry) {
 }
 
 /* ─────────────────────────── AI 구단 간 이적 ─────────────────────────── */
+/* 이적 피라미드 — K리그 모드에서는
+   ① 상위 디비전 구단이 하위 디비전 구단의 주전(스쿼드 상위 13명)을 데려가지 않습니다.
+      (내려가는 이적은 잉여·고령 자원만)
+   ② 반대로 K1·K2 구단이 K3·K4의 뛰어난 젊은 유망주를 데려오는 길은 열어 둡니다 —
+      이적료를 웃돈으로 치르고, 구단 예산 안에서만 성사됩니다. */
 export function aiTransferRound(w, round) {
   const no = round?.no ?? 0;
   const aiIds = Object.keys(w.teams).filter((id) => id !== w.myTeamId);
   const made = [];
+  const kl = isKL(w);
+  const START = kl ? 13 : 2;   // K리그: 스쿼드 상위 13명까지를 주전으로 봅니다
   for (let i = 0; i < 4; i++) {
     const rng = makeRng(`ait-${w.seed}-${w.season}-${no}-${i}`);
     // 라운드가 진행될수록 이적 시장이 뜨거워집니다 (1R 45% → 18R 90%)
@@ -1137,16 +1165,52 @@ export function aiTransferRound(w, round) {
     const buyerId = pick(rng, aiIds);
     const buyer = w.teams[buyerId];
     if (!buyer || buyer.squad.length >= 24) continue;
+    const buyerDiv = divOf(w, buyerId);
     const sellers = aiIds.filter((id) => id !== buyerId && w.teams[id].squad.length > 17);
     if (!sellers.length) continue;
-    const sellerId = pick(rng, sellers);
-    const seller = w.teams[sellerId];
-    // 에이스(상위 2명)는 팔지 않습니다 — 하위권 선수만 시장에 나옵니다
-    const pool = squadOf(w, sellerId).slice().sort((a, b) => b.ovr - a.ovr).slice(2);
-    if (!pool.length) continue;
-    const target = pick(rng, pool.slice(0, Math.max(3, Math.ceil(pool.length * 0.75))));
-    const price = Math.round(valueOf(target) * (0.9 + rng() * 0.5) * 10) / 10;
-    if (price > buyer.budget) continue;
+    let sellerId = pick(rng, sellers);
+    let seller = w.teams[sellerId];
+    let sellerDiv = divOf(w, sellerId);
+    let target = null;
+
+    // ② 상위 디비전 구단의 하위 리그 유망주 영입 (K1·K2 ← K3·K4)
+    if (kl && buyerDiv <= 2 && rng() < 0.4) {
+      const lower = sellers.filter((id) => divOf(w, id) > buyerDiv);
+      if (lower.length) {
+        const prospects = [];
+        for (const id of lower) {
+          for (const p of squadOf(w, id)) {
+            if (p.age > 23 || p.ovr < 42 || p.loan) continue;
+            prospects.push({ p, clubId: id });
+          }
+        }
+        prospects.sort((a, b) => (b.p.pot || b.p.ovr) - (a.p.pot || a.p.ovr) || b.p.ovr - a.p.ovr);
+        if (prospects.length) {
+          const pickRow = prospects[Math.floor(rng() * Math.min(6, prospects.length))];
+          sellerId = pickRow.clubId; seller = w.teams[sellerId]; sellerDiv = divOf(w, sellerId);
+          target = pickRow.p;
+        }
+      }
+    }
+
+    // ① 일반 이적 — 에이스(상위 2명)는 팔지 않고, 상위 → 하위로는 주전을 팔지 않습니다.
+    if (!target) {
+      let pool = squadOf(w, sellerId).slice().sort((a, b) => b.ovr - a.ovr).slice(2);
+      if (kl && buyerDiv > sellerDiv) pool = squadOf(w, sellerId).slice().sort((a, b) => b.ovr - a.ovr).slice(START);
+      if (!pool.length) continue;
+      target = pick(rng, pool.slice(0, Math.max(3, Math.ceil(pool.length * 0.75))));
+    }
+    if (!target || target.teamId !== sellerId || target.loan) continue;
+    // 상위 → 하위로 주전이 새는 길은 다시 한 번 막습니다 (유망주 영입 경로는 제외).
+    if (kl && buyerDiv > sellerDiv) {
+      const rank = squadOf(w, sellerId).slice().sort((a, b) => b.ovr - a.ovr).findIndex((p) => p.id === target.id);
+      if (rank >= 0 && rank < START) continue;
+    }
+    const down = kl && buyerDiv > sellerDiv;
+    const mul = down ? 0.85 + rng() * 0.3 : 0.9 + rng() * 0.5;
+    const price = Math.round(valueOf(target) * mul * 10) / 10;
+    const cap = kl ? buyer.budget * (buyerDiv <= 2 && sellerDiv > buyerDiv ? 0.6 : 0.92) : buyer.budget;
+    if (price > cap) continue;
     if (teamWageTotal(w, buyerId) + target.wage > buyer.wage * 1.08) continue;
     buyer.budget = Math.round((buyer.budget - price) * 10) / 10;
     seller.budget = Math.round((seller.budget + price) * 10) / 10;
@@ -1491,7 +1555,8 @@ export function seasonSummary(w) {
   return {
     table, myRank, cupWinner, cupOut, champion: table[0]?.id,
     divs, myDiv: isKL(w) ? divOf(w, w.myTeamId) : 1,
-    moves: isKL(w) ? (w.lastMoves || promotionPlan(w)) : [],
+    // 지난 시즌 이동(lastMoves)에 기대지 않고 지금 순위로 다시 계산합니다 — '예상'이 한 시즌 늦지 않게.
+    moves: isKL(w) ? promotionPlan(w) : [],
   };
 }
 
@@ -1569,6 +1634,31 @@ function prizeFor(w, div, rank, count) {
   return Math.round(base * (1 - frac * 0.72) * 10) / 10;
 }
 
+/* AI 구단 세대교체 — 해마다 유스 한 명은 자리를 잡고, 평균 나이가 높아지면
+   에이스(OVR 상위 3명)를 빼고 31세 이상 잉여 자원을 정리해 더 크게 순환합니다.
+   내 팀 선수는 건드리지 않고, 정리한 자리는 아래 유스 영입이 채웁니다. */
+function rebalanceAiAge(w, t) {
+  const out = [];
+  if (squadOf(w, t.id).length < 20) return out;   // 정리한 자리는 아래 유스 영입이 채웁니다
+  let guard = 0;
+  while (guard < 3) {
+    guard += 1;
+    const sq = squadOf(w, t.id);
+    const avgAge = sq.reduce((a, p) => a + p.age, 0) / sq.length;
+    // 해마다 유스 한 명은 자리를 잡고, 평균 나이가 높으면 더 크게 순환합니다.
+    const limit = avgAge >= 28 ? 3 : avgAge >= 26.8 ? 2 : 1;
+    if (out.length >= limit) break;
+    const ranked = sq.slice().sort((a, b) => b.ovr - a.ovr);
+    const core = new Set(ranked.slice(0, 3).map((p) => p.id));
+    const cand = ranked.filter((p) => p.age >= 31 && !core.has(p.id)).pop();
+    if (!cand) break;
+    t.squad = t.squad.filter((id) => id !== cand.id);
+    delete w.players[cand.id];
+    out.push(cand);
+  }
+  return out;
+}
+
 export function advanceSeason(w) {
   const s = seasonSummary(w);
   const myRow = s.table.find((r) => r.id === w.myTeamId);
@@ -1609,6 +1699,8 @@ export function advanceSeason(w) {
     p.season = freshSeasonStats();
     p.bans = 0; p.inj = 0;   // 새 시즌에는 정지·부상이 풀립니다
   }
+  // 승격·강등을 먼저 확정합니다 — 이번 시즌에 올라간 팀의 유스 아카데미도 새 디비전 기준이 됩니다.
+  const promo = isKL(w) ? applyPromotion(w) : [];
   // 은퇴 & 유스 영입
   const retired = [];
   for (const t of Object.values(w.teams)) {
@@ -1619,16 +1711,26 @@ export function advanceSeason(w) {
       keep.push(id);
     }
     t.squad = keep;
+    // AI 구단 세대교체 — 31세 이상 잉여 자원이 유스에게 자리를 내줍니다 (에이스·내 팀 선수 제외).
+    if (isKL(w) && t.id !== w.myTeamId) retired.push(...rebalanceAiAge(w, t).map((p) => p.name));
+    const acad = isKL(w) ? academyOf(w, t.id) : null;
     while (t.squad.length < 20) {
       const rng = makeRng(`youth-${w.seed}-${w.season}-${t.id}-${t.squad.length}`);
       const pos = pick(rng, ['DF', 'MF', 'FW', 'GK']);
-      const ovr = isKL(w)
-        ? clamp(teamPower(w, t.id) - 10 + Math.round(gauss(rng) * 4), 30, 70)
-        : rint(rng, 55, 68);
-      const stats = {};
-      for (const k of STAT_KEYS) stats[k] = clamp(Math.round(ovr - 6 + gauss(rng) * 6 + (k === 'gk' && pos !== 'GK' ? -45 : 0)), 25, 95);
-      const p = { id: `p${w.pidSeq++}`, name: freeName(rng, new Set(Object.values(w.players).map((x) => x.name)), isKL(w)), pos, age: rint(rng, 18, 19), num: 0, stats, teamId: t.id, form: 0, season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [] };
-      p.ovr = overall(p); p.pot = clamp(p.ovr + rint(rng, 8, 20), p.ovr, 95);
+      const age = rint(rng, 18, 19);
+      let stats;
+      if (acad) {
+        const target = clamp(Math.round(acad.base + gauss(rng) * 3.2), acad.lo, acad.hi);
+        stats = statsFor(rng, pos, target, age);
+      } else {
+        const ovr = rint(rng, 55, 68);
+        stats = {};
+        for (const k of STAT_KEYS) stats[k] = clamp(Math.round(ovr - 6 + gauss(rng) * 6 + (k === 'gk' && pos !== 'GK' ? -45 : 0)), 25, 95);
+      }
+      const p = { id: `p${w.pidSeq++}`, name: freeName(rng, new Set(Object.values(w.players).map((x) => x.name)), isKL(w)), pos, age, num: 0, stats, teamId: t.id, form: 0, season: freshSeasonStats(), career: { apps: 0, goals: 0, assists: 0, seasons: 0 }, growthLog: [] };
+      p.ovr = overall(p);
+      // 잠재력 상한은 디비전 아카데미 등급이 정합니다 — K4 유스가 K1 수준까지 자라지 않습니다.
+      p.pot = clamp(p.ovr + rint(rng, 8, 20), p.ovr, acad ? Math.max(acad.pot, p.ovr + 2) : 95);
       p.value = valueOf(p); p.wage = wageOf(p);
       w.players[p.id] = p;
       t.squad.push(p.id);
@@ -1640,7 +1742,6 @@ export function advanceSeason(w) {
     t.wage = Math.max(t.wage, Math.round((teamWageTotal(w, t.id) * 1.15) / 100) * 100);
   }
   const keepTactic = { ...w.myLineup.tactic };
-  const promo = isKL(w) ? applyPromotion(w) : [];
   w.season += 1;
   if (isKL(w)) w.year = (w.year || KL_SEASON) + 1;
   w.cup = { stages: [] };
@@ -1659,7 +1760,7 @@ export function advanceSeason(w) {
   w.offerSeq = 1;
   w.loans = [];
   w.lastGrowth = null;
-  addNews(w, `${seasonLabel(w)} 개꾸. 이적 시장이 열렸습니다.`);
+  addNews(w, `${seasonLabel(w)} 개막. 이적 시장이 열렸습니다.`);
   return { summary: s, prize: myPrize + cupPrize + sponsor, cupPrize, sponsor, promo, growth: growth.sort((a, b) => (b.to - b.from) - (a.to - a.from)).slice(0, 8), retired, loansBack };
 }
 
@@ -1687,6 +1788,8 @@ export function fixWorld(w) {
     if (!Array.isArray(w.divisions)) w.divisions = KL_DIVISIONS.map((d) => ({ id: d.id, name: d.name, short: d.short, rounds: d.rounds }));
     if (!Number.isFinite(w.year)) w.year = KL_SEASON;
     for (const t of Object.values(w.teams)) if (!t.div) t.div = KL_BY_ID[t.id]?.div || 1;
+    // 명성 필드가 없던 세이브 — 2026 초기 전력으로 채워 아카데미 회복력을 이어 갑니다.
+    for (const t of Object.values(w.teams)) if (!Number.isFinite(t.prestige)) t.prestige = KL_BY_ID[t.id]?.power || 60;
   }
   // 구버전 필드 보정
   for (const t of Object.values(w.teams)) if (!t.recent) t.recent = [];

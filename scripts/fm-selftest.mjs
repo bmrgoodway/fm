@@ -19,8 +19,9 @@
 //   23) 우리 선수 영입 오퍼 — 수락/거절/역제안
 //   24) 가격 협상·FA·시즌 임대(임대 종료 반환)
 //   25) 4단계 필드가 없는 구버전 세이브 호환
+//   29) K리그 장기 밸런스 — 12시즌 시뮬레이션 · 디비전별 유스 아카데미 · 이적 위계 · AI 세대교체
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel } from '../src/world.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel, simMatchQuick, buildCupStage, teamPower, academyOf, KL_ACADEMY, aiTransferRound } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
 import { FORMATIONS, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2065,6 +2066,148 @@ console.log('\n[28] 이전 경기 결과 · 전술·명단 프리셋 · 저장/�
   ok(/data-act="match" data-round="\d+"/.test(schedHtml), '일정 탭의 치른 경기 행이 클릭 대상(data-act=match)으로 그려집니다');
 
   setLogStore(null); setSlotStore(null); setPresetStore(null);
+}
+
+/* ── 29. K리그 2026 장기 밸런스 — 12시즌 연속 시뮬레이션 ── */
+console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유스 아카데미 · 이적 위계');
+{
+  const SEASONS = 12;
+  const lw = createWorld('geumsan', 20261123, { mode: 'kleague' });
+  const startDiv = Object.fromEntries(Object.entries(lw.teams).map(([id, t]) => [id, t.div]));
+  const startK1 = Object.keys(startDiv).filter((id) => startDiv[id] === 1);
+
+  /* 내 경기까지 빠른 시뮬로 채워 한 시즌을 끝까지 치릅니다 (앱의 '즉시 결과'와 같은 경로). */
+  const playAll = (w) => {
+    let guard = 0;
+    let changed = true;
+    while (changed && guard < 500) {
+      changed = false;
+      for (const r of w.calendar) {
+        if (r.played) continue;
+        if (r.type === 'cup') {
+          if (!w.cup.stages[r.stage]) {
+            if (r.stage > 0 && !w.cup.stages[r.stage - 1]) continue;
+            buildCupStage(w, r.stage);
+          }
+          const st = w.cup.stages[r.stage];
+          if (!st) continue;
+          for (const m of st.matches) {
+            if (m.played) continue;
+            const res = simMatchQuick(w, m.home, m.away, { stamp: `s${r.stage}` });
+            let hg = res.hg, ag = res.ag;
+            const draw = hg === ag;
+            if (draw) hg += 1;
+            m.played = true; m.hg = hg; m.ag = ag; m.aet = draw; m.winner = hg > ag ? m.home : m.away;
+          }
+          r.played = st.matches.every((m) => m.played);
+          finishRound(w, r);
+        } else {
+          for (const f of r.fixtures) {
+            if (f.played) continue;
+            const res = simMatchQuick(w, f.home, f.away, { stamp: `s${r.no}` });
+            f.played = true; f.hg = res.hg; f.ag = res.ag;
+          }
+          r.played = r.fixtures.every((f) => f.played);
+          if (r.played) finishRound(w, r);
+        }
+        changed = true;
+      }
+      guard += 1;
+    }
+  };
+  const divAvg = (w) => Object.fromEntries(divisionsOf(w).map((d) => [d.id,
+    d.teams.reduce((a, id) => a + teamPower(w, id), 0) / d.teams.length]));
+
+  const rows = [];
+  for (let i = 0; i < SEASONS; i++) {
+    playAll(lw);
+    const d = divAvg(lw);
+    const table = standingsFor(lw, 1);
+    rows.push({ year: lw.year, d, kept: startK1.filter((id) => divOf(lw, id) === 1).length, champ: table[0]?.id });
+    advanceSeason(lw);
+  }
+  const s10 = rows[9];
+  const s12 = rows[11];
+  ok(lw.year === 2026 + SEASONS && Object.keys(lw.teams).length === 56,
+    'K리그 2026을 12시즌 연속 시뮬레이션합니다', `${rows[0].year}~${s12.year} · 구단 ${Object.keys(lw.teams).length}개 유지`);
+  ok(s10.kept >= 6, '10시즌 뒤 초기 K1 12개 구단 중 절반 이상이 K1에 남아 있습니다', `${s10.kept}/12`);
+  ok(s12.kept >= 6, '12시즌 뒤에도 초기 K1 구단 다수가 K1에 남아 있습니다', `${s12.kept}/12`);
+
+  const order = (d) => d[1] > d[2] && d[2] > d[3] && d[3] > d[4];
+  const ordered = rows.slice(2).every((r) => order(r.d));
+  ok(ordered, '12시즌 내내 디비전 평균 전력 위계(K1 > K2 > K3 > K4)가 유지됩니다',
+    rows.map((r) => [1, 2, 3, 4].map((d) => r.d[d].toFixed(0)).join('>')).join(' / '));
+  const gap = (d, a, b) => d[a] - d[b];
+  ok(gap(s10.d, 1, 2) >= 5 && gap(s10.d, 2, 3) >= 3 && gap(s10.d, 3, 4) >= 1,
+    '10시즌 뒤에도 디비전 격차가 남아 있습니다',
+    `K1 ${s10.d[1].toFixed(1)} · K2 ${s10.d[2].toFixed(1)} · K3 ${s10.d[3].toFixed(1)} · K4 ${s10.d[4].toFixed(1)} (격차 ${gap(s10.d, 1, 2).toFixed(1)}/${gap(s10.d, 2, 3).toFixed(1)}/${gap(s10.d, 3, 4).toFixed(1)})`);
+  ok(s12.d[1] >= 64, '10시즌이 지나도 K1 평균 전력이 표류하지 않습니다', `12시즌째 K1 평균 ${s12.d[1].toFixed(1)}`);
+  const k1Champs = rows.filter((r) => startDiv[r.champ] === 1).length;
+  ok(k1Champs >= 9, '우승은 대부분 초기 K1 구단에서 나옵니다 (4부 출신의 돌풍은 드물게만)',
+    `12시즌 중 ${k1Champs}회 · 마지막 우승 ${lw.teams[rows[11].champ]?.short || '—'}`);
+
+  /* 유스 아카데미 — 디비전이 높을수록 신인 OVR·잠재력 상한이 높습니다 */
+  const acad = [1, 2, 3, 4].map((d) => KL_ACADEMY[d]);
+  ok(acad.every((g, i) => i === 0 || (g.base < acad[i - 1].base && g.pot < acad[i - 1].pot)),
+    '디비전별 유스 아카데미 등급(신인 OVR·잠재 상한)이 차등됩니다',
+    acad.map((g, i) => `K${i + 1} ${g.base}~${g.hi}/잠재 ${g.pot}`).join(' · '));
+  const fresh = createWorld('seoul', 20261126, { mode: 'kleague' });
+  const acK1 = academyOf(fresh, 'seoul'), acK4 = academyOf(fresh, 'geumsan');
+  ok(acK1.pot >= 85 && acK4.pot <= 70 && acK1.pot - acK4.pot >= 15,
+    '명문 구단 유스와 하위 리그 구단 유스의 잠재 상한이 다릅니다',
+    `FC 서울(K1) ${acK1.base}~${acK1.hi}/잠재 ${acK1.pot} vs 금산 인삼(K4) ${acK4.base}~${acK4.hi}/잠재 ${acK4.pot}`);
+
+  /* 실제로 들어온 유스의 차이 — 시즌을 마친 구단에서 3명씩 빼고 다음 시즌을 열어 봅니다 */
+  const beforeIds = new Set(Object.keys(lw.players));
+  const k1Club = rows[11].champ;
+  const k4Table = standingsFor(lw, 4);
+  const k4Club = k4Table[k4Table.length - 1]?.id;
+  const trim = (id) => {
+    const sq = squadOf(lw, id).slice().sort((a, b) => a.ovr - b.ovr);
+    const cut = sq.slice(0, Math.max(3, sq.length - 17));
+    lw.teams[id].squad = lw.teams[id].squad.filter((pid) => !cut.some((p) => p.id === pid));
+    for (const p of cut) delete lw.players[p.id];
+  };
+  trim(k1Club); trim(k4Club);
+  advanceSeason(lw);
+  const youth = (id) => squadOf(lw, id).filter((p) => !beforeIds.has(p.id));
+  const avgOf = (arr, k) => arr.reduce((a, p) => a + p[k], 0) / Math.max(1, arr.length);
+  const y1 = youth(k1Club), y4 = youth(k4Club);
+  ok(y1.length > 0 && y4.length > 0 && avgOf(y1, 'ovr') >= avgOf(y4, 'ovr') + 10 && avgOf(y1, 'pot') >= avgOf(y4, 'pot') + 10,
+    '같은 시즌에 들어온 유스라도 K1 구단이 K4 구단보다 훨씬 좋은 자원을 받습니다',
+    `K1 ${y1.map((p) => `${p.ovr}/${p.pot}`).join(',')} vs K4 ${y4.map((p) => `${p.ovr}/${p.pot}`).join(',')}`);
+  ok(y4.every((p) => p.pot <= Math.max(KL_ACADEMY[4].pot, p.ovr + 2) + 6),
+    'K4 유스의 잠재력은 K4 아카데미 상한을 넘지 않습니다', `K4 유스 잠재 최고 ${Math.max(...y4.map((p) => p.pot))}`);
+
+  /* 이적 피라미드 — 상위 디비전이 하위 디비전의 주전(상위 13명)을 데려가지 않습니다 */
+  const tw = createWorld('geumsan', 20261124, { mode: 'kleague' });
+  let total = 0, down = 0, violations = 0, upProspects = 0;
+  for (let no = 1; no <= 36; no++) {
+    const top13 = Object.fromEntries(Object.keys(tw.teams).map((id) => [id,
+      new Set(squadOf(tw, id).slice().sort((a, b) => b.ovr - a.ovr).slice(0, 13).map((p) => p.id))]));
+    for (const e of aiTransferRound(tw, { no })) {
+      total += 1;
+      const fd = divOf(tw, e.from), td = divOf(tw, e.to);
+      if (td > fd) { down += 1; if (top13[e.from].has(e.pid)) violations += 1; }
+      const p = tw.players[e.pid];
+      if (td < fd && fd >= 3 && td <= 2 && p && p.age <= 23) upProspects += 1;
+    }
+  }
+  ok(total > 0 && violations === 0, '상위 디비전이 하위 디비전으로 주전(상위 13명)을 팔지 않습니다',
+    `이적 ${total}건 · 하향 ${down}건 · 위반 ${violations}건`);
+  ok(upProspects >= 1, 'K1·K2 구단이 K3·K4의 젊은 유망주를 데려오는 이적이 있습니다', `${upProspects}건`);
+
+  /* AI 세대교체 — 12시즌을 지나도 선수단이 늙어붙지 않습니다 */
+  const ages = Object.values(lw.teams).filter((t) => t.id !== lw.myTeamId).map((t) => {
+    const sq = squadOf(lw, t.id);
+    return { n: sq.length, avg: sq.reduce((a, p) => a + p.age, 0) / Math.max(1, sq.length), old: sq.filter((p) => p.age >= 32).length };
+  });
+  const worst = ages.slice().sort((a, b) => b.avg - a.avg)[0];
+  ok(ages.every((x) => x.n >= 20), 'AI 구단 선수단은 20명 아래로 줄지 않습니다', `최소 ${Math.min(...ages.map((x) => x.n))}명`);
+  ok(worst.avg <= 31, 'AI 구단 평균 나이가 31세를 넘지 않습니다 (세대교체)',
+    `최고 ${worst.avg.toFixed(1)}세 · 전체 평균 ${(ages.reduce((a, x) => a + x.avg, 0) / ages.length).toFixed(1)}세 · 32세 이상 최다 ${Math.max(...ages.map((x) => x.old))}명`);
+  ok(lw.news.some((n) => n.text.includes('개막.')) && !lw.news.some((n) => n.text.includes('개꾸')),
+    "새 시즌 소식의 오타('개꾸'→'개막')가 고쳐졌습니다", lw.news.map((n) => n.text).find((t) => t.includes('개막')) || '');
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

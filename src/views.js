@@ -988,7 +988,7 @@ export function renderSeason(app) {
     </article>` : ''}
     ${done ? `<article class="card"><h3>선수 성장 · 노쇠</h3>
       <ul class="growth">${r.growth.map((g) => `<li>${teamLine(w, g.teamId)}<span>${esc(g.name)}</span><b class="${g.to >= g.from ? 'up' : 'down'}">${g.from} → ${g.to}</b></li>`).join('') || '<li class="muted sm">큰 변화가 없습니다.</li>'}</ul>
-      ${r.retired?.length ? `<p class="hint">은퇴: ${r.retired.slice(0, 12).map(esc).join(', ')}${r.retired.length > 12 ? ` 외 ${r.retired.length - 12}명` : ''}</p>` : ''}
+      ${r.retired?.length ? `<p class="hint">은퇴·방출: ${r.retired.slice(0, 12).map(esc).join(', ')}${r.retired.length > 12 ? ` 외 ${r.retired.length - 12}명` : ''}</p>` : ''}
     </article>` : '<p class="hint">다음 시즌을 시작하면 상금 정산과 함께 선수들이 한 살씩 먹고 성장·노쇠합니다.</p>'}
     <div class="actions center"><button class="btn primary big" data-act="${done ? 'close-season' : 'next-season'}" type="button">${done ? '새 시즌 시작 →' : '다음 시즌 시작 →'}</button></div>
   </section>`;
