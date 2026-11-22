@@ -14,10 +14,15 @@
 //   18) 세트피스 지시(코너 3종·프리킥 3종) — 배치·타겟·슛/크로스·중계·저장
 //   19) 세트피스 필드가 없는 구버전 세이브 호환
 //   20) 피치 위 미니 체력 바 색 기준(70%/45%)
+//   21) 선수 성장·훈련 — 라운드마다 출전·평점·나이·잠재력 반영, 훈련 방향 차이
+//   22) AI 구단 간 이적·시장 갱신·이적 소식 피드
+//   23) 우리 선수 영입 오퍼 — 수락/거절/역제안
+//   24) 가격 협상·FA·시즌 임대(임대 종료 반환)
+//   25) 4단계 필드가 없는 구버전 세이브 호환
 // 사용: node scripts/fm-selftest.mjs [경기수]
-import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup } from '../src/world.js';
-import { Match, lineupFor, applyResult, CY, W, H, aiMentalityPlan } from '../src/match.js';
-import { FORMATIONS } from '../src/data.js';
+import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam } from '../src/world.js';
+import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
+import { FORMATIONS, overall, valueOf } from '../src/data.js';
 import { roleFor, resolveRoles, defaultRole, rolesForLabel, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf, SET_PIECES, resolveSetPiece, setPieceLabel } from '../src/tactics.js';
 import { boardPos } from '../src/views.js';
 import { staminaColor, STAMINA_COLORS } from '../src/matchview.js';
@@ -43,6 +48,51 @@ function newMatch(homeId = 'gs', awayId = 'dj', seed = 'selftest') {
   });
   m.holdHalf = true;
   return m;
+}
+
+/* ── 4단계 점검 도우미 ── */
+// 지정한 포지션의 선수를 원하는 나이·잠재력·능력치로 맞춥니다.
+function craft(w, { pos = 'FW', age = 20, pot = 95, base = 70 } = {}) {
+  const p = squadOf(w, 'gs').find((x) => x.pos === pos);
+  p.age = age; p.pot = pot;
+  p.stats = { spd: base, sho: base, pas: base, dri: base, def: base, vis: base, sta: base, gk: pos === 'GK' ? base + 10 : 25 };
+  p.ovr = overall(p);
+  p.value = valueOf(p);
+  p.growthLog = [];
+  return p;
+}
+// n 라운드만큼 성장을 돌리고 종합·능력치 변화를 돌려줍니다 (경기 키도 라운드마다 다르게).
+function growN(w, p, n = 18, rating = 7.0, prefix = 'g', goals = 0) {
+  const before = { ovr: p.ovr, stats: { ...p.stats } };
+  for (let i = 1; i <= n; i++) {
+    const key = `${prefix}-o${i}`;
+    applyGrowth(w, growthPlan(w, p.id, { rating, goals }, key), key);
+  }
+  const stats = Object.fromEntries(Object.keys(p.stats).map((k) => [k, p.stats[k] - before.stats[k]]));
+  return { d: p.ovr - before.ovr, stats, points: Object.values(stats).reduce((a, b) => a + Math.max(0, b), 0) };
+}
+// 내 경기를 n 라운드 진행합니다 (경기 결과 반영 → 라운드 마감 → 나머지 경기).
+function playUserRounds(w, n = 1) {
+  let played = 0;
+  while (played < n) {
+    const nx = userNextMatch(w);
+    if (!nx) break;
+    const { round, fixture } = nx;
+    const m = simulateInstant(w, fixture.home, fixture.away, `${w.seed}-s${w.season}-r${round.no}`, round.type === 'cup', fixture.home === w.myTeamId ? 'home' : 'away');
+    applyResult(w, m);
+    if (round.type === 'league') {
+      fixture.played = true; fixture.hg = m.score.home; fixture.ag = m.score.away;
+    } else {
+      const st = w.cup.stages[round.stage];
+      const cm = st.matches.find((x) => x.home === fixture.home && x.away === fixture.away);
+      cm.played = true; cm.hg = m.score.home; cm.ag = m.score.away;
+      cm.winner = m.score.home > m.score.away ? cm.home : cm.away;
+    }
+    finishRound(w, round);
+    playOtherFixtures(w, round, true);
+    played += 1;
+  }
+  return played;
 }
 
 /* ── 1. 전술 → 좌표 ── */
@@ -373,7 +423,10 @@ console.log('\n[4] 경고 · 퇴장 · 부상');
 /* ── 4-2. 다음 경기 출전 정지 · 부상 결장 연결 ── */
 console.log('\n[4-2] 다음 경기 출전 정지 · 부상');
 {
-  const m = newMatch('gs', 'dj', 'susp');
+  // 경기 결과를 반영하면 선수가 성장하므로(4단계), 공용 월드는 건드리지 않고 이 점검 전용 월드를 씁니다.
+  const w4 = createWorld('gs', 4242);
+  const m = new Match({ world: w4, homeId: 'gs', awayId: 'dj', homeLineup: lineupFor(w4, 'gs'), awayLineup: lineupFor(w4, 'dj'), seed: 'susp', cup: false, userSide: 'home' });
+  m.holdHalf = true;
   for (let i = 0; i < 6; i++) m.tick();
   const side = m.sides[m.userSide];
   const victim = side.players.find((e) => e.onPitch && e.pos === 'DF');
@@ -383,11 +436,11 @@ console.log('\n[4-2] 다음 경기 출전 정지 · 부상');
   let g = 0;
   while (!m.done && g < 4000) { m.tick(); g++; }
   if (!m.done) m.finish();
-  applyResult(world, m);
-  const pv = world.players[victim.id], ph = world.players[hurt.id];
+  applyResult(w4, m);
+  const pv = w4.players[victim.id], ph = w4.players[hurt.id];
   ok(pv.bans === 1, '퇴장 → 다음 경기 출전 정지 1경기', `${pv.name} bans=${pv.bans}`);
   ok(ph.inj >= 1, '부상 → 결장 경기 수 기록', `${ph.name} inj=${ph.inj}`);
-  const l = lineupFor(world, world.myTeamId);
+  const l = lineupFor(w4, w4.myTeamId);
   ok(!l.starters.includes(pv.id), '정지 선수는 다음 경기 선발에서 빠짐', `${pv.name}`);
   ok(!l.starters.includes(ph.id), '부상 선수도 선발에서 빠짐', `${ph.name}`);
 }
@@ -1329,6 +1382,247 @@ console.log('\n[20] 피치 위 미니 체력 바 — 색 기준');
   const all = ['home', 'away'].every((s) => m.sides[s].players.every((e) => Number.isFinite(e.stamina) && Number.isFinite(e.st.yellow)));
   ok(all, '피치에 그릴 체력·옐로카드 값이 모든 선수에게 있습니다',
     m.sides.home.players.slice(0, 3).map((e) => `${e.num}:${Math.round(e.stamina)}%`).join(' '));
+}
+
+/* ── 21. 선수 성장·훈련 ── */
+console.log('\n[21] 선수 성장·훈련 — 라운드마다 출전·평점·나이·잠재력 반영');
+{
+  // ① 나이 — 성장기와 노장의 방향이 다릅니다.
+  const wA = createWorld('gs', 2101);
+  const young = craft(wA, { pos: 'FW', age: 20, pot: 95 });
+  const old = craft(wA, { pos: 'DF', age: 34, pot: 92 });
+  const gy = growN(wA, young, 18, 7.0, 'young');
+  const go = growN(wA, old, 18, 6.6, 'old');
+  ok(gy.d >= 2, '20세 선수는 한 시즌에 2 이상 자랍니다', `${young.name} +${gy.d} (${JSON.stringify(gy.stats)})`);
+  ok(go.d <= 0, '34세 선수는 한 시즌에 내려갑니다', `${old.name} ${go.d} (spd ${go.stats.spd} · sta ${go.stats.sta})`);
+  ok(gy.d - go.d >= 3, '성장기와 노장의 성장 차이가 뚜렷합니다', `+${gy.d} vs ${go.d}`);
+  ok(Object.values(go.stats).some((v) => v < 0), '노장은 실제 능력치가 깎입니다', JSON.stringify(go.stats));
+
+  // ② 평점 — 잘 뛴 경기는 더 자랍니다 (7.0 이상 가산).
+  const wB = createWorld('gs', 2102);
+  const high = craft(wB, { pos: 'MF', age: 21, pot: 95 });
+  const low = craft(wB, { pos: 'MF', age: 21, pot: 95 });
+  high.stats = { ...high.stats };
+  const gh = growN(wB, high, 18, 8.2, 'high');
+  const gl = growN(wB, low, 18, 5.4, 'low');
+  ok(gh.d > gl.d, '평점이 높은 쪽이 더 크게 성장합니다', `8.2 → +${gh.d} · 5.4 → +${gl.d}`);
+
+  // ③ 훈련 방향 — 같은 선수라도 고른 방향의 능력치가 먼저 자랍니다.
+  const wa = createWorld('gs', 2103); setTraining(wa, 'attack');
+  const wd = createWorld('gs', 2103); setTraining(wd, 'defense');
+  const pa = craft(wa, { pos: 'FW', age: 21, pot: 95 });
+  const pd = craft(wd, { pos: 'FW', age: 21, pot: 95 });
+  const ga = growN(wa, pa, 18, 7.0, 'train');
+  const gd = growN(wd, pd, 18, 7.0, 'train');
+  ok(TRAINING_IDS.length >= 4 && TRAINING.attack && TRAINING.defense && TRAINING.pass && TRAINING.balanced,
+    '훈련 방향 4종(균형·공격/슈팅·패스/시야·수비/체력)이 있습니다', TRAINING_IDS.join(' · '));
+  ok(ga.stats.sho > gd.stats.sho, '공격/슈팅 훈련은 슈팅이 더 자랍니다', `공격 +${ga.stats.sho} vs 수비 +${gd.stats.sho}`);
+  ok(gd.stats.def + gd.stats.sta >= ga.stats.def + ga.stats.sta + 1, '수비/체력 훈련은 수비·체력이 더 자랍니다',
+    `수비 ${gd.stats.def}+${gd.stats.sta} vs 공격 ${ga.stats.def}+${ga.stats.sta}`);
+  ok(trainingOf(wa, 'gs') === 'attack' && trainingOf(wd, 'gs') === 'defense', '고른 훈련이 팀에 저장됩니다');
+
+  // ④ 잠재력 — 한계에 닿은 선수는 더 자라지 않습니다.
+  const wP = createWorld('gs', 2104);
+  const capped = craft(wP, { pos: 'MF', age: 24, pot: 70 });
+  capped.pot = capped.ovr;
+  const gc = growN(wP, capped, 18, 9.0, 'cap');
+  ok(gc.d === 0 && gc.points === 0, '잠재력에 닿은 선수는 더 자라지 않습니다', `${capped.ovr}/${capped.pot} · +${gc.points}`);
+
+  // ⑤ 실제 경기 결과 → 성장 반영 + 결과 화면 예고와 같은 값
+  const wReal = createWorld('gs', 2105);
+  const nx = userNextMatch(wReal);
+  const mReal = simulateInstant(wReal, nx.fixture.home, nx.fixture.away, 'grow-real', false, nx.fixture.home === wReal.myTeamId ? 'home' : 'away');
+  const prev = growthPreview(wReal, mReal);
+  const beforeOvr = Object.fromEntries(prev.map((g) => [g.pid, wReal.players[g.pid].ovr]));
+  applyResult(wReal, mReal);
+  ok(prev.length >= 11, '경기 결과 화면이 보여 줄 성장 목록이 있습니다', `${prev.length}명`);
+  ok(wReal.lastGrowth && wReal.lastGrowth.list.length === prev.length, '경기 후 성장 기록이 월드에 남습니다', `${wReal.lastGrowth?.list.length}명`);
+  const same = prev.every((g) => wReal.players[g.pid].ovr === g.to && beforeOvr[g.pid] === g.from);
+  ok(same, '결과 화면 예고(성장)와 실제 반영이 같은 값입니다', `${prev.filter((g) => g.d).length}명 종합 변동`);
+  const logged = prev.filter((g) => wReal.players[g.pid].growthLog?.length).length;
+  ok(logged >= 11, '선수마다 최근 성장 기록(growthLog)이 쌓입니다', `${logged}명`);
+  const sample = wReal.players[prev[0].pid];
+  ok(sample.value === valueOf(sample) && sample.wage > 0, '성장한 선수의 몸값·주급이 다시 계산됩니다',
+    `${sample.name} ${sample.ovr} · ${sample.value}억`);
+  ok(['prospect', 'peak', 'decline', 'up', 'down', 'flat'].includes(growthStatus(sample).key)
+    && typeof recentDelta(sample) === 'number', '성장 상태(유망주·성장 중·노장 등)를 읽을 수 있습니다', growthStatus(sample).label);
+}
+
+/* ── 22. AI 구단 간 이적 ── */
+console.log('\n[22] AI 구단 간 이적·시장 갱신·이적 소식 피드');
+{
+  const w = createWorld('gs', 2201);
+  const before = Object.fromEntries(Object.values(w.teams).map((t) => [t.id, t.squad.slice().sort().join(',')]));
+  const marketBefore = w.market.length;
+  playUserRounds(w, 6);
+  const aiEntries = w.transfers.filter((t) => t.type === 'ai');
+  const changed = Object.values(w.teams).filter((t) => t.id !== w.myTeamId && t.squad.slice().sort().join(',') !== before[t.id]);
+  ok(aiEntries.length >= 2, 'AI 구단끼리 실제로 선수를 사고팝니다', `${aiEntries.length}건`);
+  ok(changed.length >= 2, '여러 AI 구단의 스쿼드가 실제로 바뀌였습니다', `${changed.map((t) => t.short).join(', ')}`);
+  ok(w.transfers.length >= aiEntries.length && w.transfers.every((t) => t.text && t.s >= 1), '이적 소식 피드에 한 줄 설명이 남습니다',
+    w.transfers.slice(0, 2).map((t) => t.text).join(' / '));
+  const sizes = Object.values(w.teams).map((t) => t.squad.length);
+  ok(Math.min(...sizes) >= 15 && Math.max(...sizes) <= 24, '모든 구단 스쿼드가 15~24명을 지킵니다', `${Math.min(...sizes)}~${Math.max(...sizes)}`);
+  ok(Object.values(w.teams).every((t) => t.budget >= 0), '이적 뒤에도 구단 자금이 음수가 되지 않습니다');
+  const marketOk = w.market.every((e) => {
+    const p = w.players[e.pid];
+    if (!p) return false;
+    if (e.loan) return !!p.teamId && p.teamId !== w.myTeamId;
+    return !e.from || p.teamId === e.from;
+  });
+  ok(marketOk, '시장 매물이 실제 소속 구단과 맞습니다', `${w.market.length}건 (시작 ${marketBefore}건)`);
+  ok(w.market.length >= 6, '라운드가 진행돼도 시장에 매물이 남아 있습니다', `${w.market.length}건`);
+  // 라운드 마감은 한 번만 처리됩니다 (중복 정산 금지)
+  const round = w.calendar.find((r) => r.played);
+  const feedLen = w.transfers.length;
+  settleRound(w, round);
+  ok(w.transfers.length === feedLen, '같은 라운드를 두 번 정산하지 않습니다', `${feedLen} → ${w.transfers.length}`);
+  // 라운드가 갈수록 이적이 잦아집니다
+  const early = w.transfers.filter((t) => t.type === 'ai' && t.s === 1).length;
+  const w2 = createWorld('gs', 2202);
+  playUserRounds(w2, 14);
+  const late = w2.transfers.filter((t) => t.type === 'ai').length;
+  ok(late > early, '라운드가 진행될수록 이적이 더 잦아집니다', `6R ${early}건 → 14R ${late}건`);
+}
+
+/* ── 23. 우리 선수 영입 오퍼 ── */
+console.log('\n[23] 우리 선수 영입 오퍼 — 수락·거절·역제안');
+{
+  const w = createWorld('gs', 2301);
+  const made = generateOffers(w, { no: 3 }, { force: true });
+  ok(made.length >= 1 && w.offers.length >= 1, 'AI 구단이 우리 선수에게 오퍼를 보내옵니다', `${made.length}건`);
+  const o1 = w.offers[0];
+  const p1 = w.players[o1.pid];
+  const budgetBefore = w.teams.gs.budget;
+  const acc = acceptOffer(w, o1.id);
+  ok(acc.ok && w.teams[o1.from].squad.includes(p1.id), '오퍼를 수락하면 선수가 그 구단으로 이적합니다',
+    `${p1.name} → ${w.teams[o1.from].short}`);
+  ok(w.teams.gs.budget > budgetBefore && w.finance.income > 0, '이적료가 우리 구단 자금으로 들어옵니다',
+    `${budgetBefore} → ${w.teams.gs.budget}`);
+  ok(!w.offers.some((o) => o.id === o1.id) && !w.teams.gs.squad.includes(p1.id), '수락한 오퍼와 선수가 정리됩니다');
+
+  // 거절
+  generateOffers(w, { no: 4 }, { force: true });
+  const o2 = w.offers[0];
+  const rej = rejectOffer(w, o2 && o2.id);
+  ok(rej.ok && w.offers.length === 0, '오퍼를 거절하면 목록에서 사라집니다');
+  ok(w.transfers.some((t) => t.type === 'reject'), '거절도 이적 소식에 남습니다');
+
+  // 역제안 — 너무 높으면 거절하고 오퍼는 남습니다
+  generateOffers(w, { no: 5 }, { force: true });
+  const o3 = w.offers[0];
+  const wild = counterOffer(w, o3.id, Math.round(o3.price * 3 * 10) / 10);
+  ok(!wild.ok && wild.accepted === false && w.offers.some((o) => o.id === o3.id),
+    '터무니없는 역제안은 거절되고 오퍼는 남습니다', `${wild.why || ''}`);
+  ok(wild.price === undefined || wild.price >= o3.price, '상대가 낼 수 있는 금액을 다시 제시합니다', `${o3.price}억 · ${wild.price}억`);
+  ok(w.offers.find((o) => o.id === o3.id)?.price >= o3.price, '거절 뒤에도 오퍼 금액은 줄지 않습니다',
+    `${o3.price} → ${w.offers.find((o) => o.id === o3.id)?.price}`);
+
+  // 역제안 수락 — 남은 여력이 큰 구단에 낮게 시작한 오퍼를 만들어 상한 안에서 부릅니다
+  const wC = createWorld('gs', 2303);
+  const p3 = squadOf(wC, 'gs').sort((a, b) => b.value - a.value)[0];
+  const value = valueOf(p3);
+  wC.offers = [{ id: 'oT', pid: p3.id, from: 'dj', price: Math.round(value * 0.55 * 10) / 10, season: wC.season, round: 5 }];
+  const target = Math.round(value * 0.8 * 10) / 10;
+  const fair = counterOffer(wC, 'oT', target);
+  ok(fair.ok && fair.accepted, '상대 상한 안의 역제안은 수락됩니다', `${p3.name} ${fair.price}억 (몸값 ${value})`);
+  ok(wC.teams.dj.squad.includes(p3.id) && wC.players[p3.id].teamId === 'dj', '역제안이 성사되면 선수가 그 구단으로 갑니다');
+  ok(!wC.offers.some((o) => o.id === 'oT'), '성사된 오퍼는 목록에서 정리됩니다');
+
+  // 선수단 15명 이하 보호
+  const w2 = createWorld('gs', 2302);
+  const list = squadOf(w2, 'gs').slice(0, 15);
+  w2.teams.gs.squad = list.map((p) => p.id);
+  w2.myLineup.starters = []; w2.myLineup.bench = []; fillLineup(w2);
+  const guarded = sellToClub(w2, list[0].id, 'dj', 5, 'offer');
+  ok(!guarded.ok && /15명/.test(guarded.why || ''), '선수단이 15명 이하가 되면 팔지 못합니다', guarded.why);
+}
+
+/* ── 24. 가격 협상 · FA · 시즌 임대 ── */
+console.log('\n[24] 가격 협상·FA·시즌 임대');
+{
+  const w = createWorld('gs', 2401);
+  const entry = w.market.filter((e) => e.from && !e.loan && e.price > 1)[0];
+  const ask = entry.price;
+  const p = w.players[entry.pid];
+  const low = negotiate(w, entry.pid, Math.round(ask * 0.45 * 10) / 10);
+  const after = w.market.find((e) => e.pid === entry.pid);
+  ok(!low.accepted && after && after.price < ask, '낮은 제안은 거절되고 요청가가 내려갑니다', `${ask} → ${after?.price}`);
+  const deal = negotiate(w, entry.pid, after ? after.price : ask);
+  ok(deal.ok && w.teams.gs.squad.includes(p.id), '상대가 제시한 금액에는 영입됩니다', `${p.name} ${deal.price}억`);
+
+  // FA — 이적료 없이
+  const fa = w.market.find((e) => !e.from && !e.loan);
+  const faP = w.players[fa.pid];
+  const budget = w.teams.gs.budget;
+  const faRes = signPlayer(w, fa);
+  ok(faRes.ok && faP.teamId === w.myTeamId && w.teams.gs.budget === budget, '자유계약(FA)은 이적료 없이 영입됩니다', `${faP.name} ${faP.ovr}`);
+
+  // 시즌 임대
+  const w2 = createWorld('gs', 2402);
+  const loanEntry = w2.market.find((e) => e.loan);
+  const lp = w2.players[loanEntry.pid];
+  const owner = lp.teamId;
+  const budget2 = w2.teams.gs.budget;
+  const ln = loanPlayer(w2, loanEntry);
+  ok(ln.ok && lp.teamId === w2.myTeamId && lp.loan && lp.loan.owner === owner, '임대로 선수를 데려오면 원소속이 기록됩니다',
+    `${lp.name} ← ${w2.teams[owner].short} · 임대료 ${ln.price}억`);
+  ok(w2.teams.gs.budget === Math.round((budget2 - ln.price) * 10) / 10 && w2.loans.length === 1, '임대료만 나가고 이적 자금은 그대로입니다',
+    `${budget2} → ${w2.teams.gs.budget}`);
+  ok(!w2.market.some((e) => e.pid === lp.id), '임대한 선수는 시장에서 빠집니다');
+  const back = returnLoans(w2);
+  ok(back.length === 1 && lp.teamId === owner && !lp.loan && w2.loans.length === 0, '시즌이 끝나면 임대 선수가 원소속으로 돌아갑니다',
+    JSON.stringify(back));
+  ok(!w2.teams.gs.squad.includes(lp.id), '돌려보낸 선수는 내 선수단에서 빠집니다');
+
+  // 임대가 아닌 매물은 임대로 데려올 수 없음
+  const normal = w2.market.find((e) => e.from && !e.loan);
+  const bad = loanPlayer(w2, { ...normal, loan: false });
+  ok(!bad.ok, '임대 매물이 아니면 임대로 데려올 수 없습니다', bad.why);
+  // 시즌 결산에서도 임대가 정리됩니다
+  const w3 = createWorld('gs', 2403);
+  const le = w3.market.find((e) => e.loan);
+  loanPlayer(w3, le);
+  playUserRounds(w3, 18);
+  const season = advanceSeason(w3);
+  ok(Array.isArray(season.loansBack) && w3.loans.length === 0, '시즌 결산에서 임대가 정리됩니다', JSON.stringify(season.loansBack));
+}
+
+/* ── 25. 4단계 필드가 없는 구버전 세이브 ── */
+console.log('\n[25] 4단계 이전 세이브 호환');
+{
+  const bak = globalThis.localStorage;
+  globalThis.localStorage = {
+    s: {},
+    getItem(k) { return Object.prototype.hasOwnProperty.call(this.s, k) ? this.s[k] : null; },
+    setItem(k, v) { this.s[k] = String(v); },
+    removeItem(k) { delete this.s[k]; },
+    key(i) { return Object.keys(this.s)[i] ?? null; },
+    get length() { return Object.keys(this.s).length; },
+  };
+  const w = createWorld('bm', 2501);
+  const legacy = JSON.parse(JSON.stringify(w));
+  // 4단계 이전 세이브 — 잠재력·훈련·오퍼·임대·성장 기록·이적 피드가 없습니다.
+  delete legacy.offers; delete legacy.loans; delete legacy.transfers; delete legacy.lastGrowth; delete legacy.offerSeq;
+  for (const t of Object.values(legacy.teams)) delete t.training;
+  for (const p of Object.values(legacy.players)) { delete p.pot; delete p.growthLog; }
+  saveWorld(legacy);
+  const back = loadWorld();
+  ok(!!back, '구버전 세이브를 그대로 엽니다');
+  ok(back && Array.isArray(back.offers) && Array.isArray(back.loans) && Array.isArray(back.transfers), '오퍼·임대·이적 피드 배열이 채워집니다');
+  ok(back && Object.values(back.teams).every((t) => TRAINING[t.training]), '모든 구단의 훈련 방향이 기본값(균형)으로 채워집니다',
+    back ? Object.values(back.teams).map((t) => t.training).join(',') : '');
+  ok(back && Object.values(back.players).every((p) => Number.isFinite(p.pot) && p.pot >= p.ovr && Array.isArray(p.growthLog)),
+    '모든 선수의 잠재력·성장 기록이 보정됩니다',
+    back ? `${Object.values(back.players).filter((p) => p.pot > p.ovr).length}명 성장 여지` : '');
+  const p = back ? squadOf(back, back.myTeamId).sort((a, b) => a.age - b.age)[0] : null;
+  const plan = p ? growthPlan(back, p.id, { rating: 7.4 }, 'legacy') : null;
+  ok(!!plan, '구버전 세이브에서도 성장 계산이 됩니다', p ? `${p.name} ${plan.from}→${plan.to}` : '');
+  const round = back?.calendar?.[0];
+  let settledOk = false;
+  try { settledOk = settleRound(back, round) === true; } catch { settledOk = false; }
+  ok(settledOk, '구버전 세이브에서도 라운드 정산(AI 이적·오퍼)이 돕니다');
+  globalThis.localStorage = bak;
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

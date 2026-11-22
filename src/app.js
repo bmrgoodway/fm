@@ -205,6 +205,58 @@ function onClick(e) {
       if (!r.ok) { toast(r.why, 'warn'); break; }
       api.save(); render(); toast('영입 완료! 선수단에 합류했습니다.', 'ok'); break;
     }
+    case 'training': {
+      if (!w) break;
+      const got = W.setTraining(w, el.dataset.key);
+      if (!got) break;
+      api.save(); keepScroll(); render();
+      toast(`주간 훈련 · ${W.TRAINING[got].name} — ${W.TRAINING[got].note}`, 'ok');
+      break;
+    }
+    case 'offer-accept': {
+      if (!w) break;
+      const r = W.acceptOffer(w, el.dataset.id);
+      if (!r.ok) { toast(r.why, 'warn'); break; }
+      api.save(); render(); toast(`오퍼 수락 — ${W.fmt(r.price)}억이 들어왔습니다.`, 'ok'); break;
+    }
+    case 'offer-reject': {
+      if (!w) break;
+      const r = W.rejectOffer(w, el.dataset.id);
+      if (!r.ok) { toast(r.why, 'warn'); break; }
+      api.save(); render(); toast('오퍼를 거절했습니다.', 'info'); break;
+    }
+    case 'offer-counter': {
+      if (!w) break;
+      state.modal = { kind: 'offer-counter', id: el.dataset.id }; render(); break;
+    }
+    case 'offer-counter-send': {
+      if (!w) break;
+      const r = W.counterOffer(w, el.dataset.id, Number(el.dataset.price));
+      state.modal = null;
+      if (r.ok) { api.save(); render(); toast(`역제안 수락 — ${W.fmt(r.price)}억에 이적했습니다.`, 'ok'); }
+      else { api.save(); render(); toast(r.accepted === false ? r.why : (r.why || '역제안을 받아들이지 않았습니다.'), 'warn'); }
+      break;
+    }
+    case 'negotiate': {
+      if (!w) break;
+      state.modal = { kind: 'negotiate', pid: el.dataset.pid }; render(); break;
+    }
+    case 'negotiate-send': {
+      if (!w) break;
+      const r = W.negotiate(w, el.dataset.pid, Number(el.dataset.price));
+      state.modal = null;
+      if (r.ok) { api.save(); render(); toast(`협상 성사 — ${W.fmt(r.price)}억에 영입했습니다.`, 'ok'); }
+      else { api.save(); render(); toast(r.why || '상대가 거절했습니다.', 'warn'); }
+      break;
+    }
+    case 'loan': {
+      if (!w) break;
+      const entry = w.market.find((x) => x.pid === el.dataset.pid);
+      if (!entry) break;
+      const r = W.loanPlayer(w, entry);
+      if (!r.ok) { toast(r.why, 'warn'); break; }
+      api.save(); render(); toast(`임대 영입 — 임대료 ${W.fmt(r.price)}억, 시즌이 끝나면 돌아갑니다.`, 'ok'); break;
+    }
     case 'sell': state.modal = { kind: 'sell', pid: el.dataset.pid }; render(); break;
     case 'sell-confirm': {
       if (!w) break;

@@ -1,9 +1,9 @@
 // 라이브 매치 화면 — Canvas 2D 피치 + 60fps 보간 + 배속/전술/교체/실시간 기록
 // · 엔진은 틱(경기 15초)마다 상태를 만들고, 화면은 매 프레임 이전 좌표→현재 좌표를 보간(lerp)합니다.
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
-import { W as PW, H as PH, CY, GOAL_HALF, diveProgress } from './match.js';
+import { W as PW, H as PH, CY, GOAL_HALF, diveProgress, growthPreview } from './match.js';
 import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, nextRole, defaultRole, setPieceLabel, SET_PIECES } from './tactics.js';
-import { FORMATIONS } from './data.js';
+import { FORMATIONS, STAT_LABEL } from './data.js';
 import * as X from './world.js';
 import { esc, setPieceRows } from './views.js';
 
@@ -187,6 +187,7 @@ export function mountMatch(app, m, meta) {
         <h2 id="ov-title">0 - 0</h2>
         <p class="sm" id="ov-sub"></p>
         <div class="ov-stats" id="ov-stats"></div>
+        <div class="ov-growth" id="ov-growth"></div>
         <button class="btn big" id="ov-replay" type="button" hidden>🎬 득점 리플레이</button>
         <button class="btn primary big" id="ov-continue" type="button">계속 →</button>
       </div>
@@ -1110,6 +1111,18 @@ export function mountMatch(app, m, meta) {
       ['오프사이드', s.offsides.home, s.offsides.away],
       ['경고 / 퇴장', `${s.yellow.home} / ${s.red.home}`, `${s.yellow.away} / ${s.red.away}`],
     ].map(([k, h, a]) => `<div class="ov-row"><b>${h}</b><span>${k}</span><b>${a}</b></div>`).join('');
+    // 이번 경기로 자라는 선수 — applyResult 가 그대로 반영할 값입니다.
+    const grow = (() => {
+      try { return growthPreview(app.world, m); } catch { return []; }
+    })();
+    const moved = grow.filter((g) => g.d !== 0 || g.plus.length || g.minus.length);
+    $('ov-growth').innerHTML = moved.length
+      ? `<div class="ovg-head"><b>선수 성장</b><span>출전·평점·득점 반영</span></div>
+        <ul class="ovg-list">${moved.slice(0, 6).map((g) => {
+          const words = [...new Set([...g.plus.map((k) => '+' + (STAT_LABEL[k] || k)), ...g.minus.map((k) => '-' + (STAT_LABEL[k] || k))])].join(' · ');
+          return `<li><b>${esc(g.name)}</b><span class="ovg-num ${g.d < 0 ? 'down' : 'up'}">${g.d ? `${g.from}→${g.to}` : g.to}</span><small>${esc(words || '변화 없음')}</small><em class="ovg-pot">잠재 ${g.pot}</em></li>`;
+        }).join('')}</ul>`
+      : '';
     $('m-overlay').hidden = false;
     if (lastClip) $('ov-replay').hidden = false;
     cancelAnimationFrame(raf); raf = 0;

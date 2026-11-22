@@ -5,7 +5,7 @@
 // 화면(DOM)에 의존하지 않으므로 '즉시 결과'에서도 그대로 돌릴 수 있습니다.
 import { makeRng, clamp, rint, pick } from './rng.js';
 import { FORMATIONS } from './data.js';
-import { posFactor, autoLineup, squadOf, available } from './world.js';
+import { posFactor, autoLineup, squadOf, available, growTeamFromMatch, growthPlan } from './world.js';
 import { defaultRole, roleFor, roleTuning, NEUTRAL_TUNING, mentalityOf, stepLabel, resolveSetPiece, setPieceOpt, setPieceLabel, SET_PIECES } from './tactics.js';
 
 export const W = 100, H = 64, CY = 32, GOAL_HALF = 3.7;
@@ -310,6 +310,7 @@ export class Match {
     // 상대 AI 감독의 맞대응을 끄고 축 하나만 재고 싶을 때(밸런스 계측) false 로 넘깁니다.
     this.opponentCoach = opponentCoach !== false;
     this.rng = makeRng(String(seed));
+    this.seed = String(seed);   // 경기별 성장 난수 키 — 결과 화면 예고와 실제 반영을 맞춥니다
     this.homeId = homeId;
     this.awayId = awayId;
     this.score = { home: 0, away: 0 };
@@ -2982,6 +2983,7 @@ export function applyResult(world, m) {
   const played = new Set();
   for (const s of ['home', 'away']) {
     const teamId = s === 'home' ? m.homeId : m.awayId;
+    const perf = [];
     for (const e of m.sides[s].appeared) {
       played.add(e.id);
       const p = world.players[e.id];
@@ -2998,6 +3000,7 @@ export function applyResult(world, m) {
       const r = clamp(6.0 + e.rd, 4.2, 10);
       p.season.ratingSum += r;
       p.season.ratingCount += 1;
+      perf.push({ pid: p.id, rating: r, goals: e.st.goals, assists: e.st.assists });
       // 퇴장 → 다음 경기 출전 정지
       if (e.st.red > 0) p.bans = (p.bans || 0) + 1;
       else if (e.st.yellow > 0 && p.season.yellow > 0 && p.season.yellow % 5 === 0) p.bans = (p.bans || 0) + 1;
@@ -3014,12 +3017,23 @@ export function applyResult(world, m) {
       if (p.bans > 0) p.bans -= 1;
       if (p.inj > 0) p.inj -= 1;
     }
+    // 이 경기 출전·평점·득점·도움으로 능력치·종합·몸값이 자랍니다 (노장은 하락).
+    growTeamFromMatch(world, teamId, perf, m.seed);
   }
   const hg = m.score.home, ag = m.score.away;
   const homeTeam = world.teams[m.homeId], awayTeam = world.teams[m.awayId];
   homeTeam.recent = [...(homeTeam.recent || []), hg > ag ? 'W' : hg < ag ? 'L' : 'D'].slice(-6);
   awayTeam.recent = [...(awayTeam.recent || []), ag > hg ? 'W' : ag < hg ? 'L' : 'D'].slice(-6);
   return st;
+}
+
+/* 경기 결과 화면의 성장 예고 — applyResult 가 그대로 반영할 값과 같은 값입니다. */
+export function growthPreview(world, m) {
+  const side = m.sides?.[m.userSide];
+  if (!side) return [];
+  return (side.appeared || [])
+    .map((e) => growthPlan(world, e.id, { rating: clamp(6.0 + e.rd, 4.2, 10), goals: e.st.goals, assists: e.st.assists }, m.seed))
+    .filter(Boolean);
 }
 
 export function simulateInstant(world, homeId, awayId, seed, cup = false, userSide = 'home') {

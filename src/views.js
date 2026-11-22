@@ -1,5 +1,5 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
-import { FORMATIONS } from './data.js';
+import { FORMATIONS, STAT_LABEL } from './data.js';
 import * as W from './world.js';
 import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING, SET_PIECES, SET_PIECE_TYPES, resolveSetPiece, setPieceKey, setPieceLabel, setPieceEffect } from './tactics.js';
 import { scoutReport } from './scout.js';
@@ -24,6 +24,15 @@ export function applyTeamColors(root, world) {
 export const badge = (t, cls = '') => `<span class="badge ${cls}" data-team="${t.id}" aria-hidden="true">${esc(t.short.slice(0, 2))}</span>`;
 const formChips = (rec) => (rec && rec.length ? `<span class="form">${rec.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>` : '<span class="muted sm">경기 없음</span>');
 const won = (v) => `${W.fmt(v)}억`;
+
+/* 성장·훈련 표시 도우미 */
+const statWords = (keys) => [...new Set(keys || [])].map((k) => STAT_LABEL[k] || k);
+const deltaChip = (d) => (d > 0 ? `<b class="grow-up">+${d}</b>` : d < 0 ? `<b class="grow-down">${d}</b>` : '<span class="muted xs">—</span>');
+const statusPill = (p) => {
+  const s = W.growthStatus(p);
+  return `<span class="pill xs g-${s.key}" title="${esc(s.note)}">${esc(s.label)}</span>`;
+};
+const potOf = (p) => (Number.isFinite(p.pot) ? p.pot : p.ovr);
 
 /* 작은 포메이션 미리보기 (SVG) */
 function miniPitch(formation, team, flip) {
@@ -132,7 +141,7 @@ export function renderHub(app) {
     </div>
     <button class="btn small ghost" data-act="new-game" type="button">새 게임</button>
   </section>
-  <nav class="tabs" aria-label="앱 탭">${TABS.map((t) => `<button type="button" class="tab ${app.state.tab === t.id ? 'on' : ''}" data-act="tab" data-tab="${t.id}" aria-current="${app.state.tab === t.id}">${t.label}</button>`).join('')}</nav>
+  <nav class="tabs" aria-label="앱 탭">${TABS.map((t) => `<button type="button" class="tab ${app.state.tab === t.id ? 'on' : ''}" data-act="tab" data-tab="${t.id}" aria-current="${app.state.tab === t.id}">${t.label}${t.id === 'market' && (w.offers || []).length ? ` <span class="tab-n">${w.offers.length}</span>` : ''}</button>`).join('')}</nav>
   <section class="tab-body">${body(app, w)}</section>`;
 }
 
@@ -295,6 +304,23 @@ function recentList(app, w) {
   }).join('')}</ul>`;
 }
 
+/* ── 지난 라운드 성장 요약 ── */
+function growthCard(w) {
+  const g = w.lastGrowth;
+  const list = (g?.list || []).filter((x) => x.d !== 0 || x.plus.length || x.minus.length);
+  if (!list.length) return '';
+  const up = list.filter((x) => x.d > 0).length, down = list.filter((x) => x.d < 0).length;
+  return `<article class="card growth-card">
+    <div class="card-head"><h3>📈 지난 경기 선수 성장</h3><span class="pill">${up}명 상승 · ${down}명 하락</span></div>
+    <ul class="growth">${list.slice(0, 14).map((x) => {
+      const words = [...new Set([...x.plus.map((k) => '+' + (STAT_LABEL[k] || k)), ...x.minus.map((k) => '-' + (STAT_LABEL[k] || k))])].join(' · ');
+      const p = w.players[x.pid];
+      return `<li><b>${esc(x.name)}</b><span class="muted xs">${esc(x.pos)} · ${x.age}세</span><b class="${x.d >= 0 ? 'up' : 'down'}">${x.from === x.to ? `${x.to}` : `${x.from}→${x.to}`}</b><small class="gr-words">${esc(words || '변화 없음')}</small>${p ? statusPill(p) : ''}</li>`;
+    }).join('')}</ul>
+    <p class="hint">출전·평점·득점에 따라 매 라운드 자랍니다. 잠재력 가까이 간 선수는 성장이 둔해지고, 30대는 서서히 내려갑니다.</p>
+  </article>`;
+}
+
 function scheduleTab(app, w) {
   return `<div class="grid2">
     ${nextMatchCard(app, w)}
@@ -306,6 +332,7 @@ function scheduleTab(app, w) {
     </article>
   </div>
   ${scoutCard(w)}
+  ${growthCard(w)}
   <article class="card">
     <div class="card-head"><h3>시즌 일정</h3><span class="pill">${w.season}시즌</span></div>
     <div class="table-wrap"><table class="tbl sched">
@@ -437,9 +464,28 @@ function playerCard(w, p, opts = {}) {
       <div><small>득점/도움</small><b>${st.goals || 0} / ${st.assists || 0}</b></div>
       <div><small>평균 평점</small><b>${st.ratingCount ? (st.ratingSum / st.ratingCount).toFixed(2) : '—'}</b></div>
     </div>
+    ${(() => {
+      const gs = W.growthStatus(p);
+      const logs = (p.growthLog || []).slice(-3).reverse();
+      return `<div class="grow-box">
+        <div class="gb-head"><b>성장</b>${statusPill(p)}<span class="sm">잠재력 <b>${potOf(p)}</b> · ${esc(gs.note)}</span></div>
+        <ul class="grow-log">${logs.map((l) => `<li><span class="muted xs">${l.s}시즌</span>${deltaChip(l.d)}<span>${statWords(l.st).join(' · ') || '능력치 변화 없음'}</span></li>`).join('') || '<li class="muted sm">아직 경기 기록이 없습니다.</li>'}</ul>
+      </div>`;
+    })()}
     ${(p.bans > 0 || p.inj > 0) ? `<p class="warn-bar">${p.bans > 0 ? `⛔ 출전 정지 ${p.bans}경기` : ''}${p.bans > 0 && p.inj > 0 ? ' · ' : ''}${p.inj > 0 ? `🚑 부상 ${p.inj}경기 결장` : ''}</p>` : ''}
     ${opts.note ? `<p class="hint">${opts.note}</p>` : ''}
   </div>`;
+}
+
+function trainingCard(w) {
+  const cur = W.trainingOf(w, w.myTeamId);
+  const opts = W.TRAINING_IDS.map((k) => `<button type="button" class="train-btn ${k === cur ? 'on' : ''}" data-act="training" data-key="${k}" aria-pressed="${k === cur}">
+      <b>${W.TRAINING[k].icon} ${esc(W.TRAINING[k].name)}</b><small>${esc(W.TRAINING[k].note)}</small></button>`).join('');
+  return `<article class="card">
+    <div class="card-head"><h3>주간 팀 훈련</h3><span class="pill">${esc(W.TRAINING[cur].name)}</span></div>
+    <div class="train-row" role="group" aria-label="주간 훈련 방향">${opts}</div>
+    <p class="hint">경기에 나선 선수는 <b>출전·평점(7.0 이상 가산)·득점·도움</b>만큼 매 라운드 성장합니다. 잠재력이 높은 어린 선수는 훈련 방향에 따라 자라는 능력치가 달라지고, 30대는 서서히 내려갑니다.</p>
+  </article>`;
 }
 
 function squadTab(app, w) {
@@ -497,6 +543,7 @@ function squadTab(app, w) {
         <div class="card-head"><h3>세트피스 지시</h3><span class="pill">경기 중에도 변경</span></div>
         <ul class="axes sp-axes">${setPieceRows(l.setpiece, (t, k) => `data-act="setpiece" data-type="${t}" data-key="${k}"`)}</ul>
       </article>
+      ${trainingCard(w)}
       <article class="card">
         <div class="card-head"><h3>전술 4축</h3><span class="pill">경기 중에도 변경</span></div>
         <ul class="axes">${axes}</ul>
@@ -506,13 +553,44 @@ function squadTab(app, w) {
   <article class="card">
     <div class="card-head"><h3>선수단 ${w.teams[w.myTeamId].squad.length}명</h3><span class="pill">주급 합계 ${W.fmt(W.teamWageTotal(w, w.myTeamId))}만/주</span></div>
     <div class="table-wrap"><table class="tbl squad">
-      <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>스피드</th><th>슈팅</th><th>패스</th><th>수비</th><th>체력</th><th>몸값</th><th>출전</th></tr></thead>
-      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>#</th><th>이름</th><th>포지션</th><th>나이</th><th>종합</th><th>잠재</th><th>최근</th><th>스피드</th><th>슈팅</th><th>패스</th><th>수비</th><th>체력</th><th>몸값</th><th>출전</th></tr></thead>
+      <tbody>${W.squadOf(w, w.myTeamId).sort((a, b) => b.ovr - a.ovr).map((p) => `<tr class="${p.id === selPid ? 'on' : ''}" data-act="player" data-pid="${p.id}"><td>${p.num}</td><td><b>${esc(p.name)}</b>${p.bans > 0 ? ' <span class="pill xs" title="출전 정지">정지</span>' : ''}${p.inj > 0 ? ' <span class="pill xs" title="부상">부상</span>' : ''}${p.loan ? ' <span class="pill xs" title="임대">임대</span>' : ''}</td><td>${p.pos}</td><td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td><td>${deltaChip(W.recentDelta(p))}</td><td>${p.stats.spd}</td><td>${p.stats.sho}</td><td>${p.stats.pas}</td><td>${p.stats.def}</td><td>${p.stats.sta}</td><td>${won(p.value)}</td><td>${p.season?.apps || 0}</td></tr>`).join('')}</tbody>
     </table></div>
   </article>`;
 }
 
 /* ── 이적 시장 탭 ── */
+function offersCard(w) {
+  const offers = w.offers || [];
+  return `<article class="card offers">
+    <div class="card-head"><h3>📨 우리 선수 영입 오퍼</h3><span class="pill">${offers.length ? `${offers.length}건 대기` : '없음'}</span></div>
+    ${offers.length ? `<ul class="offer-list">${offers.map((o) => {
+      const p = w.players[o.pid], from = w.teams[o.from];
+      if (!p || !from) return '';
+      return `<li class="offer">
+        <div class="of-top">${badge(from)}<div class="of-who"><b>${esc(p.name)}</b><small>${p.pos} · ${p.age}세 · 종합 ${p.ovr} · 잠재 ${potOf(p)}</small></div><span class="of-price">${won(o.price)}</span></div>
+        <p class="of-line">${esc(from.name)} · ${esc(from.nick)} · 제안 ${won(o.price)} <span class="muted">(${o.round}R)</span></p>
+        <div class="of-acts">
+          <button class="btn small primary" data-act="offer-accept" data-id="${o.id}" type="button">수락</button>
+          <button class="btn small" data-act="offer-counter" data-id="${o.id}" type="button">역제안</button>
+          <button class="btn small ghost" data-act="offer-reject" data-id="${o.id}" type="button">거절</button>
+        </div>
+      </li>`;
+    }).join('')}</ul>` : '<p class="muted sm">아직 오퍼가 없습니다. 라운드가 진행되면 AI 구단이 우리 선수에게 접근해 옵니다.</p>'}
+    <p class="hint">수락하면 이적료가 들어오고 선수가 빠집니다. 역제안으로 더 높은 이적료를 부를 수 있고, 거절하면 당분간 같은 구단의 접근이 줄어듭니다.</p>
+  </article>`;
+}
+
+const FEED_ICON = { ai: '🔁', in: '🟢', out: '🔴', offer: '📨', reject: '✋', 'loan-in': '🤝', 'counter-no': '💬' };
+
+function transferFeed(w) {
+  const list = (w.transfers || []).slice(0, 12);
+  return `<article class="card">
+    <div class="card-head"><h3>이적 소식</h3><span class="pill">최근 ${list.length}건</span></div>
+    <ul class="tfeed">${list.map((t) => `<li class="tf-${esc(t.type)}"><span class="tf-ic" aria-hidden="true">${FEED_ICON[t.type] || '•'}</span><span class="tf-t">${esc(t.text)}</span><span class="muted xs">${t.s}시즌</span></li>`).join('') || '<li class="muted sm">아직 이적 소식이 없습니다. 라운드를 진행하면 AI 구단끼리 선수를 사고팝니다.</li>'}</ul>
+  </article>`;
+}
+
 function marketTab(app, w) {
   const me = W.myTeam(w);
   const wage = W.teamWageTotal(w, w.myTeamId);
@@ -521,24 +599,31 @@ function marketTab(app, w) {
     if (!p) return '';
     const from = e.from ? w.teams[e.from] : null;
     const c = W.canSign(w, e);
-    return `<tr>
+    const price = e.loan ? `임대 ${won(e.fee ?? 0)}` : e.price ? won(e.price) : '무료';
+    const acts = e.loan
+      ? `<button type="button" class="btn small" data-act="loan" data-pid="${p.id}" title="시즌 임대 — 시즌이 끝나면 원소속으로 돌아갑니다">임대</button>`
+      : e.from
+        ? `<span class="act-pair"><button type="button" class="btn small ${c.ok ? 'primary' : ''}" data-act="sign" data-pid="${p.id}" ${c.ok ? '' : `disabled title="${esc(c.why)}"`}>영입</button><button type="button" class="btn small" data-act="negotiate" data-pid="${p.id}">협상</button></span>`
+        : `<button type="button" class="btn small ${c.ok ? 'primary' : ''}" data-act="sign" data-pid="${p.id}" ${c.ok ? '' : `disabled title="${esc(c.why)}"`}>FA 영입</button>`;
+    return `<tr class="${e.loan ? 'loan' : ''}">
       <td><b>${esc(p.name)}</b><small class="pos">${p.pos}</small></td>
-      <td>${from ? `<span class="tl">${badge(from)}${esc(from.short)}</span>` : '<span class="pill free">자유계약</span>'}</td>
-      <td>${p.age}</td><td><b>${p.ovr}</b></td>
-      <td>${won(p.value)}</td><td><b>${e.price ? won(e.price) : '무료'}</b></td>
+      <td>${from ? `<span class="tl">${badge(from)}${esc(from.short)}</span>` : '<span class="pill free">자유계약</span>'}${e.loan ? ' <span class="pill xs">임대</span>' : ''}</td>
+      <td>${p.age}</td><td><b>${p.ovr}</b></td><td>${potOf(p)}</td>
+      <td>${won(p.value)}</td><td><b>${price}</b></td>
       <td>${W.fmt(p.wage)}만</td>
-      <td><button type="button" class="btn small ${c.ok ? 'primary' : ''}" data-act="sign" data-pid="${p.id}" ${c.ok ? '' : 'disabled title="' + esc(c.why) + '"'}>영입</button></td>
+      <td>${acts}</td>
     </tr>`;
   }).join('');
   const mine = W.squadOf(w, w.myTeamId).sort((a, b) => b.value - a.value).map((p) => `<tr>
-      <td><b>${esc(p.name)}</b><small class="pos">${p.pos}</small></td>
-      <td>${p.age}</td><td>${p.ovr}</td><td>${won(p.value)}</td><td>${W.fmt(p.wage)}만</td>
-      <td>${won(Math.round(p.value * 0.9 * 10) / 10)}</td>
-      <td><button type="button" class="btn small danger" data-act="sell" data-pid="${p.id}">방출</button></td>
+      <td><b>${esc(p.name)}</b><small class="pos">${p.pos}</small>${p.loan ? ' <span class="pill xs">임대</span>' : ''}</td>
+      <td>${p.age}</td><td>${p.ovr}</td><td>${potOf(p)}</td><td>${won(p.value)}</td><td>${W.fmt(p.wage)}만</td>
+      <td>${p.loan ? '<span class="muted xs">임대 중</span>' : won(Math.round(p.value * 0.9 * 10) / 10)}</td>
+      <td>${p.loan ? '' : `<button type="button" class="btn small danger" data-act="sell" data-pid="${p.id}">방출</button>`}</td>
     </tr>`).join('');
   const overWage = wage > me.wage;
-  return `<article class="card">
-    <div class="card-head"><h3>이적 시장</h3><span class="pill">${w.season}시즌 · 다음 시즌 개막 때 갱신</span></div>
+  return `${offersCard(w)}
+  <article class="card">
+    <div class="card-head"><h3>이적 시장</h3><span class="pill">${w.season}시즌 · 라운드마다 갱신</span></div>
     <div class="money-row">
       <div><small>이적 자금</small><b>${won(me.budget)}</b></div>
       <div><small>주급 사용</small><b>${W.fmt(wage)}<span class="unit"> / ${W.fmt(me.wage)}만</span></b></div>
@@ -546,16 +631,17 @@ function marketTab(app, w) {
       <div><small>이번 시즌 지출</small><b>${won(w.finance.spent)}</b></div>
     </div>
     ${overWage ? '<p class="warn-bar">주급 예산을 초과했습니다. 선수를 방출해 공간을 만든 뒤 영입할 수 있습니다.</p>' : ''}
-    <div class="table-wrap"><table class="tbl market">
-      <thead><tr><th>선수</th><th>소속</th><th>나이</th><th>종합</th><th>몸값</th><th>이적료</th><th>주급</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="8" class="muted">시장에 나온 선수가 없습니다.</td></tr>'}</tbody>
+    <div class="table-wrap"><table class="tbl market buy">
+      <thead><tr><th>선수</th><th>소속</th><th>나이</th><th>종합</th><th>잠재</th><th>몸값</th><th>이적료</th><th>주급</th><th></th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="9" class="muted">시장에 나온 선수가 없습니다.</td></tr>'}</tbody>
     </table></div>
-    <p class="hint">영입하면 이적 자금이 빠지고 주급이 늘어납니다. 주급 예산을 넘으면 영입할 수 없습니다.</p>
+    <p class="hint"><b>영입</b>은 요청가 그대로, <b>협상</b>은 낮은 금액을 불러 흥정합니다(상대가 받아들일 최저선이 있습니다). <b>FA</b>는 이적료 없이, <b>임대</b>는 임대료만 내고 시즌이 끝나면 원소속으로 돌아갑니다. 주급 예산을 넘으면 영입할 수 없습니다.</p>
   </article>
+  ${transferFeed(w)}
   <article class="card">
     <div class="card-head"><h3>방출 가능한 선수</h3><span class="pill">몸값의 90% 회수</span></div>
-    <div class="table-wrap"><table class="tbl market">
-      <thead><tr><th>선수</th><th>나이</th><th>종합</th><th>몸값</th><th>주급</th><th>예상 이적료</th><th></th></tr></thead>
+    <div class="table-wrap"><table class="tbl market sell">
+      <thead><tr><th>선수</th><th>나이</th><th>종합</th><th>잠재</th><th>몸값</th><th>주급</th><th>예상 이적료</th><th></th></tr></thead>
       <tbody>${mine}</tbody>
     </table></div>
   </article>`;
@@ -680,6 +766,37 @@ export function renderModal(app) {
       <p>${old ? `${esc(old.name)} · ${(app.savedGame || app.world).season}시즌 커리어` : '저장된 커리어'}가 이 브라우저에서 사라집니다. 되돌릴 수 없습니다.</p>
       <p class="sm"><b>${esc(t.name)}</b> 감독으로 새로 시작합니다.</p>
       <div class="actions"><button class="btn danger" data-act="overwrite-confirm" data-team="${t.id}" type="button">지우고 새로 시작</button><button class="btn" data-act="modal-close" type="button">취소</button></div>
+    </div></div>`;
+  }
+  if (m.kind === 'offer-counter') {
+    const o = (app.world?.offers || []).find((x) => x.id === m.id);
+    const p = o ? app.world.players[o.pid] : null;
+    const club = o ? app.world.teams[o.from] : null;
+    if (!o || !p || !club) return '';
+    const opts = [0.1, 0.2, 0.3].map((rate) => {
+      const price = Math.round(o.price * (1 + rate) * 10) / 10;
+      return `<button class="btn" data-act="offer-counter-send" data-id="${o.id}" data-price="${price}" type="button">${won(price)} <small class="muted">+${Math.round(rate * 100)}%</small></button>`;
+    }).join('');
+    return `<div class="modal-back" data-act="modal-close"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <h3 id="m-title">${esc(p.name)} 역제안</h3>
+      <p>${esc(club.name)}의 오퍼 <b>${won(o.price)}</b> · 몸값 ${won(p.value)} · 종합 ${p.ovr} · 잠재 ${potOf(p)}</p>
+      <p class="sm">부를 금액을 고르세요. 상대 구단이 낼 수 있는 상한을 넘기면 거절하고, 대신 자기들이 낼 수 있는 최대액을 다시 제시합니다.</p>
+      <div class="actions">${opts}<button class="btn ghost" data-act="modal-close" type="button">닫기</button></div>
+    </div></div>`;
+  }
+  if (m.kind === 'negotiate') {
+    const e = (app.world?.market || []).find((x) => x.pid === m.pid);
+    const p = app.world?.players?.[m.pid];
+    if (!e || !p) return '';
+    const opts = [0, 0.1, 0.2].map((rate) => {
+      const price = Math.round(e.price * (1 - rate) * 10) / 10;
+      return `<button class="btn" data-act="negotiate-send" data-pid="${p.id}" data-price="${price}" type="button">${won(price)} <small class="muted">${rate ? `-${Math.round(rate * 100)}%` : '요청가'}</small></button>`;
+    }).join('');
+    return `<div class="modal-back" data-act="modal-close"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="m-title">
+      <h3 id="m-title">${esc(p.name)} 가격 협상</h3>
+      <p>${esc(app.world.teams[e.from]?.name || '상대 구단')} 요청가 <b>${won(e.price)}</b> · 몸값 ${won(p.value)} · 종합 ${p.ovr} · 잠재 ${potOf(p)}</p>
+      <p class="sm">낮은 금액을 부르면 상대가 받아들일지 판단합니다. 거절하면 자기들이 낼 수 있는 최저선으로 다시 제시합니다.</p>
+      <div class="actions">${opts}<button class="btn ghost" data-act="modal-close" type="button">닫기</button></div>
     </div></div>`;
   }
   if (m.kind === 'team') {

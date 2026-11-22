@@ -865,6 +865,92 @@ html[data-theme="night"] .rating-cols b.hi { color: #37e07a; } html[data-theme="
   .scorebar { padding: 6px 8px; gap: 6px; }
   .badge.mid { width: 34px; height: 34px; font-size: 11px; }
 }
+
+/* ── 4단계: 선수 성장 · 훈련 · 이적 오퍼/피드 ─────────────────────────── */
+.tab-n { display: inline-block; min-width: 15px; padding: 0 3px; margin-left: 2px; background: var(--coral); color: #2a0a04; border: 1.5px solid var(--line); font-size: 9.5px; font-weight: 900; line-height: 13px; text-align: center; }
+.train-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; margin: 2px 0 6px; }
+.train-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 7px 8px; border: 1.5px solid var(--line); background: var(--paper); cursor: pointer; font-family: inherit; color: var(--ink); font-weight: 900; }
+.train-btn b { font-size: 12px; letter-spacing: -0.02em; }
+.train-btn small { font-size: 9.5px; font-weight: 700; color: var(--soft); line-height: 1.35; }
+.train-btn:hover:not(.on) { background: var(--paper2); }
+.train-btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); box-shadow: 2px 2px 0 var(--line); }
+.train-btn.on small { color: var(--bg); opacity: 0.75; }
+
+.grow-box { border-top: 1.5px dashed color-mix(in srgb, var(--line) 35%, transparent); margin-top: 8px; padding-top: 7px; }
+.gb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 4px; }
+.gb-head > b { font-size: 12px; font-weight: 900; }
+.gb-head .sm { font-size: 10.5px; color: var(--soft); font-weight: 700; }
+.grow-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.grow-log li { display: flex; align-items: baseline; gap: 6px; font-size: 11px; font-weight: 800; }
+.grow-up { color: #0a7a33; font-size: 11px; }
+.grow-down { color: #c23a24; font-size: 11px; }
+html[data-theme="night"] .grow-up { color: #37e07a; }
+html[data-theme="night"] .grow-down { color: #ff8a76; }
+.pill.g-prospect { background: var(--cyan); color: #04222f; }
+.pill.g-up { background: var(--green); color: #04220f; }
+.pill.g-peak { background: var(--yellow); color: #2a2200; }
+.pill.g-decline, .pill.g-down { background: var(--coral); color: #2a0a04; }
+.pill.g-flat { background: var(--paper2); color: var(--soft); }
+
+.growth-card .growth li { flex-wrap: wrap; }
+.growth-card .growth .gr-words { font-size: 10.5px; font-weight: 700; color: var(--soft); margin-left: auto; }
+.growth-card .growth .pill { margin-left: 4px; }
+
+.offer-list { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.offer { border: 1.5px solid var(--line); background: var(--paper2); padding: 7px 8px; }
+.of-top { display: flex; align-items: center; gap: 8px; }
+.of-who { display: flex; flex-direction: column; min-width: 0; }
+.of-who b { font-size: 13px; }
+.of-who small { font-size: 10px; font-weight: 700; color: var(--soft); }
+.of-price { margin-left: auto; font-size: 14px; font-weight: 900; background: var(--yellow); color: #2a2200; border: 1.5px solid var(--line); padding: 1px 6px; white-space: nowrap; }
+.of-line { font-size: 10.5px; font-weight: 700; color: var(--soft); margin: 4px 0 6px; }
+.of-acts { display: flex; gap: 5px; flex-wrap: wrap; }
+.of-acts .btn { flex: 1 1 auto; }
+
+.tfeed { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tfeed li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; font-size: 11.5px; font-weight: 750; line-height: 1.4; }
+.tfeed .tf-ic { font-size: 11px; }
+.tfeed .tf-t { min-width: 0; overflow-wrap: anywhere; }
+.tfeed .tf-offer .tf-t { color: #8a5a00; }
+html[data-theme="night"] .tfeed .tf-offer .tf-t { color: var(--yellow); }
+
+.act-pair { display: inline-flex; gap: 4px; }
+.tbl.market tr.loan td { background: color-mix(in srgb, var(--purple) 10%, transparent); }
+
+.ov-growth:empty { display: none; }
+.ov-growth { border-top: 1.5px dashed color-mix(in srgb, var(--line) 30%, transparent); margin-top: 6px; padding-top: 6px; }
+.ovg-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.ovg-head b { font-size: 12px; font-weight: 900; }
+.ovg-head span { font-size: 9.5px; font-weight: 800; color: var(--soft); }
+.ovg-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; max-height: 132px; overflow-y: auto; }
+.ovg-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 6px; align-items: baseline; font-size: 11px; font-weight: 800; }
+.ovg-list li b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ovg-num { font-weight: 900; }
+.ovg-num.up { color: #0a7a33; }
+.ovg-num.down { color: #c23a24; }
+html[data-theme="night"] .ovg-num.up { color: #37e07a; }
+html[data-theme="night"] .ovg-num.down { color: #ff8a76; }
+.ovg-list small { font-size: 9.5px; font-weight: 700; color: var(--soft); grid-column: 1 / -1; margin-top: -1px; }
+.ovg-pot { font-size: 9px; font-style: normal; font-weight: 800; color: var(--soft); }
+@media (max-width: 520px) {
+  .train-row { grid-template-columns: 1fr 1fr; }
+  .of-acts .btn { flex: 1 1 30%; }
+  /* 좁은 화면에서는 매물 표의 보조 열을 접어 영입/협상 버튼이 바로 보이게 합니다 */
+  .tbl.market.buy th:nth-child(3), .tbl.market.buy td:nth-child(3),
+  .tbl.market.buy th:nth-child(5), .tbl.market.buy td:nth-child(5),
+  .tbl.market.buy th:nth-child(6), .tbl.market.buy td:nth-child(6),
+  .tbl.market.buy th:nth-child(8), .tbl.market.buy td:nth-child(8) { display: none; }
+  .tbl.market.sell th:nth-child(2), .tbl.market.sell td:nth-child(2),
+  .tbl.market.sell th:nth-child(4), .tbl.market.sell td:nth-child(4),
+  .tbl.market.sell th:nth-child(6), .tbl.market.sell td:nth-child(6) { display: none; }
+  .tbl.squad th:nth-child(8), .tbl.squad td:nth-child(8),
+  .tbl.squad th:nth-child(9), .tbl.squad td:nth-child(9),
+  .tbl.squad th:nth-child(10), .tbl.squad td:nth-child(10),
+  .tbl.squad th:nth-child(11), .tbl.squad td:nth-child(11),
+  .tbl.squad th:nth-child(12), .tbl.squad td:nth-child(12) { display: none; }
+  .tbl.market, .tbl.squad { min-width: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; scroll-behavior: auto !important; }
 }
