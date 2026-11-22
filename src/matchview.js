@@ -436,6 +436,12 @@ export function mountMatch(app, m, meta) {
   const pos = (e, a) => ({ x: lerp(e.px, e.x, a), y: lerp(e.py, e.y, a) });
 
   // S = 그릴 장면. 생방송에서는 m(경기 엔진), 리플레이에서는 버퍼에 담아 둔 스냅샷입니다.
+  /* 라이브 세트피스의 지시 키 — m.sp 에는 key 필드가 없어 매 프레임 읽습니다 (리플레이 스냅숏은 key 를 들고 있습니다) */
+  function liveSpKey(S, type) {
+    if (S !== m) return null;
+    try { return m.spDirective(type, m.sp.side); } catch { return null; }
+  }
+
   function draw(a = 0, S = m) {
     const c = colors();
     const pad = 2.0;
@@ -516,12 +522,16 @@ export function mountMatch(app, m, meta) {
       const sx = CX(S.sp.x), sy = CYp(S.sp.y);
       ctx.beginPath(); ctx.arc(sx, sy, Math.max(8, scale * 1.6), 0, Math.PI * 2);
       ctx.strokeStyle = '#ffdc1a'; ctx.lineWidth = 2.4; ctx.setLineDash([4, 3]); ctx.stroke(); ctx.setLineDash([]);
-      if (S.sp.type && S.sp.key) {
-        const label = `${SET_PIECES[S.sp.type]?.name || ''} · ${setPieceLabel(S.sp.type, S.sp.key)}`;
+      const spKeyLive = S.sp.key || (S.sp.type ? liveSpKey(S, S.sp.type) : null);
+      if (spKeyLive) {
+        const label = `${SET_PIECES[S.sp.type]?.name || ''} · ${setPieceLabel(S.sp.type, spKeyLive)}`;
         ctx.font = `900 ${Math.max(9, Math.round(scale * 1.15))}px "Pretendard Variable", Pretendard, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         const tw = ctx.measureText(label).width + 10, th = Math.max(15, scale * 1.9);
-        const lx = Math.min(cssW - tw / 2 - 2, Math.max(tw / 2 + 2, sx)), ly = Math.max(th / 2 + 2, sy - Math.max(16, scale * 2.4));
+        // 위가 아니면 지점 아래로 — 모서리 팀 이름(금산 ▶)과 겹치지 않게
+        const up = Math.max(16, scale * 2.4);
+        const lx = Math.min(cssW - tw / 2 - 2, Math.max(tw / 2 + 2, sx));
+        const ly = (sy - up >= th / 2 + 16) ? sy - up : Math.min(cssH - th / 2 - 2, sy + up);
         ctx.fillStyle = 'rgba(16,16,20,.82)';
         ctx.fillRect(lx - tw / 2, ly - th / 2, tw, th);
         ctx.fillStyle = '#ffdc1a';

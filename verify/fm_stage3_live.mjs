@@ -86,17 +86,18 @@ const barCheck = (page) => page.evaluate(() => {
   const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
   let match = 0, miss = 0, sampled = 0;
   const colors = [];
+  const near = (d, R, G, B) => Math.abs(d[0] - R) < 30 && Math.abs(d[1] - G) < 30 && Math.abs(d[2] - B) < 30;
   for (const b of info.list) {
-    // b.x 는 바의 '가운데' 좌표 — 바 높이의 한가운데를 읽습니다
-    const sx = Math.round(b.x * info.dpr);
+    // b.x 는 바둑알(=바 가운데) x, b.y 는 바 위 끝 — 바 안 3점을 읽어 하나라도 제 색이면 그립니다
+    // (다른 선수 링·번호가 바 위를 지나가는 순간도 있어서입니다)
     const sy = Math.round((b.y + b.h * 0.5) * info.dpr);
-    if (sx < 1 || sy < 1 || sx >= c.width - 1 || sy >= c.height - 1) continue;
-    const d = ctx.getImageData(sx, sy, 1, 1).data;
+    const xs = [-0.35, 0, 0.35].map((k) => Math.round((b.x + b.w * k) * info.dpr));
+    if (xs[0] < 1 || sy < 1 || xs[2] >= c.width - 1 || sy >= c.height - 1) continue;
+    const ds = xs.map((x) => ctx.getImageData(x, sy, 1, 1).data);
     const [R, G, B] = hex(b.color);
     sampled += 1;
-    if (Math.abs(d[0] - R) < 26 && Math.abs(d[1] - G) < 26 && Math.abs(d[2] - B) < 26) match += 1;
+    if (ds.some((d) => near(d, R, G, B))) match += 1;
     else miss += 1;
-    colors.push({ num: b.num, side: b.side, stamina: b.stamina, want: b.color, got: `#${[d[0], d[1], d[2]].map((v) => v.toString(16).padStart(2, '0')).join('')}` });
   }
   const bands = info.list.reduce((m, b) => { const k = b.stamina >= 70 ? 'good' : b.stamina >= 45 ? 'warn' : 'low'; m[k] = (m[k] || 0) + 1; return m; }, {});
   return { sampled, match, miss, bands, bad: colors.filter((c2) => c2.want !== c2.got).slice(0, 4), scale: info.scale };
@@ -286,8 +287,40 @@ console.log('\n[데스크톱 1440×900]');
     return { sp: m.sp ? { type: m.sp.type, key: m.spDirective(m.sp.type, m.sp.side) } : null };
   });
   ok(spState.sp?.type === 'corner' && spState.sp?.key === 'near', '세트피스가 열리면 지금 지시를 읽습니다', JSON.stringify(spState.sp));
-  ok(spLabel && spLabel.yellow > (px?.yellow || 0), '코너 지점·지시 라벨(노랑)이 피치에 그려집니다',
-    `${px?.yellow}px → ${spLabel?.yellow}px`);
+  // 라벨은 코너 지점 위 짙은 바탕 + 노랑 글자 — 그 좌표를 화면이 알려 주는 값으로 직접 샘플합니다
+  const label = await page.evaluate(() => {
+    const m = window.__fm.match;
+    const info = window.__fm.bars();
+    const c = document.getElementById('pitch');
+    const ctx = c.getContext('2d');
+    const dpr = info.dpr;
+    const pad = 2.0;
+    const scale = Math.min(info.cssW / (100 + pad * 2), info.cssH / (64 + pad * 2));
+    const ox = (info.cssW - (100 + pad * 2) * scale) / 2 + pad * scale;
+    const oy = (info.cssH - (64 + pad * 2) * scale) / 2 + pad * scale;
+    const sx = (ox + m.sp.x * scale) * dpr, sy = (oy + m.sp.y * scale) * dpr;
+    // draw() 와 같은 배치 규칙 — 위에 두면 모서리 팀 이름과 겹치므로 아래로 내립니다
+    const upC = Math.max(16, scale * 2.4);
+    const thC = Math.max(15, scale * 1.9);
+    const lyC = ((oy + m.sp.y * scale) - upC >= thC / 2 + 16) ? (oy + m.sp.y * scale) - upC : Math.min(info.cssH - thC / 2 - 2, (oy + m.sp.y * scale) + upC);
+    const lxC = Math.min(info.cssW - 40, Math.max(40, ox + m.sp.x * scale));
+    const spx = lxC * dpr, spy = lyC * dpr;
+    const up = thC * dpr * 0.75;
+    let dark = 0, gold = 0;
+    for (let dy = -12; dy <= 12; dy += 2) {
+      for (let dx = -70; dx <= 70; dx += 2) {
+        const x = Math.round(spx + dx), y = Math.round(spy + dy);
+        if (x < 0 || y < 0 || x >= c.width || y >= c.height) continue;
+        const d = ctx.getImageData(x, y, 1, 1).data;
+        if (d[3] < 40) continue;
+        if (d[0] < 70 && d[1] < 70 && d[2] < 70) dark += 1;
+        else if (Math.abs(d[0] - 255) < 30 && Math.abs(d[1] - 220) < 40 && Math.abs(d[2] - 26) < 50) gold += 1;
+      }
+    }
+    return { dark, gold, sx: spx, sy: spy };
+  });
+  ok(label.dark > 60 && label.gold > 8, '코너 지점 위에 지시 라벨(짙은 바탕·노랑 글자)이 그려집니다',
+    `바탕 ${label.dark}px · 글자 ${label.gold}px at ${Math.round(label.sx)},${Math.round(label.sy)}`);
   out.metrics.barsAtCorner = spLabel;
   await page.locator('#m-pause').click();
   await sleep(200);
