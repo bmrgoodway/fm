@@ -621,7 +621,7 @@ function presetCard(w) {
     </div>
     ${list.length ? `<ul class="preset-list">${list.map((p) => {
       const n = (p.starters || []).filter(Boolean).length;
-      return `<li class="preset">
+      return `<li class="preset" data-act="preset-load" data-id="${esc(p.id)}" tabindex="0" title="눌러서 이 프리셋을 불러옵니다">
         <div class="pr-main">
           <b>${esc(p.name)}</b>
           <small>${esc(p.formation)} · ${esc(tacticWords(p.tactic || {}))} · ${esc(p.div || '')}</small>

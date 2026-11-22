@@ -1154,6 +1154,8 @@ html[data-theme="night"] .mrlist b.lo { color: #ff8a76; }
 .preset .pr-main b { font-size: 13px; }
 .preset .pr-main small { font-size: 10.5px; font-weight: 800; color: var(--soft); }
 .preset .pr-ops { display: flex; gap: 4px; flex-wrap: wrap; margin-left: auto; }
+.preset[data-act] { cursor: pointer; }
+.preset[data-act]:hover { background: var(--paper); outline: 1.5px solid var(--line); }
 
 /* ── 저장 / 불러오기 모달 ── */
 .saves-modal { width: min(680px, 100%); }

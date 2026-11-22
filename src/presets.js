@@ -8,7 +8,7 @@
 import { local } from './store.js';
 import { FORMATIONS } from './data.js';
 import { rolesForLabel, defaultRole, resolveSetPiece } from './tactics.js';
-import { squadOf, available, TRAINING, seasonLabel, divOf } from './world.js';
+import { squadOf, available, TRAINING, seasonLabel, divOf, divName } from './world.js';
 
 export const PRESET_KEY = 'presets';
 export const PRESET_VERSION = 1;
@@ -48,7 +48,7 @@ export function snapshot(w, name) {
     at: Date.now(),
     mode: w.mode || 'custom',
     season: seasonLabel(w),
-    div: divOf(w, w.myTeamId),
+    div: w.mode === 'kleague' ? divName(w, divOf(w, w.myTeamId)) : '커스텀 리그',
     formation: l.formation,
     slots: slots.map((s) => s.label),
     tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(l.tactic || {}) },

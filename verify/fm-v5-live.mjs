@@ -111,11 +111,12 @@ await page.locator('#preset-name').fill('홈 4-3-3 압박');
 await page.locator('[data-act="preset-save"]').click();
 await sleep(400);
 ok((await page.locator('.preset').count()) === 1, '프리셋이 저장되어 목록에 나옵니다');
+ok(/K4리그|리그/.test((await page.locator('.preset').first().textContent()) || ''), '프리셋에 디비전·시즌이 함께 표시됩니다');
 const savedFormation = await page.locator('.form-row .btn.on').first().textContent();
 await page.locator('.form-row [data-act="formation"]').nth(6).click();
 await sleep(300);
 const otherFormation = await page.locator('.form-row .btn.on').first().textContent();
-await page.locator('.preset [data-act="preset-load"]').first().click();
+await page.locator('.preset .pr-main b').first().click();   // 프리셋 줄(이름)을 한 번 누르면 불러오기
 await sleep(600);
 const backFormation = await page.locator('.form-row .btn.on').first().textContent();
 ok(savedFormation !== otherFormation && backFormation === savedFormation, '한 번 눌러 저장한 포메이션·전술이 되살아납니다', `${savedFormation} → ${otherFormation} → ${backFormation}`);
