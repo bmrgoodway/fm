@@ -192,6 +192,10 @@ console.log('\n[데스크톱 1440×900]');
   await prepShot(page, '.offers', 150);
   await page.screenshot({ path: `${SHOT_DIR}/fm-stage4-transfer.png` });
   out.metrics.transferShot = `${SHOT_DIR}/fm-stage4-transfer.png`;
+  // 이적 소식 피드도 따로 담아 둡니다 (시장 표 아래)
+  await prepShot(page, '.tfeed', 220);
+  await page.screenshot({ path: `${SHOT_DIR}/fm-stage4-feed.png` });
+  out.metrics.feedShot = `${SHOT_DIR}/fm-stage4-feed.png`;
 
   // ⑧ 역제안 모달 → 금액 3단계 → 전송
   const beforeOffer = await saved(page);
