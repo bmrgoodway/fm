@@ -193,6 +193,8 @@ function sharePanel(app, team) {
   const vsLink = vsA?.code && vsB?.code && vsA.id !== vsB.id ? matchLink(vsA.code, vsB.code) : '';
   const missing = [vsA, vsB].filter((t) => t && !t.code);
   const opt = (t, selId, showCode = true) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${esc(t.name)} · ${formatName(t.size)}${showCode ? (t.code ? ` · ${t.code}` : ' · 코드 없음') : ''}</option>`;
+  // 두 팀 고르기에서는 규모 대신 코드를 붙여 좌우 칸에서도 읽히게 합니다
+  const vsOpt = (t, selId) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${esc(t.name)} · ${t.code || '코드 없음'}</option>`;
   return `<div class="cm-grid">
     <section class="card">
       <h3>공유 코드 만들기</h3>
@@ -265,17 +267,20 @@ function sharePanel(app, team) {
       <p class="sm">두 팀을 고르면 <code>?m=팀A:팀B</code> 짧은 링크가 바로 만들어집니다. 받은 사람은 두 팀이 한 번에 열려 홈/원정만 고르면 돼요.</p>
       ${db.list.length ? `<div class="cm-vs-pick">
         <label class="cm-vs-side"><span>팀 A</span>
-          <select class="inp" data-cm="vs" data-side="a" aria-label="매치업 링크 팀 A">${db.list.map((t) => opt(t, vsA?.id)).join('')}</select>
+          <select class="inp" data-cm="vs" data-side="a" aria-label="매치업 링크 팀 A">${db.list.map((t) => vsOpt(t, vsA?.id)).join('')}</select>
         </label>
         <span class="cm-vs-x" aria-hidden="true">vs</span>
         <label class="cm-vs-side"><span>팀 B</span>
           <select class="inp" data-cm="vs" data-side="b" aria-label="매치업 링크 팀 B">${db.list.length > 1
-            ? db.list.map((t) => opt(t, vsB?.id)).join('')
+            ? db.list.map((t) => vsOpt(t, vsB?.id)).join('')
             : '<option value="">팀이 하나 더 필요합니다</option>'}</select>
         </label>
       </div>` : ''}
       ${vsLink ? `<div class="cm-vs-out">
-        <code>${esc(vsLink)}</code>
+        <div class="cm-vs-main">
+          <code class="cm-vs-code">${esc(vsLink.slice(vsLink.indexOf('?')))}</code>
+          <p class="cm-vs-full sm muted">${esc(vsLink)}</p>
+        </div>
         <button class="btn small" data-act="cm-copy" data-copy="${esc(vsLink)}" type="button">복사</button>
       </div>` : db.list.length > 1 ? `<div class="cm-vs-out off">
         ${vsA && vsB && vsA.id === vsB.id ? '<p class="sm">서로 다른 두 팀을 골라 주세요.</p>' : ''}
