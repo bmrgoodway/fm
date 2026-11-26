@@ -193,8 +193,8 @@ function sharePanel(app, team) {
   const vsLink = vsA?.code && vsB?.code && vsA.id !== vsB.id ? matchLink(vsA.code, vsB.code) : '';
   const missing = [vsA, vsB].filter((t) => t && !t.code);
   const opt = (t, selId, showCode = true) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${esc(t.name)} · ${formatName(t.size)}${showCode ? (t.code ? ` · ${t.code}` : ' · 코드 없음') : ''}</option>`;
-  // 두 팀 고르기에서는 규모 대신 코드를 붙여 좌우 칸에서도 읽히게 합니다
-  const vsOpt = (t, selId) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${esc(t.name)} · ${t.code || '코드 없음'}</option>`;
+  // 두 팀 고르기에서는 코드를 앞에 두어, 좁은 칸에서 잘려도 코드가 먼저 보이게 합니다
+  const vsOpt = (t, selId) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${t.code || '코드 없음'} · ${esc(t.name)}</option>`;
   return `<div class="cm-grid">
     <section class="card">
       <h3>공유 코드 만들기</h3>
