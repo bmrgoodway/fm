@@ -119,8 +119,6 @@ ok((await teamIn(page)).customCoords[9].x === 0.62, '역할을 바꿔도 옮긴 
 
 /* ── 4) 기본 대형으로 되돌리기 / 포메이션 변경 ─────────────── */
 console.log('\n[4] 되돌리기·포메이션 변경');
-await page.locator('.cpb').scrollIntoViewIfNeeded();
-await page.locator('.cpb').screenshot({ path: `${SHOT}/fm-custom-free-formation.png` });
 const resetBtn = page.locator('[data-act="cm-board-reset"]');
 ok(await resetBtn.count() === 1 && await resetBtn.isEnabled(), '「기본 대형으로 되돌리기」 버튼이 있습니다');
 await resetBtn.click();
@@ -160,7 +158,7 @@ async function mockSupabase(route) {
   }
   return route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
 }
-for (const [i, x, y] of [[8, 0.8, 0.2], [10, 0.8, 0.8], [9, 0.62, 0.35]]) await dragChip(page, i, x, y);
+for (const [i, x, y] of [[1, 0.42, 0.2], [4, 0.42, 0.8], [8, 0.8, 0.2], [10, 0.8, 0.8], [9, 0.62, 0.35]]) await dragChip(page, i, x, y);
 const mine = await teamIn(page);
 await page.route('**/rest/v1/custom_teams*', mockSupabase);
 await page.locator('[data-act="cm-tab"][data-tab="share"]').click();
@@ -230,6 +228,9 @@ console.log('\n[6] 자유 대형으로 2D 경기');
 await page.locator('[data-act="cm-tab"][data-tab="match"]').click();
 await sleep(300);
 const before = await teamIn(page);
+await page.locator('.cpb').scrollIntoViewIfNeeded();
+await sleep(200);
+await page.locator('.cpb').screenshot({ path: `${SHOT}/fm-custom-free-formation.png` });   // 경기에 나설 그 대형
 await page.locator('[data-act="mu-start"][data-instant="0"]').click();
 await page.waitForSelector('.matchview', { timeout: 20000 });
 await sleep(150);
