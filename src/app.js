@@ -608,6 +608,13 @@ function onClick(e) {
       C.saveTeam(t); keepScroll(); render();
       toast(`팀 성향 · ${mentalityOf(v).name} — ${mentalityEffect(v, true)}`, 'ok'); break;
     }
+    case 'cm-setpiece': {
+      const t = state.custom.team;
+      if (!t) break;
+      t.setpiece = C.setTeamSetPiece(t, el.dataset.type, el.dataset.key);
+      C.saveTeam(t); keepScroll(); render();
+      toast(`세트피스 · ${el.dataset.type === 'corner' ? '코너킥' : '프리킥'} ${setPieceLabel(el.dataset.type, t.setpiece[el.dataset.type])}`, 'ok'); break;
+    }
     case 'cm-share':
       state.custom.tab = 'share'; render(); break;
     case 'cm-publish': publishTeam(el.dataset.id); break;

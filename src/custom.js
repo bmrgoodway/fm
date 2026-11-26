@@ -131,6 +131,12 @@ export function setSize(team, size) {
   return setFormation(team, formationsFor(n)[0]);
 }
 
+/* 세트피스 지시 — 코너킥·프리킥을 어떻게 찰지 고릅니다 */
+export function setTeamSetPiece(team, type, key) {
+  team.setpiece = resolveSetPiece({ ...(team.setpiece || {}), [type]: key });
+  return team.setpiece;
+}
+
 /* ─────────────────────────── 능력치 ─────────────────────────── */
 export function ovrOf(team, p) {
   if (!p?.stats) return 0;

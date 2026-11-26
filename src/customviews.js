@@ -3,7 +3,7 @@
 import { FORMATIONS, formationsFor, STAT_KEYS, STAT_LABEL, sizeOfFormation } from './data.js';
 import { MENTALITY, mentalityOf, mentalityEffect, AXES, STEPS, stepLabel, roleLabel, roleShort, nextRole, rolesForLabel } from './tactics.js';
 import { KL_TEAMS, KL_DIVISIONS } from './kleague2026.js';
-import { esc } from './views.js';
+import { esc, setPieceRows } from './views.js';
 import {
   FORMATS, formatName, formatOf, readTeams, getTeam, teamShort, teamPowerOf, ovrOf, teamSlotPos,
   slotLabelsOf, teamLink, matchLink, matchSummary,
@@ -321,6 +321,9 @@ function matchupPanel(app, team) {
               <span class="rr-role">${esc(roleShort(role))}${more ? ' ↻' : ''}</span></button>`;
           }).join('')}
         </div>
+      </div>
+      <div class="cm-field"><span>세트피스 지시</span>
+        <ul class="axes compact sp-axes">${setPieceRows(team.setpiece, (t, k) => `data-act="cm-setpiece" data-type="${t}" data-key="${k}"`, { compact: true })}</ul>
       </div>` : ''}
       <p class="hint">K리그 구단과 붙을 때도 내 팀 전술은 그대로 적용됩니다. 경기 중에도 바꿀 수 있습니다.</p>
     </section>

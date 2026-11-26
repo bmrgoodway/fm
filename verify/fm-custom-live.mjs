@@ -159,6 +159,11 @@ await sleep(300);
 await page.locator('[data-act="cm-tab"][data-tab="match"]').click();
 await sleep(250);
 ok(await page.locator('[data-act="mu-start"]').count() === 2, '매치업 준비 화면(중계/즉시)이 그려집니다');
+ok(await page.locator('[data-act="cm-setpiece"]').count() === 6, '코너·프리킥 세트피스 지시를 경기 전에 고를 수 있습니다');
+await page.locator('[data-act="cm-setpiece"][data-type="corner"][data-key="short"]').click();
+await sleep(250);
+const spSaved = await page.evaluate(() => JSON.parse(localStorage.getItem('fm:customTeams') || '{}').list?.find((t) => t.size === 5)?.setpiece?.corner);
+ok(spSaved === 'short', '고른 세트피스 지시가 팀에 저장됩니다', String(spSaved));
 
 // K리그 구단과 5:5 (즉시 결과)
 await page.locator('[data-mu="kl"]').selectOption('seoul');

@@ -26,7 +26,7 @@ import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H
 // 커스텀 매치업 — 친구 팀 빌더·공유 코드·풋살(5·6인제) 경기
 import {
   newTeam, normalizeTeam, setPlayerOvr, setPlayerName, setPlayerStat, autoFill, ovrOf, teamPowerOf,
-  setFormation as setTeamFormation, setSize, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
+  setFormation as setTeamFormation, setSize, setTeamSetPiece, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
@@ -2343,6 +2343,15 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
     '11인제 매치업은 11명·원정 선택이 그대로입니다');
   const m11 = new Match({ world: b11.world, homeId: b11.homeId, awayId: b11.awayId, homeLineup: b11.homeLineup, awayLineup: b11.awayLineup, seed: 'cm-11', userSide: 'away' });
   ok(m11.offsideOn === true, '11인제 경기는 오프사이드 판정이 켜집니다');
+
+  /* 세트피스 지시가 경기 라인업까지 전달됩니다 */
+  const spTeam = newTeam({ size: 5, name: '세트피스 점검' });
+  autoFill(spTeam, { level: 70 });
+  setTeamSetPiece(spTeam, 'corner', 'near');
+  setTeamSetPiece(spTeam, 'freekick', 'box');
+  const bsp = buildMatchupWorld({ home: { kind: 'custom', team: spTeam }, away: { kind: 'kl', id: 'seoul' }, seed: 'cm-sp', mySide: 'home' });
+  ok(bsp?.homeLineup.setpiece.corner === 'near' && bsp?.homeLineup.setpiece.freekick === 'box',
+    '커스텀 팀의 코너·프리킥 지시가 경기 라인업에 들어갑니다', `코너 ${bsp?.homeLineup.setpiece.corner} · 프리킥 ${bsp?.homeLineup.setpiece.freekick}`);
 
   /* 커리어 세이브는 그대로 */
   ok(JSON.stringify(career) === careerBefore, '커스텀 매치업이 커리어 세이브(세계)를 건드리지 않습니다');
