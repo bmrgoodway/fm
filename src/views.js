@@ -1,5 +1,5 @@
 // 화면 렌더 — 문자열 HTML + data-act 버튼. 상태는 app 객체에서 읽습니다.
-import { FORMATIONS, STAT_LABEL, STAT_KEYS } from './data.js';
+import { FORMATIONS, FORMATION_IDS, STAT_LABEL, STAT_KEYS } from './data.js';
 import { KL_TEAMS, KL_DIVISIONS, KL_ROSTERS } from './kleague2026.js';
 import * as W from './world.js';
 import { AXES, STEPS, stepLabel, tacticWords, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, defaultRole, nextRole, ROLE_TUNING, SET_PIECES, SET_PIECE_TYPES, resolveSetPiece, setPieceKey, setPieceLabel, setPieceEffect } from './tactics.js';
@@ -122,6 +122,9 @@ export function renderSelect(app) {
     <button type="button" class="mode-tab ${mode === 'kleague' ? 'on' : ''}" data-act="pick-mode" data-mode="kleague" aria-pressed="${mode === 'kleague'}">
       <b>K리그 2026</b><small>실제 56개 구단 · K4→K1 승강제 + 코리아컵</small>
     </button>
+    <button type="button" class="mode-tab match" data-act="pick-mode" data-mode="matchup" aria-pressed="false">
+      <b>커스텀 매치업</b><small>내 팀·친구 팀·K리그 · 11인제 · 5·6인제 풋살</small>
+    </button>
   </div>`;
   const divTabs = mode === 'kleague' ? `<div class="div-tabs" role="group" aria-label="디비전">
     ${KL_DIVISIONS.map((d) => {
@@ -203,6 +206,7 @@ export function renderHub(app) {
       <div><small>리그 라운드</small><b>${lr > divRounds ? '종료' : `${lr} / ${divRounds}R`}</b></div>
     </div>
     <div class="club-acts">
+      <button class="btn small ghost" data-act="pick-mode" data-mode="matchup" type="button">⚔ 커스텀 매치업</button>
       <button class="btn small ghost" data-act="saves" type="button">💾 저장/불러오기</button>
       <button class="btn small ghost" data-act="new-game" type="button">새 게임</button>
     </div>
@@ -670,7 +674,7 @@ function squadTab(app, w) {
     <article class="card">
       <div class="card-head"><h3>전술 보드</h3><span class="pill">${esc(l.formation)}${mismatch ? ` · 위치 보정 ${mismatch}` : ' · 최적 배치'}</span></div>
       <div class="form-row" role="group" aria-label="포메이션">
-        ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${l.formation === f ? 'on' : ''}" data-act="formation" data-formation="${f}" title="${esc(FORMATIONS[f].shape)}" aria-pressed="${l.formation === f}">${f}</button>`).join('')}
+        ${FORMATION_IDS.map((f) => `<button type="button" class="btn small ${l.formation === f ? 'on' : ''}" data-act="formation" data-formation="${f}" title="${esc(FORMATIONS[f].shape)}" aria-pressed="${l.formation === f}">${f}</button>`).join('')}
         <button type="button" class="btn small ghost right" data-act="auto-lineup">자동 선발</button>
       </div>
       ${outMen.length ? `<p class="warn-bar">🚑 선발 중 뛸 수 없는 선수 ${outMen.length}명 — ${outMen.map((s) => esc(s.p.name)).join(', ')}. 경기를 시작하면 자동으로 교체됩니다.</p>` : ''}

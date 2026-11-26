@@ -3,7 +3,7 @@
 // · 득점 연출(슛 궤적·골키퍼 다이빙·골망), 하프타임 라커룸, 실시간 자막 티커를 담습니다.
 import { W as PW, H as PH, CY, GOAL_HALF, diveProgress, growthPreview } from './match.js';
 import { AXES, STEPS, stepLabel, MENTALITY, mentalityOf, mentalityEffect, roleLabel, roleShort, roleEffect, rolesForLabel, nextRole, defaultRole, setPieceLabel, SET_PIECES } from './tactics.js';
-import { FORMATIONS, STAT_LABEL } from './data.js';
+import { FORMATIONS, STAT_LABEL, formationsFor } from './data.js';
 import * as X from './world.js';
 import { esc, setPieceRows } from './views.js';
 
@@ -916,7 +916,7 @@ export function mountMatch(app, m, meta) {
         <p class="axis-eff">${esc(mentalityEffect(ment, true))}</p>
       </div>
       <div class="drawer-sec"><h4>포메이션</h4>
-        <div class="form-row">${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-mform="${f}" aria-pressed="${side.formation === f}">${f}</button>`).join('')}</div>
+        <div class="form-row">${formationsFor(side.players.length).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-mform="${f}" aria-pressed="${side.formation === f}">${f}</button>`).join('')}</div>
       </div>
       <div class="drawer-sec"><h4>포지션별 역할 <span class="hint-inline">자리를 누르면 역할이 바뀝니다</span></h4>
         ${roleGridHtml()}
@@ -1028,7 +1028,7 @@ export function mountMatch(app, m, meta) {
         ${roleGridHtml()}
         <h4 class="ht-sub">포메이션 <span class="hint-inline">후반 시작부터</span></h4>
         <div class="form-row" role="group" aria-label="포메이션">
-          ${Object.keys(FORMATIONS).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-htform="${f}" aria-pressed="${side.formation === f}" title="${esc(FORMATIONS[f].shape)}">${f}</button>`).join('')}
+          ${formationsFor(side.players.length).map((f) => `<button type="button" class="btn small ${side.formation === f ? 'on' : ''}" data-htform="${f}" aria-pressed="${side.formation === f}" title="${esc(FORMATIONS[f].shape)}">${f}</button>`).join('')}
         </div>
         <h4 class="ht-sub">세트피스 지시</h4>
         <ul class="axes compact sp-axes">${setPieceRows(side.setpiece, (t, k) => `data-htsp="${t}" data-key="${k}"`, { compact: true })}</ul>

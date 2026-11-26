@@ -87,7 +87,57 @@ export const FORMATIONS = {
     ],
   },
 };
-export const FORMATION_IDS = Object.keys(FORMATIONS);
+
+/* ─────────────────────── 풋살 규모(5인제·6인제) 포메이션 ───────────────────────
+   커스텀 매치업에서만 씁니다. 11인제 화면(커리어)은 FORMATION_IDS 만 고르므로
+   여기에 더해도 기존 구단 선택·전술 화면의 포메이션 목록은 그대로 7종입니다.
+   size: 그 포메이션이 세우는 선수 수 (GK 포함). */
+export const FUTSAL_FORMATIONS = {
+  '1-2-1': {
+    name: '1-2-1', shape: '풋살 균형 · 피보+알라 2', size: 5,
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.07, y: 0.50 },
+      { pos: 'DF', label: 'FIXO', x: 0.27, y: 0.50 },
+      { pos: 'MF', label: 'ALA', x: 0.50, y: 0.19 }, { pos: 'MF', label: 'ALA', x: 0.50, y: 0.81 },
+      { pos: 'FW', label: 'PIVO', x: 0.72, y: 0.50 },
+    ],
+  },
+  '2-2': {
+    name: '2-2', shape: '풋살 두 줄 · 수비 둘 공격 둘', size: 5,
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.07, y: 0.50 },
+      { pos: 'DF', label: 'CB', x: 0.28, y: 0.33 }, { pos: 'DF', label: 'CB', x: 0.28, y: 0.67 },
+      { pos: 'FW', label: 'ST', x: 0.62, y: 0.32 }, { pos: 'FW', label: 'ST', x: 0.62, y: 0.68 },
+    ],
+  },
+  '1-2-2': {
+    name: '1-2-2', shape: '풋살 공격적 · 앞선 둘', size: 6,
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.07, y: 0.50 },
+      { pos: 'DF', label: 'FIXO', x: 0.26, y: 0.50 },
+      { pos: 'MF', label: 'ALA', x: 0.47, y: 0.24 }, { pos: 'MF', label: 'ALA', x: 0.47, y: 0.76 },
+      { pos: 'FW', label: 'PIVO', x: 0.66, y: 0.33 }, { pos: 'FW', label: 'PIVO', x: 0.66, y: 0.67 },
+    ],
+  },
+  '1-3-1': {
+    name: '1-3-1', shape: '풋살 중원 장악', size: 6,
+    slots: [
+      { pos: 'GK', label: 'GK', x: 0.07, y: 0.50 },
+      { pos: 'DF', label: 'FIXO', x: 0.24, y: 0.50 },
+      { pos: 'MF', label: 'ALA', x: 0.48, y: 0.18 }, { pos: 'MF', label: 'ALA', x: 0.46, y: 0.50 },
+      { pos: 'MF', label: 'ALA', x: 0.48, y: 0.82 },
+      { pos: 'FW', label: 'PIVO', x: 0.70, y: 0.50 },
+    ],
+  },
+};
+for (const [id, f] of Object.entries(FUTSAL_FORMATIONS)) FORMATIONS[id] = f;
+/* 포메이션 한 개가 세우는 선수 수 — 풋살 포메이션이 아니면 11인제 */
+export const sizeOfFormation = (id) => FUTSAL_FORMATIONS[id]?.size || 11;
+/* 그 규모에서 고를 수 있는 포메이션 목록 */
+export const formationsFor = (size) => Object.keys(FORMATIONS).filter((id) => sizeOfFormation(id) === Number(size));
+export const isFutsalFormation = (id) => !!FUTSAL_FORMATIONS[id];
+/* 11인제 포메이션 7종 — 커리어(구단 선택·전술) 화면은 이 목록만 씁니다. */
+export const FORMATION_IDS = Object.keys(FORMATIONS).filter((id) => !FUTSAL_FORMATIONS[id]);
 export const POS_LABEL = { GK: '골키퍼', DF: '수비수', MF: '미드필더', FW: '공격수' };
 
 /* ─────────────────────────── 10개 구단 ─────────────────────────── */

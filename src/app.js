@@ -1,9 +1,11 @@
 // 앱 셸 — 상태·화면 전환·감독 조작
-import { TEAM_DEFS, FORMATIONS } from './data.js';
+import { TEAM_DEFS, FORMATIONS, sizeOfFormation, formationsFor } from './data.js';
 import { KL_TEAMS, KL_BY_ID } from './kleague2026.js';
 import * as W from './world.js';
 import { local } from './store.js';
 import { renderSelect, renderHub, renderSeason, renderModal, applyTeamColors } from './views.js';
+import { renderCustom, renderCustomResult } from './customviews.js';
+import * as C from './custom.js';
 import { mountMatch } from './matchview.js';
 import { Match, applyResult, lineupFor } from './match.js';
 import { roleLabel, roleEffect, nextRole, mentalityOf, mentalityEffect, setPieceLabel } from './tactics.js';
@@ -22,6 +24,10 @@ const state = {
   // 구단 선택 · 디비전 탭 · 선수단 필터
   pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
   posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
+  // 커스텀 매치업 — 팀 빌더·공유·가상 경기 (커리어와 분리)
+  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null },
+  matchup: { oppKind: 'kl', oppId: 'geumsan', oppTeam: null, side: 'home' },
+  customResult: null, customMatch: null, headerOverride: null,
 };
 
 const api = {
@@ -54,6 +60,8 @@ export function init() {
   }
   document.addEventListener('click', onClick);
   document.addEventListener('input', onFilterInput);
+  document.addEventListener('input', onCustomInput);
+  document.addEventListener('change', onCustomChange);
   document.addEventListener('change', onFileChange);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && state.modal) { state.modal = null; render(); return; }
@@ -65,6 +73,7 @@ export function init() {
   });
   document.getElementById('btn-theme').addEventListener('click', toggleTheme);
   render();
+  openFromUrl();
 }
 
 function toggleTheme() {
@@ -84,21 +93,39 @@ function render() {
   if (state.world && state.view !== 'match') W.ensureProgress(state.world);
   document.body.dataset.view = state.view;
   if (state.view === 'select') root.innerHTML = renderSelect(api);
+  else if (state.view === 'custom') root.innerHTML = state.customResult ? renderCustomResult(api) : renderCustom(api);
   else if (state.view === 'hub') root.innerHTML = renderHub(api);
   else if (state.view === 'season') root.innerHTML = renderSeason(api);
   if (state.view !== 'match') {
     const modal = renderModal(api);
     if (modal) root.insertAdjacentHTML('beforeend', modal);
   }
-  applyTeamColors(root, state.world || { teams: defs });
+  applyTeamColors(root, colorWorld());
   updateHeader();
   if (state.view !== 'match') window.scrollTo(0, Math.min(y, root.scrollHeight));
+}
+
+/* 팀 색을 칠할 때 쓰는 팀 목록 — 커리어 구단 + 내가 만든 커스텀 팀(+ 진행 중인 커스텀 경기의 두 팀) */
+function colorWorld() {
+  const map = { ...(state.world?.teams || defs) };
+  for (const t of C.readTeams().list) map[t.id] = { id: t.id, primary: t.colors.primary, secondary: t.colors.secondary, ink: '#101014' };
+  const cm = state.customMatch?.world || state.customResult?.m?.world;
+  if (cm) Object.assign(map, cm.teams);
+  return { teams: map };
 }
 
 function updateHeader() {
   const nameEl = document.querySelector('.brand b');
   const subEl = document.querySelector('.brand small');
   if (!nameEl) return;
+  if (state.headerOverride) {
+    nameEl.textContent = state.headerOverride.name;
+    subEl.textContent = state.headerOverride.sub;
+    document.title = `${state.headerOverride.name} · Football Manager`;
+    const b = document.getElementById('btn-theme');
+    if (b) b.textContent = document.documentElement.getAttribute('data-theme') === 'night' ? '☀' : '☾';
+    return;
+  }
   if (state.world) {
     const t = W.myTeam(state.world);
     nameEl.textContent = t.name;
@@ -256,6 +283,7 @@ function onClick(e) {
       break;
     }
     case 'pick-mode':
+      if (el.dataset.mode === 'matchup') { openCustom(); break; }
       state.pickMode = el.dataset.mode === 'kleague' ? 'kleague' : 'custom';
       state.pickDiv = state.pickMode === 'kleague' ? 4 : 1;
       render(); break;
@@ -460,6 +488,153 @@ function onClick(e) {
     case 'close-season':
       state.view = 'hub'; state.tab = 'schedule'; state.seasonResult = null; state.selPid = null; state.selSlot = 0;
       render(); break;
+
+    /* ─────────────── 커스텀 매치업 (커리어와 완전히 분리) ─────────────── */
+    case 'cm-tab':
+      state.custom.tab = el.dataset.tab || 'build';
+      state.custom.msg = '';
+      state.customResult = null;
+      ensureCustomTeam();
+      render(); break;
+    case 'cm-back':
+      state.customResult = null; state.custom.tab = 'build'; state.custom.msg = '';
+      window.scrollTo(0, 0); render(); break;
+    case 'cm-new': {
+      const made = C.saveTeam(C.newTeam({ size: state.custom.team?.size || 11 }));
+      if (!made.ok) { toast(made.why, 'warn'); break; }
+      state.custom.team = made.team; state.custom.teamId = made.team.id; state.custom.tab = 'build';
+      state.custom.msg = `새 팀을 만들었습니다 — 이름·색·선수를 채워 주세요.`; state.customResult = null;
+      render(); toast('새 팀을 만들었습니다.', 'ok'); break;
+    }
+    case 'cm-duplicate': {
+      const src = state.custom.team;
+      if (!src) break;
+      const made = C.saveTeam(C.normalizeTeam({ ...JSON.parse(JSON.stringify(src)), id: C.newTeamId(), name: `${src.name} 복사`, code: null }));
+      if (!made.ok) { toast(made.why, 'warn'); break; }
+      state.custom.team = made.team; state.custom.teamId = made.team.id;
+      render(); toast('팀을 복제했습니다.', 'ok'); break;
+    }
+    case 'cm-delete': {
+      const id = el.dataset.id;
+      if (state.custom.confirmDelete !== id) { state.custom.confirmDelete = id; render(); break; }
+      const r = C.deleteTeam(id);
+      state.custom.confirmDelete = null;
+      state.custom.team = null; state.custom.teamId = null;
+      ensureCustomTeam();
+      render(); toast(r.ok ? '팀을 삭제했습니다.' : r.why, r.ok ? 'ok' : 'warn'); break;
+    }
+    case 'cm-delete-cancel':
+      state.custom.confirmDelete = null; render(); break;
+    case 'cm-open': {
+      const t = C.getTeam(el.dataset.id);
+      if (!t) { toast('팀을 찾을 수 없습니다.', 'warn'); break; }
+      state.custom.team = t; state.custom.teamId = t.id; state.custom.tab = 'build'; state.custom.msg = '';
+      render(); break;
+    }
+    case 'cm-size': {
+      const t = state.custom.team;
+      if (!t) break;
+      C.setSize(t, Number(el.dataset.size));
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      state.custom.msg = `${C.formatName(t.size)} · ${t.formation} — 자리 이름이 같은 선수는 그대로 따라갑니다.`;
+      render(); break;
+    }
+    case 'cm-formation': {
+      const t = state.custom.team;
+      if (!t) break;
+      C.setFormation(t, el.dataset.formation);
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      render(); break;
+    }
+    case 'cm-save': {
+      const t = state.custom.team;
+      if (!t) break;
+      C.autoFill(t);
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      render();
+      toast(r.ok ? `'${t.name}' 저장했습니다.` : r.why, r.ok ? 'ok' : 'warn'); break;
+    }
+    case 'cm-autofill': {
+      const t = state.custom.team;
+      if (!t) break;
+      const added = C.autoFill(t);
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      render();
+      toast(added.length ? `빈 자리 ${added.length}곳을 기본 선수로 채웠습니다.` : '이미 모든 자리가 채워져 있습니다.', added.length ? 'ok' : 'info'); break;
+    }
+    case 'cm-bulk-open':
+      state.custom.bulk = true; render(); break;
+    case 'cm-bulk-close':
+      state.custom.bulk = false; render(); break;
+    case 'cm-bulk-apply': {
+      const t = state.custom.team;
+      if (!t) break;
+      const { rows, errors } = C.parseBulk(state.custom.bulkText);
+      if (!rows.length) { toast(errors[0] || '넣을 선수를 찾지 못했습니다.', 'warn'); break; }
+      const n = C.applyBulk(t, rows);
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      state.custom.bulk = false; state.custom.bulkText = '';
+      render();
+      toast(`${n}명을 명단에 넣었습니다${errors.length ? ` · ${errors.length}줄은 건너뛰었습니다` : ''}.`, 'ok'); break;
+    }
+    case 'cm-role': {
+      const t = state.custom.team;
+      if (!t) break;
+      const i = Number(el.dataset.i);
+      const p = t.players[i];
+      if (!p) break;
+      t.roles = t.roles || [];
+      t.roles[i] = nextRole(p.slot, t.roles[i] || 'b2b');
+      C.saveTeam(t); keepScroll(); render();
+      toast(`역할 · ${roleLabel(t.roles[i])} — ${roleEffect(t.roles[i])}`, 'ok'); break;
+    }
+    case 'cm-tactic': {
+      const t = state.custom.team;
+      if (!t) break;
+      t.tactic = { ...t.tactic, [el.dataset.axis]: Number(el.dataset.val) };
+      C.saveTeam(t); keepScroll(); render(); break;
+    }
+    case 'cm-mentality': {
+      const t = state.custom.team;
+      if (!t) break;
+      const v = Number(el.dataset.val);
+      t.tactic = { ...t.tactic, mentality: v };
+      C.saveTeam(t); keepScroll(); render();
+      toast(`팀 성향 · ${mentalityOf(v).name} — ${mentalityEffect(v, true)}`, 'ok'); break;
+    }
+    case 'cm-share':
+      state.custom.tab = 'share'; render(); break;
+    case 'cm-publish': publishTeam(el.dataset.id); break;
+    case 'cm-load': loadSharedCode(); break;
+    case 'cm-copy': copyText(el.dataset.copy, '복사했습니다.'); break;
+    case 'cm-longlink': {
+      const t = C.getTeam(el.dataset.id);
+      if (!t) break;
+      state.custom.longLink = C.teamLink(C.encodePayload(C.packTeam(t)));
+      render(); toast('긴 링크를 만들었습니다 — 링크 하나에 팀 전체가 담깁니다.', 'ok'); break;
+    }
+    case 'cm-copy-result': {
+      const r = state.customResult;
+      if (!r) break;
+      copyText(C.resultText(r.meta, r.m), '경기 결과를 복사했습니다.'); break;
+    }
+    case 'mu-oppkind': {
+      state.matchup.oppKind = el.dataset.kind === 'custom' ? 'custom' : 'kl';
+      if (state.matchup.oppKind === 'custom') {
+        const other = C.readTeams().list.find((t) => t.id !== state.custom.teamId);
+        state.matchup.oppId = state.matchup.oppTeam?.id || other?.id || '';
+        state.matchup.oppTeam = state.matchup.oppId ? C.getTeam(state.matchup.oppId) : null;
+      } else if (!KL_BY_ID[state.matchup.oppId]) state.matchup.oppId = 'geumsan';
+      render(); break;
+    }
+    case 'mu-side': state.matchup.side = el.dataset.side === 'away' ? 'away' : 'home'; render(); break;
+    case 'mu-start': startCustomMatch(el.dataset.instant === '1'); break;
+    case 'mu-rematch': startCustomMatch(false); break;
     default: break;
   }
 }
@@ -620,4 +795,324 @@ function endMatch(m, meta) {
   window.scrollTo(0, 0);
   render();
   toast(`${meta.label} ${res === '승' ? '승리!' : res === '무' ? '무승부' : '패배'} ${m.score.home}-${m.score.away}`, res === '승' ? 'ok' : res === '패' ? 'warn' : 'info');
+}
+
+/* ─────────────────────────── 커스텀 매치업 ─────────────────────────── */
+/* 화면 전환·상태는 모두 여기서 — 커리어(state.world / savedGame)는 절대 건드리지 않습니다. */
+function openCustom() {
+  state.view = 'custom';
+  state.customResult = null;
+  state.custom.msg = '';
+  ensureCustomTeam();
+  window.scrollTo(0, 0);
+  render();
+}
+
+function ensureCustomTeam() {
+  const db = C.readTeams();
+  if (state.custom.team) return state.custom.team;
+  const t = (state.custom.teamId && db.list.find((x) => x.id === state.custom.teamId)) || db.list[0] || null;
+  state.custom.team = t;
+  state.custom.teamId = t?.id || null;
+  if (!state.matchup.oppId || state.matchup.oppKind === 'custom') {
+    if (state.matchup.oppKind === 'custom') {
+      const other = db.list.find((x) => x.id !== t?.id) || null;
+      state.matchup.oppId = other?.id || '';
+      state.matchup.oppTeam = other;
+    }
+  }
+  return t;
+}
+
+/* 입력 — 화면을 다시 그리지 않아 타이핑 중 포커스가 유지됩니다. */
+function onCustomInput(e) {
+  const el = e.target;
+  if (state.view !== 'custom' || !el?.dataset) return;
+  const t = state.custom.team;
+  if (!t) return;
+  const cp = el.dataset.cp;
+  if (cp) {
+    const i = Number(el.dataset.i);
+    const p = t.players?.[i];
+    if (!p) return;
+    if (cp === 'name') { p.name = String(el.value).slice(0, 16); return; }
+    if (cp === 'ovr') { const v = Number(el.value); if (Number.isFinite(v) && v >= 25) C.setPlayerOvr(t, i, v, 'edit'); return; }
+    if (cp === 'stat') { if (el.value !== '') C.setPlayerStat(t, i, el.dataset.key, el.value); return; }
+    if (cp === 'age') { if (el.value !== '') C.setPlayerAge(t, i, el.value); return; }
+  }
+  const cm = el.dataset.cm;
+  if (cm === 'name') t.name = String(el.value).slice(0, 24);
+  else if (cm === 'short') t.short = String(el.value).slice(0, 5);
+  else if (cm === 'primary') t.colors.primary = el.value;
+  else if (cm === 'secondary') t.colors.secondary = el.value;
+  else if (cm === 'bulk') state.custom.bulkText = el.value;
+  else if (cm === 'code') state.custom.codeInput = el.value;
+}
+
+/* 값이 확정되는 순간(블러·선택) — 모델을 저장하고 바뀐 부분만 그 자리에서 갱신합니다.
+   입력칸에서 바로 다음 버튼을 누를 때 화면을 통째로 다시 그리면 그 탭이 삼켜지므로,
+   글자·숫자 입력은 화면을 다시 그리지 않고 OVR 표시만 고칩니다. */
+function onCustomChange(e) {
+  const el = e.target;
+  if (state.view !== 'custom' || !el?.dataset) return;
+  const t = state.custom.team;
+  if (!t) return;
+  const cm = el.dataset.cm;
+  const cp = el.dataset.cp;
+  if (cm === 'pick') {
+    const nt = C.getTeam(el.value);
+    if (nt) { state.custom.team = nt; state.custom.teamId = nt.id; state.custom.confirmDelete = null; render(); }
+    return;
+  }
+  if (cm === 'primary' || cm === 'secondary') {
+    C.saveTeam(t);
+    applyTeamColors(document.getElementById('app'), colorWorld());
+    return;
+  }
+  if (cm === 'name' || cm === 'short') {
+    C.saveTeam(t);
+    const badgeEl = document.querySelector('.cm-badge');
+    if (badgeEl) badgeEl.textContent = C.teamShort(t);
+    return;
+  }
+  if (cp) {
+    const i = Number(el.dataset.i);
+    const p = t.players?.[i];
+    if (!p) return;
+    if (cp === 'slot') {
+      // 포지션(자리)을 바꾸면 그 자리 기준으로 OVR을 다시 깔아 줍니다
+      p.slot = el.value;
+      const ovr = C.ovrOf(t, p) || 68;
+      C.setPlayerOvr(t, i, ovr, 'slot');
+    }
+    C.saveTeam(t);
+    const chip = el.closest('.cp-row')?.querySelector('.cp-ovr-val');
+    if (chip) {
+      const v = C.ovrOf(t, p);
+      chip.textContent = v || '—';
+      chip.classList.toggle('hi', v >= 80);
+      chip.classList.toggle('lo', !!v && v < 60);
+    }
+    return;
+  }
+  if (el.dataset.mu === 'opp' || el.dataset.mu === 'kl') {
+    state.matchup.oppKind = el.dataset.mu === 'kl' ? 'kl' : 'custom';
+    state.matchup.oppId = el.value;
+    state.matchup.oppTeam = state.matchup.oppKind === 'custom' ? C.getTeam(el.value) : null;
+    render(); return;
+  }
+}
+
+async function publishTeam(id) {
+  const t = C.getTeam(id) || state.custom.team;
+  if (!t) return;
+  if (!t.players.some((p) => p.stats)) C.autoFill(t);
+  C.saveTeam(t);
+  state.custom.share = { busy: true };
+  state.custom.msg = '공유 서버에 올리는 중…';
+  render();
+  try {
+    const r = await C.publishTeam(t);
+    state.custom.share = { busy: false };
+    if (r.ok) {
+      t.code = r.code; t.sharedAt = Date.now();
+      const saved = C.saveTeam(t);
+      state.custom.team = saved.ok ? saved.team : t;
+      state.custom.msg = `공유 코드 ${r.code} — 친구에게 코드나 링크를 보내세요.`;
+      render();
+      toast(`공유 코드 ${r.code} 발급!`, 'ok');
+    } else {
+      state.custom.msg = r.why;
+      render();
+      toast(r.why, 'warn');
+    }
+  } catch (err) {
+    state.custom.share = { busy: false };
+    state.custom.msg = `공유하지 못했습니다 (${String(err?.message || err).slice(0, 80)})`;
+    render();
+    toast('공유하지 못했습니다.', 'warn');
+  }
+}
+
+const codeFromInput = (raw) => {
+  const s = String(raw || '').trim();
+  const m = s.match(/[?&#]team=([^&\s]+)/);
+  if (m) return decodeURIComponent(m[1]);
+  return s;
+};
+
+async function loadSharedCode() {
+  const raw = (state.custom.codeInput || '').trim();
+  if (!raw) { toast('공유 코드나 링크를 입력해 주세요.', 'warn'); return; }
+  const code = codeFromInput(raw);
+  state.custom.msg = '불러오는 중…';
+  render();
+  const r = await C.fetchTeam(code);
+  if (!r.ok) { state.custom.msg = r.why; render(); toast(r.why, 'warn'); return; }
+  const saved = C.saveTeam({ ...r.team, id: C.newTeamId(), code: /^[A-Za-z0-9]{4,12}$/.test(code) ? code.toUpperCase() : null, from: r.team.from || '공유 코드' });
+  if (!saved.ok) { state.custom.msg = saved.why; render(); toast(saved.why, 'warn'); return; }
+  state.custom.team = saved.team;
+  state.custom.teamId = saved.team.id;
+  state.custom.codeInput = '';
+  state.custom.msg = `'${saved.team.name}' 팀을 불러와 내 팀으로 저장했습니다.`;
+  render();
+  toast(`${saved.team.name} 팀을 불러왔습니다.`, 'ok');
+}
+
+function copyText(text, okMsg = '복사했습니다.') {
+  const value = String(text || '');
+  if (!value) return;
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = value;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    ta.remove();
+    toast(ok ? okMsg : '복사하지 못했습니다 — 길게 눌러 복사해 주세요.', ok ? 'ok' : 'warn');
+  };
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(value).then(() => toast(okMsg, 'ok')).catch(fallback);
+  else fallback();
+}
+
+/* ?team=CODE · ?match=A:B — 공유 링크로 바로 열기 */
+async function openFromUrl() {
+  const q = new URLSearchParams(location.search);
+  const team = q.get('team');
+  const match = q.get('match');
+  if (match) { await openMatchParam(match); return; }
+  if (team) await openSharedParam(team);
+}
+
+async function openSharedParam(code) {
+  state.view = 'custom';
+  state.custom.tab = 'build';
+  ensureCustomTeam();
+  state.custom.msg = '공유된 팀을 불러오는 중…';
+  render();
+  const r = await C.fetchTeam(code);
+  if (!r.ok) { state.custom.msg = r.why; render(); toast(r.why, 'warn'); return; }
+  const saved = C.saveTeam({ ...r.team, id: C.newTeamId(), code: /^[A-Za-z0-9]{4,12}$/.test(code) ? code.toUpperCase() : null, from: r.team.from || '공유 링크' });
+  if (!saved.ok) { state.custom.msg = saved.why; render(); return; }
+  state.custom.team = saved.team;
+  state.custom.teamId = saved.team.id;
+  state.custom.msg = `공유받은 '${saved.team.name}' 팀입니다 — 바로 경기하거나 고쳐서 내 팀으로 쓸 수 있어요.`;
+  render();
+  toast(`${saved.team.name} 팀을 불러왔습니다.`, 'ok');
+}
+
+async function openMatchParam(value) {
+  const [a, b] = String(value).split(':').map((s) => s.trim()).filter(Boolean);
+  state.view = 'custom';
+  state.custom.tab = 'match';
+  ensureCustomTeam();
+  state.custom.msg = '두 팀을 불러오는 중…';
+  render();
+  const [ra, rb] = await Promise.all([C.fetchTeam(a || ''), C.fetchTeam(b || '')]);
+  if (!ra.ok || !rb.ok) {
+    state.custom.msg = ra.ok ? rb.why : ra.why;
+    render();
+    toast(state.custom.msg, 'warn');
+    return;
+  }
+  const sa = C.saveTeam({ ...ra.team, id: C.newTeamId(), from: '공유 링크' });
+  const sb = C.saveTeam({ ...rb.team, id: C.newTeamId(), from: '공유 링크' });
+  if (!sa.ok || !sb.ok) { state.custom.msg = '팀을 저장하지 못했습니다.'; render(); return; }
+  state.custom.team = sa.team;
+  state.custom.teamId = sa.team.id;
+  state.matchup.oppKind = 'custom';
+  state.matchup.oppId = sb.team.id;
+  state.matchup.oppTeam = sb.team;
+  state.custom.msg = `${sa.team.name} vs ${sb.team.name} — 홈/원정을 고르고 시작하세요.`;
+  render();
+  toast('두 팀을 불러왔습니다.', 'ok');
+}
+
+/* 경기용 앱 객체 — 커리어 api 대신 넘겨 세이브를 건드리지 않습니다. */
+function customMatchApi() {
+  return {
+    get world() { return state.customMatch?.world || null; },
+    get savedGame() { return state.savedGame; },
+    get state() { return state; },
+    defs,
+    save: () => true,
+    toast,
+    endMatch: (m, meta) => endCustomMatch(m, meta),
+  };
+}
+
+function startCustomMatch(instant) {
+  const my = state.custom.team;
+  if (!my) { toast('내 팀을 먼저 만들어 주세요.', 'warn'); return; }
+  if (!my.players.some((p) => p.stats) || my.players.some((p) => !p.name)) {
+    C.autoFill(my);
+    C.saveTeam(my);
+    toast('빈 자리를 기본 선수로 채우고 경기를 시작합니다.', 'info');
+  }
+  const mu = state.matchup;
+  let opp;
+  if (mu.oppKind === 'custom') {
+    const t = C.getTeam(mu.oppId) || mu.oppTeam;
+    if (!t) { toast('상대 팀을 고르세요.', 'warn'); return; }
+    if (t.size !== my.size) { toast(`규모가 다릅니다 — ${C.formatName(my.size)} 팀끼리 경기할 수 있어요.`, 'warn'); return; }
+    opp = { kind: 'custom', team: t };
+  } else {
+    const kl = KL_BY_ID[mu.oppId];
+    if (!kl) { toast('상대 구단을 고르세요.', 'warn'); return; }
+    opp = { kind: 'kl', id: kl.id };
+  }
+  const meSpec = { kind: 'custom', team: my };
+  const home = mu.side === 'away' ? opp : meSpec;
+  const away = mu.side === 'away' ? meSpec : opp;
+  const seed = `cm-${Date.now()}`;
+  const built = C.buildMatchupWorld({ home, away, seed, mySide: mu.side });
+  if (!built) { toast('경기를 준비하지 못했습니다.', 'warn'); return; }
+  const { world, homeId, awayId, homeLineup, awayLineup, size } = built;
+  const m = new Match({
+    world, homeId, awayId, homeLineup, awayLineup,
+    seed: `cm-${size}-${my.id}-${Date.now()}`, cup: false, userSide: mu.side,
+  });
+  const meta = {
+    label: `커스텀 매치업 · ${C.formatName(size)}`,
+    custom: true, size, instant: !!instant,
+    myTeamId: world.myTeamId,
+    homeName: world.teams[homeId].name, awayName: world.teams[awayId].name,
+  };
+  if (instant) {
+    let guard = 0;
+    while (!m.done && guard < 5000) { m.tick(); guard += 1; }
+    if (!m.done) m.finish();
+  }
+  state.customResult = null;
+  state.customMatch = { m, meta, world };
+  state.headerOverride = {
+    name: `${world.teams[homeId].short} vs ${world.teams[awayId].short}`,
+    sub: `GOODWAY APPS · FM · 커스텀 매치업 · ${C.formatName(size)}`,
+  };
+  state.view = 'match';
+  document.body.dataset.view = 'match';
+  updateHeader();
+  mountMatch(customMatchApi(), m, meta);
+  applyTeamColors(document.getElementById('app'), colorWorld());
+  window.scrollTo(0, 0);
+}
+
+function endCustomMatch(m, meta) {
+  state.customResult = { m, meta };
+  state.customMatch = null;
+  state.headerOverride = null;
+  state.view = 'custom';
+  state.custom.tab = 'match';
+  state.custom.msg = '';
+  document.body.dataset.view = 'custom';
+  window.scrollTo(0, 0);
+  render();
+  const mine = m.score[m.userSide] || 0;
+  const theirs = m.score[m.userSide === 'home' ? 'away' : 'home'] || 0;
+  toast(`커스텀 매치업 ${mine > theirs ? '승리!' : mine < theirs ? '패배' : '무승부'} ${m.score.home}-${m.score.away}`,
+    mine > theirs ? 'ok' : mine < theirs ? 'warn' : 'info');
 }

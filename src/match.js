@@ -350,6 +350,11 @@ export class Match {
       home: this.buildSide(homeId, homeLineup, 1, 'home'),
       away: this.buildSide(awayId, awayLineup, -1, 'away'),
     };
+    // 풋살(5·6인제)에는 오프사이드가 없습니다 — 양 팀 모두 11명일 때만 라인을 봅니다.
+    // (11인제끼리면 예전과 똑같이 동작합니다)
+    this.offsideOn = this.sides.home.players.length >= 11 && this.sides.away.players.length >= 11;
+    // 퇴장으로 경기를 계속할 수 없는 인원 — 11인제는 8명(예전과 같음), 풋살은 3명 미만
+    this.minOnPitch = (side) => Math.max(3, (side.players.length || 11) - 3);
     // 키트 색이 겹치면 원정팀은 대체 유니폼
     const homeKit = this.sides.home.team.primary;
     const awayKit = colorGap(homeKit, this.sides.away.team.primary) < 110
@@ -864,7 +869,7 @@ export class Match {
     }
     if (ment < 0) { wide *= 1 + ment * 0.18; mid *= 1 + ment * 0.12; }   // 잠그기는 폭도 좁혀 슈팅 길목을 지웁니다
     else if (ment > 0) { wide *= 1 + ment * 0.06; mid *= 1 + ment * 0.07; }
-    const men = 11 - (side.reds || 0);
+    const men = (side.players.length || 11) - (side.reds || 0);
     // 상대 수비 라인의 높이 — 침투 러닝과 스루패스의 목표점을 정합니다
     let oppLine = 52;
     if (hasBall) {
@@ -1056,6 +1061,7 @@ export class Match {
      상대 골문 쪽에서 두 번째(= 끝에서 두 번째) 수비수의 진행도가 오프사이드 라인입니다.
      키퍼가 스위퍼로 올라와 있으면 그 키퍼가 라인이 됩니다. */
   offsideLineDepth(sideName) {
+    if (!this.offsideOn) return null;
     const side = this.sides[sideName];
     if (!side) return null;
     const opp = this.sides[this.opposing[sideName]];
@@ -1083,6 +1089,7 @@ export class Match {
   /* 패스 출발 순간 오프사이드 위치인가
      → 상대 진영 · 공보다 앞 · 끝에서 두 번째 수비수보다 앞. 동일 선상은 온사이드입니다. */
   offsideSpot(c, m) {
+    if (!this.offsideOn) return null;
     const dir = c.dir;
     const opp = this.sides[this.opposing[c.side]];
     const ds = opp.players.filter((e) => e.onPitch).map((e) => prog(e.x, dir)).sort((a, b) => b - a);
@@ -2438,7 +2445,7 @@ export class Match {
       this.ball.vy = (this.rng() - 0.5) * 2;
     }
     this.fx.push({ kind: 'red', side: e.side, at: this.t, pid: e.id, name: e.name });
-    if (this.sides[e.side].players.filter((x) => x.onPitch).length < 8) this.finish();
+    if (this.sides[e.side].players.filter((x) => x.onPitch).length < this.minOnPitch(side)) this.finish();
   }
 
   injure(e, side, cause) {

@@ -81,6 +81,8 @@ export const SLOT_GROUP = {
   DM: 'mid', CM: 'mid', CAM: 'mid', LM: 'mid', RM: 'mid', LWB: 'mid', RWB: 'mid',
   LW: 'wide', RW: 'wide', LAM: 'wide', RAM: 'wide',
   ST: 'st',
+  // 풋살 자리(피보·알라·피보) — 센터백·측면 공격·중앙 공격 역할을 그대로 씁니다
+  FIXO: 'cb', ALA: 'wide', PIVO: 'st',
 };
 
 export const ROLES = {
@@ -127,6 +129,7 @@ export const DEFAULT_ROLE = {
   LM: 'b2b', RM: 'b2b', LWB: 'b2b', RWB: 'b2b',
   LW: 'winger', RW: 'winger', LAM: 'winger', RAM: 'winger',
   ST: 'poacher',
+  FIXO: 'cover', ALA: 'winger', PIVO: 'poacher',
 };
 
 export function groupOf(label) { return SLOT_GROUP[label] || 'mid'; }

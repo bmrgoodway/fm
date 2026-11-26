@@ -23,7 +23,13 @@
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel, simMatchQuick, buildCupStage, teamPower, academyOf, KL_ACADEMY, aiTransferRound } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
-import { FORMATIONS, overall, valueOf, TEAM_DEFS } from '../src/data.js';
+// 커스텀 매치업 — 친구 팀 빌더·공유 코드·풋살(5·6인제) 경기
+import {
+  newTeam, normalizeTeam, setPlayerOvr, setPlayerName, setPlayerStat, autoFill, ovrOf, teamPowerOf,
+  setFormation as setTeamFormation, setSize, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
+  buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
+} from '../src/custom.js';
+import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
 import { roleFor, resolveRoles, defaultRole, rolesForLabel, ROLE_TUNING, MENTALITY, tacticWords, mentalityOf, SET_PIECES, resolveSetPiece, setPieceLabel } from '../src/tactics.js';
 import { boardPos, renderSeason, renderHub, renderSelect, renderModal } from '../src/views.js';
@@ -1121,7 +1127,7 @@ console.log('\n[17] 새 포메이션 3종 — 배치·역할·전술 보드·스
 {
   const NEW_F = ['4-1-4-1', '3-4-3', '4-3-1-2'];
   ok(NEW_F.every((f) => !!FORMATIONS[f]), '포메이션 3종이 데이터에 등록됩니다', NEW_F.join(' · '));
-  ok(Object.keys(FORMATIONS).length === 7, '기존 4종 + 신규 3종 = 7종', Object.keys(FORMATIONS).join(' · '));
+  ok(FORMATION_IDS.length === 7, '기존 4종 + 신규 3종 = 11인제 7종 (풋살 포메이션은 따로 셉니다)', FORMATION_IDS.join(' · '));
   const slotsOf = (f) => FORMATIONS[f].slots;
   ok(NEW_F.every((f) => slotsOf(f).length === 11 && slotsOf(f).filter((s) => s.pos === 'GK').length === 1),
     '각 포메이션 11명(골키퍼 1명)', NEW_F.map((f) => `${f}:${slotsOf(f).length}`).join(' '));
@@ -2208,6 +2214,138 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
     `최고 ${worst.avg.toFixed(1)}세 · 전체 평균 ${(ages.reduce((a, x) => a + x.avg, 0) / ages.length).toFixed(1)}세 · 32세 이상 최다 ${Math.max(...ages.map((x) => x.old))}명`);
   ok(lw.news.some((n) => n.text.includes('개막.')) && !lw.news.some((n) => n.text.includes('개꾸')),
     "새 시즌 소식의 오타('개꾸'→'개막')가 고쳐졌습니다", lw.news.map((n) => n.text).find((t) => t.includes('개막')) || '');
+}
+
+
+/* ── 30) 커스텀 매치업 — 팀 빌더·공유 코드·풋살(5·6인제) 경기 ───────────── */
+{
+  console.log('\n[30] 커스텀 매치업 — 팀 빌더 · 공유 코드 · 풋살(5·6인제) 경기');
+
+  /* 규모별 포메이션 — 11인제는 기존 7종, 풋살은 5인제 2종·6인제 2종 */
+  ok(formationsFor(11).length === 7 && formationsFor(5).join(',') === '1-2-1,2-2' && formationsFor(6).join(',') === '1-2-2,1-3-1',
+    '규모별 포메이션 목록이 맞습니다', `11인제 ${formationsFor(11).length}종 · 5인제 ${formationsFor(5).join('·')} · 6인제 ${formationsFor(6).join('·')}`);
+  ok(FORMATS.length === 3 && FORMATS.map((f) => f.name).join(' / ') === '11인제 / 6인제 풋살 / 5인제 풋살',
+    '경기 규모 3가지가 정의됩니다', FORMATS.map((f) => `${f.name}(${f.size}명)`).join(' · '));
+  ok(sizeOfFormation('4-3-3') === 11 && sizeOfFormation('1-2-1') === 5 && sizeOfFormation('1-2-2') === 6,
+    '포메이션에서 규모를 읽습니다');
+
+  /* 새 팀 — 자리 수·포메이션 */
+  const t11 = newTeam({ size: 11, name: '점검 FC' });
+  ok(t11.players.length === 11 && t11.formation === '4-3-3' && t11.players.every((p) => p.slot),
+    '11인제 팀은 11자리로 시작합니다', `${t11.formation} · ${t11.players.map((p) => p.slot).join(',')}`);
+
+  /* OVR 한 칸 → 포지션별 세부 능력치 자동 배분 */
+  setPlayerName(t11, 0, '테스트 키퍼');
+  setPlayerOvr(t11, 0, 75);
+  const gk0 = t11.players[0];
+  ok(gk0.stats && gk0.stats.gk >= 78 && gk0.stats.gk > gk0.stats.sho, '골키퍼 OVR 75 → GK 능력치가 높게 배분됩니다', `gk ${gk0.stats.gk} · 슈팅 ${gk0.stats.sho}`);
+  ok(Math.abs(ovrOf(t11, gk0) - 75) <= 2, 'OVR 입력값이 종합으로 다시 계산됩니다', `${ovrOf(t11, gk0)}`);
+
+  /* 세부 능력치를 직접 고치면 OVR이 따라 움직입니다 */
+  const beforeOvr = ovrOf(t11, gk0);
+  setPlayerStat(t11, 0, 'gk', 40);
+  ok(ovrOf(t11, gk0) < beforeOvr, '세부 능력치를 낮추면 OVR도 내려갑니다', `${beforeOvr} → ${ovrOf(t11, gk0)}`);
+  setPlayerOvr(t11, 0, 75);
+
+  /* 빈 자리 자동 채우기 */
+  const added = autoFill(t11);
+  ok(added.length === 10 && t11.players.every((p) => p.name && p.stats), '빈 자리를 기본 선수로 채웁니다', `${added.length}명 추가`);
+  ok(teamPowerOf(t11) >= 55 && teamPowerOf(t11) <= 85, '팀 전력이 합리적인 범위입니다', `${teamPowerOf(t11)}`);
+
+  /* 빠른 일괄 입력 */
+  const parsed = parseBulk('김철수 ST 84\n이영희,CB,79\n박민수 74\n\n잘못된줄 999');
+  ok(parsed.rows.length === 3 && parsed.errors.length === 1, '이름·포지션·OVR 일괄 입력을 읽습니다', `${parsed.rows.map((r) => `${r.name}/${r.label || '자동'}/${r.ovr ?? 'OVR없음'}`).join(' · ')}`);
+  const tb = newTeam({ size: 11, name: '일괄 입력' });
+  const filled = applyBulk(tb, parsed.rows);
+  ok(filled === 3 && tb.players.filter((p) => p.name).length === 3, '일괄 입력이 빈 자리에 차례로 들어갑니다', `${filled}명`);
+  const striker = tb.players.find((p) => p.name === '김철수');
+  ok(striker && striker.slot === 'ST' && Math.abs(ovrOf(tb, striker) - 84) <= 3, '포지션 자리에 맞춰 넣고 OVR을 맞춥니다', `${striker?.slot} · ${striker ? ovrOf(tb, striker) : ''}`);
+
+  /* 포메이션·규모 바꾸기 */
+  const t5 = newTeam({ size: 5, name: '별무리 풋살단' });
+  autoFill(t5, { level: 70 });
+  ok(t5.players.length === 5 && t5.formation === '1-2-1', '5인제 팀은 5자리(1-2-1)로 시작합니다', t5.formation);
+  setTeamFormation(t5, '2-2');
+  ok(t5.players.length === 5 && t5.formation === '2-2', '5인제 안에서 포메이션을 바꿉니다', t5.players.map((p) => p.slot).join(','));
+  const t6 = newTeam({ size: 6, name: '별무리 6인' });
+  autoFill(t6);
+  ok(t6.players.length === 6 && t6.formation === '1-2-2', '6인제 팀은 6자리(1-2-2)로 시작합니다', t6.formation);
+  setSize(t5, 11);
+  ok(t5.players.length === 11 && t5.size === 11, '규모를 11인제로 키우면 자리도 11개가 됩니다', `${t5.formation} · ${t5.players.length}명`);
+  setSize(t5, 5);
+  ok(t5.players.length === 5 && t5.size === 5, '다시 5인제로 줄입니다', `${t5.formation} · ${t5.players.length}명`);
+
+  /* 공유 코드 — 링크에 담는 긴 코드 왕복 */
+  const packed = packTeam(t5);
+  const longCode = encodePayload(packed);
+  const back = unpackTeam(decodePayload(longCode));
+  ok(back && back.size === 5 && back.formation === t5.formation && back.players.length === 5
+    && back.players[0].name === t5.players[0].name && back.colors.primary === t5.colors.primary,
+    '링크용 긴 코드로 팀이 그대로 복원됩니다', `${longCode.length}자`);
+  ok(longCode.length < 4000, '긴 코드는 URL에 담을 수 있는 길이입니다', `${longCode.length}자`);
+  ok(decodePayload('Z아무거나') === null, '망가진 코드는 null 로 안전하게 처리합니다');
+
+  /* 5인제 커스텀 vs 커스텀 — 엔진이 5명으로 끝까지 진행 */
+  const a5 = newTeam({ size: 5, name: '별무리 풋살' });
+  autoFill(a5, { level: 70 });
+  const b5 = newTeam({ size: 5, name: '친구 풋살' });
+  autoFill(b5, { level: 70 });
+  const career = createWorld('gs', 20261126);
+  const careerBefore = JSON.stringify(career);
+  const bu = buildMatchupWorld({ home: { kind: 'custom', team: a5 }, away: { kind: 'custom', team: b5 }, seed: 'cm-5', mySide: 'home' });
+  ok(!!bu && bu.size === 5 && bu.homeLineup.starters.length === 5 && bu.awayLineup.starters.length === 5,
+    '5인제 매치업 세계를 만듭니다', `${bu?.world.teams[bu.homeId].name} vs ${bu?.world.teams[bu.awayId].name}`);
+  const m5 = new Match({ world: bu.world, homeId: bu.homeId, awayId: bu.awayId, homeLineup: bu.homeLineup, awayLineup: bu.awayLineup, seed: 'cm-5', userSide: 'home' });
+  m5.holdHalf = false;
+  let g5 = 0;
+  while (!m5.done && g5 < 8000) { m5.tick(); g5 += 1; }
+  ok(m5.done && g5 < 8000, '5인제 경기가 90분을 끝까지 진행합니다', `${m5.score.home}-${m5.score.away} · ${g5}틱`);
+  ok(m5.sides.home.players.filter((e) => e.onPitch).length === 5 && m5.sides.away.players.filter((e) => e.onPitch).length === 5,
+    '5인제 경기 내내 양 팀 5명이 필드에 있습니다');
+  ok(['home', 'away'].every((s) => m5.sides[s].players.every((e) => Number.isFinite(e.x) && Number.isFinite(e.y) && e.x >= -1 && e.x <= 101)),
+    '모든 선수 좌표가 피치 안의 유한한 값입니다');
+  const s5 = m5.stats();
+  ok(m5.offsideOn === false && s5.offsides.home + s5.offsides.away === 0, '풋살 경기에는 오프사이드가 없습니다', `오프사이드 ${s5.offsides.home + s5.offsides.away}`);
+  ok((s5.shots.home + s5.shots.away) > 0 && (m5.score.home + m5.score.away) < 20, '5인제 경기에 슈팅·득점이 자연스럽게 나옵니다', `슈팅 ${s5.shots.home + s5.shots.away} · 득점 ${m5.score.home + m5.score.away}`);
+  ok(s5.passes.home + s5.passes.away > 20, '5인제에서도 패스가 이어집니다', `패스 성공 ${s5.passes.home + s5.passes.away}`);
+
+  /* 결과 요약·공유 텍스트 */
+  const sum5 = matchSummary(m5);
+  ok(sum5.mom && sum5.mom.rating >= 4.2 && sum5.mom.rating <= 10, '결과 요약이 MOM을 뽑습니다', `${sum5.mom?.e.name} ${sum5.mom?.rating}`);
+  const txt = resultText({ size: 5 }, m5);
+  ok(txt.includes('별무리 풋살') && txt.includes(`${m5.score.home}-${m5.score.away}`) && /5인제 풋살/.test(txt),
+    '결과 텍스트에 팀·스코어·규모가 들어갑니다', txt.split('\n')[0]);
+
+  /* 퇴장 — 5인제는 3명 밑으로 떨어질 때만 끝납니다 */
+  const bu2 = buildMatchupWorld({ home: { kind: 'custom', team: a5 }, away: { kind: 'custom', team: b5 }, seed: 'cm-red', mySide: 'home' });
+  const mRed = new Match({ world: bu2.world, homeId: bu2.homeId, awayId: bu2.awayId, homeLineup: bu2.homeLineup, awayLineup: bu2.awayLineup, seed: 'cm-red', userSide: 'home' });
+  mRed.sides.home.players.slice(1, 3).forEach((e) => mRed.sendOff(e, 'red'));
+  ok(!mRed.done && mRed.sides.home.players.filter((e) => e.onPitch).length === 3, '5인제에서 두 명이 퇴장해도 3명으로 계속합니다', `남은 인원 ${mRed.sides.home.players.filter((e) => e.onPitch).length}`);
+  mRed.sendOff(mRed.sides.home.players.filter((e) => e.onPitch)[0], 'red');
+  ok(mRed.done, '3명 미만이 되면 경기를 멈춥니다');
+
+  /* 5인제 커스텀 vs K리그 구단 — 그 구단에서 5명만 추려 5:5 */
+  const bkl = buildMatchupWorld({ home: { kind: 'custom', team: a5 }, away: { kind: 'kl', id: 'geumsan' }, seed: 'cm-kl', mySide: 'home' });
+  ok(!!bkl && bkl.awayLineup.starters.length === 5 && ['1-2-1', '2-2'].includes(bkl.world.teams[bkl.awayId].formation),
+    'K리그 구단도 풋살 규모(5명)로 나옵니다', `${bkl?.world.teams[bkl.awayId].name} · ${bkl?.world.teams[bkl.awayId].formation}`);
+  const mkl = new Match({ world: bkl.world, homeId: bkl.homeId, awayId: bkl.awayId, homeLineup: bkl.homeLineup, awayLineup: bkl.awayLineup, seed: 'cm-kl', userSide: 'home' });
+  mkl.holdHalf = false;
+  let gkl = 0;
+  while (!mkl.done && gkl < 8000) { mkl.tick(); gkl += 1; }
+  ok(mkl.done, '커스텀 5인제 팀 vs K리그 구단 경기가 끝까지 진행합니다', `${mkl.score.home}-${mkl.score.away}`);
+  ok(mkl.sides.away.players.filter((e) => e.onPitch).length === 5, 'K리그 쪽도 5명이 필드에 있습니다');
+
+  /* 11인제 커스텀 vs 커스텀 — 오프사이드는 그대로 켜집니다 */
+  const c11a = newTeam({ size: 11, name: '커스텀 A' }); autoFill(c11a);
+  const c11b = newTeam({ size: 11, name: '커스텀 B' }); autoFill(c11b);
+  const b11 = buildMatchupWorld({ home: { kind: 'custom', team: c11a }, away: { kind: 'custom', team: c11b }, seed: 'cm-11', mySide: 'away' });
+  ok(b11 && b11.homeLineup.starters.length === 11 && b11.world.myTeamId === b11.awayId,
+    '11인제 매치업은 11명·원정 선택이 그대로입니다');
+  const m11 = new Match({ world: b11.world, homeId: b11.homeId, awayId: b11.awayId, homeLineup: b11.homeLineup, awayLineup: b11.awayLineup, seed: 'cm-11', userSide: 'away' });
+  ok(m11.offsideOn === true, '11인제 경기는 오프사이드 판정이 켜집니다');
+
+  /* 커리어 세이브는 그대로 */
+  ok(JSON.stringify(career) === careerBefore, '커스텀 매치업이 커리어 세이브(세계)를 건드리지 않습니다');
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);
