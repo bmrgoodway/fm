@@ -1278,6 +1278,24 @@ textarea.inp { resize: vertical; line-height: 1.5; }
 .cm-longlink { word-break: break-all; }
 .cm-link-info code { word-break: break-all; }
 
+/* 공유·불러오기 — 팀마다 코드 배지·복사 버튼, 두 팀 매치업 링크 생성기 */
+.cm-team-hint { margin: 2px 0 4px; font-size: 11.5px; font-weight: 800; color: var(--soft); line-height: 1.5; }
+.cm-team-hint b { color: var(--ink); }
+.cm-team-list .cm-team-row { flex-direction: column; align-items: stretch; gap: 6px; }
+.cm-tl-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cm-tl-code { flex: none; font-size: 12.5px; font-weight: 900; letter-spacing: 0.12em; border: 1.5px solid var(--line); background: var(--yellow); color: #101014; padding: 2px 8px; }
+.cm-tl-nocode { flex: none; font-size: 11px; font-weight: 900; color: var(--soft); border: 1.5px dashed var(--line); padding: 2px 8px; }
+.cm-tl-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.cm-vs-pick { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: end; margin: 10px 0 8px; }
+.cm-vs-side { display: block; min-width: 0; }
+.cm-vs-side > span { display: block; font-size: 11px; font-weight: 900; color: var(--soft); margin-bottom: 4px; }
+.cm-vs-side .inp { width: 100%; min-width: 0; }
+.cm-vs-x { font-weight: 900; font-size: 13px; padding-bottom: 9px; color: var(--soft); }
+.cm-vs-out { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border: var(--bw) solid var(--line); background: var(--paper2); padding: 8px 10px; }
+.cm-vs-out code { flex: 1 1 150px; min-width: 0; word-break: break-all; font-weight: 900; }
+.cm-vs-out.off { border-style: dashed; background: var(--paper); }
+.cm-vs-out .actions { margin: 0; }
+
 .cm-vs-team { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
 .cm-pitch-wrap { max-width: 320px; }
 .cm-pitch-wrap .mini-pitch { width: 100%; height: auto; }
@@ -1330,6 +1348,9 @@ textarea.inp { resize: vertical; line-height: 1.5; }
   .cp-name { flex: 1 1 100%; order: 3; }
   .cp-slot { width: 84px; }
   .cm-code-val { font-size: 22px; }
+  .cm-vs-pick { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .cm-vs-x { padding: 0; }
+  .cm-tl-code { letter-spacing: 0.08em; }
   .cm-score { flex-wrap: wrap; }
 }
 

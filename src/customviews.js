@@ -183,37 +183,56 @@ function sharePanel(app, team) {
   const db = readTeams();
   const sh = app.state.custom.share || {};
   const busy = !!sh.busy;
+  // 공유 카드는 여기서 고른 팀을 씁니다 — 탭을 옮기지 않고 팀을 바꿔 가며 코드를 발급할 수 있게
+  const pick = db.list.find((t) => t.id === app.state.custom.sharePick) || team || db.list[0] || null;
+  // 두 팀 매치업 링크 — 기본은 지금 공유 중인 팀과, 코드가 있는 다른 팀
+  const coded = db.list.filter((t) => t.code);
+  const vsA = db.list.find((t) => t.id === app.state.custom.vsA) || (pick?.code ? pick : coded[0]) || db.list[0] || null;
+  const vsB = db.list.find((t) => t.id === app.state.custom.vsB && t.id !== vsA?.id)
+    || coded.find((t) => t.id !== vsA?.id) || db.list.find((t) => t.id !== vsA?.id) || null;
+  const vsLink = vsA?.code && vsB?.code && vsA.id !== vsB.id ? matchLink(vsA.code, vsB.code) : '';
+  const missing = [vsA, vsB].filter((t) => t && !t.code);
+  const opt = (t, selId, showCode = true) => `<option value="${t.id}" ${t.id === selId ? 'selected' : ''}>${esc(t.name)} · ${formatName(t.size)}${showCode ? (t.code ? ` · ${t.code}` : ' · 코드 없음') : ''}</option>`;
   return `<div class="cm-grid">
     <section class="card">
       <h3>공유 코드 만들기</h3>
-      <p class="sm">팀을 공유 서버에 올리고 <b>6자리 코드</b>와 링크를 받습니다. 코드를 받은 친구는 자기 브라우저에 팀을 저장해 바로 대결할 수 있어요.</p>
-      ${team ? `
+      <p class="sm">공유할 팀을 여기서 고르고 <b>6자리 코드</b>를 받습니다. 코드나 짧은 링크를 받은 친구는 자기 브라우저에 팀을 저장해 바로 대결할 수 있어요.</p>
+      ${db.list.length ? `<div class="cm-picker">
+        <label class="cm-lab" for="cm-share-pick">공유할 팀</label>
+        <select id="cm-share-pick" class="inp" data-cm="share-pick" aria-label="공유할 팀 고르기">
+          ${db.list.map((t) => opt(t, pick?.id, false)).join('')}
+        </select>
+      </div>` : ''}
+      ${pick ? `
       <div class="cm-share-team">
-        <span class="badge" data-team="${team.id}">${esc(teamShort(team))}</span>
-        <div><b>${esc(team.name)}</b><br><small class="muted">${formatName(team.size)} · ${esc(team.formation)} · 전력 ${teamPowerOf(team) || '—'}</small></div>
+        <span class="badge" data-team="${pick.id}">${esc(teamShort(pick))}</span>
+        <div><b>${esc(pick.name)}</b><br><small class="muted">${formatName(pick.size)} · ${esc(pick.formation)} · 전력 ${teamPowerOf(pick) || '—'}</small></div>
       </div>
       <div class="actions">
-        <button class="btn primary" data-act="cm-publish" data-id="${team.id}" type="button" ${busy ? 'disabled' : ''}>${busy ? '올리는 중…' : '공유 코드 발급'}</button>
-        ${team.code ? `<button class="btn ghost" data-act="cm-copy" data-copy="${esc(teamLink(team.code))}" type="button">링크 복사</button>` : ''}
+        <button class="btn primary" data-act="cm-publish" data-id="${pick.id}" type="button" ${busy ? 'disabled' : ''}>${busy ? '올리는 중…' : pick.code ? '새 코드로 다시 공유' : '공유 코드 발급'}</button>
+        ${pick.code ? `<button class="btn ghost" data-act="cm-copy" data-copy="${esc(teamLink(pick.code))}" type="button">링크 복사</button>` : ''}
       </div>
-      ${team.code ? `<div class="cm-code">
+      ${pick.code ? `<div class="cm-code">
         <small>공유 코드</small>
-        <b class="cm-code-val">${esc(team.code)}</b>
-        <button class="btn small" data-act="cm-copy" data-copy="${esc(team.code)}" type="button">코드 복사</button>
-        <button class="btn small ghost" data-act="cm-copy" data-copy="${esc(teamLink(team.code))}" type="button">링크 복사</button>
-        <p class="sm muted">${esc(teamLink(team.code))}</p>
-      </div>` : ''}
+        <b class="cm-code-val">${esc(pick.code)}</b>
+        <button class="btn small" data-act="cm-copy" data-copy="${esc(pick.code)}" type="button">코드 복사</button>
+        <button class="btn small ghost" data-act="cm-copy" data-copy="${esc(teamLink(pick.code))}" type="button">링크 복사</button>
+        <p class="sm muted">${esc(teamLink(pick.code))}</p>
+      </div>
+      <p class="hint">팀을 고쳤다면 「새 코드로 다시 공유」를 눌러 주세요 — 고친 내용으로 새 코드가 나오고, 예전 코드도 그대로 열립니다.</p>
+      ` : '<p class="hint">아직 공유하지 않은 팀입니다 — 「공유 코드 발급」을 누르면 코드와 짧은 링크가 생깁니다.</p>'}
       ` : '<p class="muted sm">먼저 팀을 만들어 주세요.</p>'}
     </section>
 
     <section class="card">
       <h3>코드·링크로 불러오기</h3>
-      <p class="sm">친구에게 받은 <b>6자리 코드</b>를 넣거나, <code>?team=</code> 링크를 그대로 붙여 넣으세요. 링크는 통째로 넣어도 됩니다.</p>
+      <p class="sm">친구에게 받은 <b>6자리 코드</b>를 넣거나, 공유 링크를 그대로 붙여 넣으세요. 두 팀 매치업 링크(<code>?m=</code>)를 넣으면 두 팀이 함께 열립니다.</p>
       <div class="cm-load">
-        <input class="inp" data-cm="code" placeholder="예: K7M2QX 또는 https://…?team=K7M2QX" value="${esc(app.state.custom.codeInput || '')}" aria-label="공유 코드 또는 링크">
+        <input class="inp" data-cm="code" placeholder="예: K7M2QX 또는 https://…?t=K7M2QX" value="${esc(app.state.custom.codeInput || '')}" aria-label="공유 코드 또는 링크">
         <button class="btn" data-act="cm-load" type="button">불러오기</button>
       </div>
       <h4 class="sub">내 팀 ${db.list.length}개</h4>
+      <p class="cm-team-hint">이 브라우저에 저장된 내 팀 전부입니다. 노란 <b>코드 배지</b>가 붙은 팀이 공유 서버에 올린 팀이에요.</p>
       ${(() => {
         const extra = duplicateTeams(db.list).reduce((n, g) => n + g.drop.length, 0);
         if (!extra) return '';
@@ -225,22 +244,46 @@ function sharePanel(app, team) {
             : `<button class="btn small" data-act="cm-dedupe" type="button">중복 팀 ${extra}개 정리</button>`}</p>`;
       })()}
       <ul class="cm-team-list">
-        ${db.list.map((t) => `<li>
-          <span class="badge" data-team="${t.id}">${esc(teamShort(t))}</span>
-          <span class="cm-tl-name"><b>${esc(t.name)}</b><small class="muted">${formatName(t.size)} · ${esc(t.formation)}${t.code ? ` · 코드 ${t.code}` : ''}${t.from ? ` · ${esc(t.from)}` : ''}</small></span>
-          <button class="btn small ghost" data-act="cm-open" data-id="${t.id}" type="button">편집</button>
-          ${t.code ? `<button class="btn small ghost" data-act="cm-copy" data-copy="${esc(teamLink(t.code))}" type="button">링크</button>` : ''}
-          <button class="btn small ghost" data-act="cm-delete" data-id="${t.id}" type="button">삭제</button>
+        ${db.list.map((t) => `<li class="cm-team-row">
+          <div class="cm-tl-head">
+            <span class="badge" data-team="${t.id}">${esc(teamShort(t))}</span>
+            <span class="cm-tl-name"><b>${esc(t.name)}</b><small class="muted">${formatName(t.size)} · ${esc(t.formation)}${t.from ? ` · ${esc(t.from)}` : ''}</small></span>
+            ${t.code ? `<code class="cm-tl-code" title="공유 코드">${esc(t.code)}</code>` : '<span class="cm-tl-nocode">공유 안 함</span>'}
+          </div>
+          <div class="cm-tl-acts">
+            ${t.code ? `<button class="btn small ghost" data-act="cm-copy" data-copy="${esc(t.code)}" type="button">코드 복사</button>
+            <button class="btn small ghost" data-act="cm-copy" data-copy="${esc(teamLink(t.code))}" type="button">링크 복사</button>` : ''}
+            <button class="btn small ghost" data-act="cm-open" data-id="${t.id}" type="button">편집</button>
+            <button class="btn small ghost" data-act="cm-delete" data-id="${t.id}" type="button">삭제</button>
+          </div>
         </li>`).join('')}
       </ul>
     </section>
 
     <section class="card cm-link-info">
-      <h3>링크로 바로 열기</h3>
-      <p class="sm">매치업 링크는 두 팀을 한 번에 엽니다 — <code>?match=내팀코드:상대팀코드</code></p>
-      ${team?.code ? `<p class="sm"><code>${esc(matchLink(team.code, '상대코드'))}</code></p>` : ''}
+      <h3>두 팀 매치업 링크</h3>
+      <p class="sm">두 팀을 고르면 <code>?m=팀A:팀B</code> 짧은 링크가 바로 만들어집니다. 받은 사람은 두 팀이 한 번에 열려 홈/원정만 고르면 돼요.</p>
+      ${db.list.length ? `<div class="cm-vs-pick">
+        <label class="cm-vs-side"><span>팀 A</span>
+          <select class="inp" data-cm="vs" data-side="a" aria-label="매치업 링크 팀 A">${db.list.map((t) => opt(t, vsA?.id)).join('')}</select>
+        </label>
+        <span class="cm-vs-x" aria-hidden="true">vs</span>
+        <label class="cm-vs-side"><span>팀 B</span>
+          <select class="inp" data-cm="vs" data-side="b" aria-label="매치업 링크 팀 B">${db.list.length > 1
+            ? db.list.map((t) => opt(t, vsB?.id)).join('')
+            : '<option value="">팀이 하나 더 필요합니다</option>'}</select>
+        </label>
+      </div>` : ''}
+      ${vsLink ? `<div class="cm-vs-out">
+        <code>${esc(vsLink)}</code>
+        <button class="btn small" data-act="cm-copy" data-copy="${esc(vsLink)}" type="button">복사</button>
+      </div>` : db.list.length > 1 ? `<div class="cm-vs-out off">
+        ${vsA && vsB && vsA.id === vsB.id ? '<p class="sm">서로 다른 두 팀을 골라 주세요.</p>' : ''}
+        ${missing.length ? `<p class="sm">${missing.map((t) => `<b>${esc(t.name)}</b>`).join(', ')}에 아직 공유 코드가 없습니다 — 발급하면 짧은 링크가 만들어져요.</p>
+        <div class="actions">${missing.map((t) => `<button class="btn small" data-act="cm-publish" data-id="${t.id}" type="button">${esc(t.name)} 코드 발급</button>`).join('')}</div>` : ''}
+      </div>` : `<p class="sm muted">팀이 하나 더 있어야 두 팀 링크를 만들 수 있습니다.</p>`}
       <p class="sm muted">인터넷이 없거나 공유 서버가 막히면 「긴 링크」로 팀 전체를 링크에 담아 보낼 수 있습니다.</p>
-      <div class="actions">${team ? `<button class="btn ghost" data-act="cm-longlink" data-id="${team.id}" type="button">긴 링크 만들기</button>` :
+      <div class="actions">${pick ? `<button class="btn ghost" data-act="cm-longlink" data-id="${pick.id}" type="button">긴 링크 만들기</button>` :
         ''}</div>
       ${app.state.custom.longLink ? `<p class="sm cm-longlink" data-cm="longlink"><code>${esc(app.state.custom.longLink)}</code></p>
         <div class="actions"><button class="btn small" data-act="cm-copy" data-copy="${esc(app.state.custom.longLink)}" type="button">복사</button></div>` : ''}

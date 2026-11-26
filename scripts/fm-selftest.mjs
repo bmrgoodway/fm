@@ -33,6 +33,7 @@ import {
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
   coordsOf, isCustomShape, movePlayerCoord, resetCoords, clampCoord, FIELD_BOX, GK_BOX,
   teamFingerprint, readTeams, saveTeam, newTeamId, duplicateTeams, removeDuplicates, TEAM_MAX,
+  teamLink, matchLink, parseShareInput,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2521,6 +2522,28 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
   const full = saveTeam(newTeam({ size: 5, name: '한도 초과' }));
   ok(!full.ok && /최대 24개/.test(full.why || '') && readTeams().list.length === TEAM_MAX, '팀이 24개일 때 새 팀 저장은 거절하고 이유를 알려 줍니다', full.why);
   mem.clear();
+
+  /* ─────────── [33] 짧은 공유 링크 — ?t=CODE · ?m=A:B (예전 ?team=·?match= 도 그대로) ─────────── */
+  console.log('\n[33] 짧은 공유 링크 — ?t=CODE · ?m=A:B 와 예전 링크 호환');
+  const tLink = teamLink('NUCAD9');
+  const mLink = matchLink('NUCAD9', '4GT4F5');
+  ok(tLink.endsWith('/fm/?t=NUCAD9'), '팀 링크는 ?t=CODE 짧은 형식입니다', tLink);
+  ok(mLink.endsWith('/fm/?m=NUCAD9:4GT4F5'), '두 팀 링크는 ?m=A:B 짧은 형식입니다', mLink);
+  ok(!/%/.test(mLink), '짧은 두 팀 링크에는 인코딩 문자가 없습니다');
+  const pShort = parseShareInput(tLink);
+  const pOld = parseShareInput('https://bmrgoodway.github.io/fm/?team=4GT4F5');
+  ok(pShort.kind === 'team' && pShort.code === 'NUCAD9', '?t= 링크를 팀 코드로 읽습니다', pShort.code);
+  ok(pOld.kind === 'team' && pOld.code === '4GT4F5', '예전 ?team= 링크도 그대로 읽습니다', pOld.code);
+  const mShort = parseShareInput(mLink);
+  const mOld = parseShareInput('https://bmrgoodway.github.io/fm/?match=NUCAD9:4GT4F5');
+  ok(mShort.kind === 'match' && mShort.a === 'NUCAD9' && mShort.b === '4GT4F5', '?m=A:B 링크를 두 팀으로 읽습니다', `${mShort.a} : ${mShort.b}`);
+  ok(mOld.kind === 'match' && mOld.a === 'NUCAD9' && mOld.b === '4GT4F5', '예전 ?match=A:B 링크도 그대로 읽습니다', `${mOld.a} : ${mOld.b}`);
+  const bareVs = parseShareInput(' NUCAD9:4GT4F5 ');
+  ok(bareVs.kind === 'match' && bareVs.a === 'NUCAD9' && bareVs.b === '4GT4F5', '「코드:코드」만 붙여 넣어도 두 팀으로 읽습니다');
+  const bareCode = parseShareInput('K7M2QX');
+  ok(bareCode.kind === 'team' && bareCode.code === 'K7M2QX', '코드만 넣으면 그대로 씁니다', bareCode.code);
+  const pLong = parseShareInput(teamLink(encodePayload(packTeam(newTeam({ size: 5, name: '긴 링크 점검' })))));
+  ok(pLong.kind === 'team' && pLong.code.startsWith('Z'), '긴 링크(?t=Z…)에 담긴 팀 전체 코드도 그대로 읽습니다', `${pLong.code.length}자`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

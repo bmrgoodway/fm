@@ -94,7 +94,7 @@ await page.waitForSelector('.cm-code-val', { timeout: 20000 });
 const code = (await page.locator('.cm-code-val').textContent()).trim();
 ok(/^[A-Z0-9]{6,8}$/.test(code), '6~8자리 공유 코드를 받습니다', code);
 const link = await page.locator('.cm-code p.sm').first().textContent();
-ok(link.includes(`?team=${code}`), '공유 링크가 ?team=CODE 모양입니다', link.trim());
+ok(link.includes(`?t=${code}`), '공유 링크가 ?t=CODE 짧은 모양입니다', link.trim());
 
 // 새 브라우저(친구) — 코드로 불러오기
 const { ctx: ctx2, page: page2 } = await open();
@@ -114,12 +114,18 @@ const friendTeams = await page2.evaluate(() => JSON.parse(localStorage.getItem('
 ok(friendTeams.list?.some((t) => t.name === '별무리 풋살단' && t.size === 5 && t.players.length === 5),
   '친구(새 브라우저)가 코드로 팀을 불러와 저장합니다', `${friendTeams.list?.length}개 팀`);
 
-// 링크(?team=)로 바로 열기
+// 예전 링크(?team=)도 그대로 열리는지 — 이미 나눠 준 링크 호환
 const { ctx: ctx3, page: page3 } = await open({}, `?team=${code}`);
 await sleep(1200);
 const linkOpened = await page3.locator('.cm-head h1').count() === 1;
 const linkTeam = await page3.evaluate(() => JSON.parse(localStorage.getItem('fm:customTeams') || '{}').list?.[0]?.name || '');
-ok(linkOpened && linkTeam === '별무리 풋살단', '공유 링크(?team=)로 열면 그 팀이 바로 불러와집니다', linkTeam);
+ok(linkOpened && linkTeam === '별무리 풋살단', '예전 공유 링크(?team=)로도 그 팀이 바로 불러와집니다', linkTeam);
+
+// 짧은 링크(?t=)로 열기 — 주소창도 정리되는지
+const { ctx: ctx3b, page: page3b } = await open({}, `?t=${code}`);
+await sleep(1200);
+const shortTeam = await page3b.evaluate(() => JSON.parse(localStorage.getItem('fm:customTeams') || '{}').list?.[0]?.name || '');
+ok(shortTeam === '별무리 풋살단' && !page3b.url().includes('?t='), '짧은 공유 링크(?t=)로 열면 그 팀이 바로 불러와지고 주소창은 정리됩니다', `${shortTeam} · ${page3b.url().slice(0, 50)}`);
 
 // 두 팀을 함께 여는 ?match=A:B — 친구 쪽에서 받은 팀을 그대로 공유해 코드를 하나 더 받습니다
 await page2.locator('[data-act="cm-tab"][data-tab="share"]').click();
@@ -128,11 +134,16 @@ await page2.locator('[data-act="cm-publish"]').first().click();
 await page2.waitForSelector('.cm-code-val', { timeout: 20000 });
 const code2 = (await page2.locator('.cm-code-val').textContent()).trim();
 ok(/^[A-Z0-9]{6,8}$/.test(code2), '친구도 받은 팀을 그대로 다시 공유할 수 있습니다', code2);
-const { ctx: ctx4, page: page4 } = await open({}, `?match=${code}:${code2}`);
+const { ctx: ctx4, page: page4 } = await open({}, `?m=${code}:${code2}`);
 await sleep(2000);
 const matchOpened = await page4.evaluate(() => (document.querySelector('.cm-msg')?.textContent || '').trim());
 ok(await page4.locator('[data-act="mu-start"]').count() === 2 && /vs/.test(matchOpened),
-  '매치업 링크(?match=A:B)로 두 팀이 함께 열립니다', `${code}:${code2} · ${matchOpened.slice(0, 40)}`);
+  '짧은 매치업 링크(?m=A:B)로 두 팀이 함께 열립니다', `${code}:${code2} · ${matchOpened.slice(0, 40)}`);
+
+// 예전 매치업 링크(?match=)도 그대로
+const { ctx: ctx4b, page: page4b } = await open({}, `?match=${code}:${code2}`);
+await sleep(2000);
+ok(await page4b.locator('[data-act="mu-start"]').count() === 2, '예전 매치업 링크(?match=A:B)도 그대로 열립니다');
 
 /* ── 3) K리그 커리어 세이브와 분리 ───────────────────────────── */
 console.log('\n[3] 커스텀 매치업 — 커리어 세이브를 건드리지 않는지');

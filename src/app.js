@@ -25,7 +25,7 @@ const state = {
   pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
   posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
   // 커스텀 매치업 — 팀 빌더·공유·가상 경기 (커리어와 분리)
-  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0, tacticsOpen: true, confirmDedupe: null },
+  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, sharePick: null, vsA: null, vsB: null, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0, tacticsOpen: true, confirmDedupe: null },
   matchup: { oppKind: 'kl', oppId: 'geumsan', oppTeam: null, side: 'home' },
   customResult: null, customMatch: null, headerOverride: null,
 };
@@ -532,6 +532,9 @@ function onClick(e) {
       if (state.custom.confirmDelete !== id) { state.custom.confirmDelete = id; render(); break; }
       const r = C.deleteTeam(id);
       state.custom.confirmDelete = null;
+      if (state.custom.sharePick === id) state.custom.sharePick = null;
+      if (state.custom.vsA === id) state.custom.vsA = null;
+      if (state.custom.vsB === id) state.custom.vsB = null;
       state.custom.team = null; state.custom.teamId = null;
       ensureCustomTeam();
       render(); toast(r.ok ? '팀을 삭제했습니다.' : r.why, r.ok ? 'ok' : 'warn'); break;
@@ -986,6 +989,19 @@ function onCustomChange(e) {
     if (nt) { state.custom.team = nt; state.custom.teamId = nt.id; state.custom.confirmDelete = null; render(); }
     return;
   }
+  // 공유·불러오기 탭 — 공유할 팀 고르기 / 매치업 링크의 두 팀 고르기 (팀이 없어도 동작해야 합니다)
+  if (cm === 'share-pick') {
+    state.custom.sharePick = el.value;
+    state.custom.longLink = '';
+    render();
+    return;
+  }
+  if (cm === 'vs') {
+    if (el.dataset.side === 'b') state.custom.vsB = el.value;
+    else state.custom.vsA = el.value;
+    render();
+    return;
+  }
   const t = state.custom.team;
   if (!t) return;
   if (cm === 'primary' || cm === 'secondary') {
@@ -1058,11 +1074,10 @@ async function publishTeam(id) {
   }
 }
 
+/* 코드·링크 입력 — 짧은 링크(?t=·?m=)와 예전 링크(?team=·?match=) 모두 알아봅니다. */
 const codeFromInput = (raw) => {
-  const s = String(raw || '').trim();
-  const m = s.match(/[?&#]team=([^&\s]+)/);
-  if (m) return decodeURIComponent(m[1]);
-  return s;
+  const p = C.parseShareInput(raw);
+  return p.kind === 'match' ? p.a || '' : p.code;
 };
 
 /* 공유 코드·링크로 들여온 팀을 내 팀으로 저장합니다.
@@ -1082,7 +1097,7 @@ function importSharedTeam(team, { code = null, source = '공유 링크' } = {}) 
   return { saved, updated: !!same, count: saved.count };
 }
 
-/* 공유 링크(?team=·?match=)로 들어왔을 때 주소창에서 그 값을 지웁니다 —
+/* 공유 링크(?t=·?team=·?m=·?match=)로 들어왔을 때 주소창에서 그 값을 지웁니다 —
    새로고침·뒤로가기로 같은 링크를 다시 열어도 팀 사본이 쌓이지 않게. */
 function clearShareParams() {
   try { history.replaceState(null, '', C.appBase()); } catch { /* 주소를 못 바꾸는 환경이면 그냥 둡니다 */ }
@@ -1091,6 +1106,13 @@ function clearShareParams() {
 async function loadSharedCode() {
   const raw = (state.custom.codeInput || '').trim();
   if (!raw) { toast('공유 코드나 링크를 입력해 주세요.', 'warn'); return; }
+  // 매치업 링크(?m=A:B)를 붙여 넣었으면 두 팀을 함께 엽니다
+  const parsed = C.parseShareInput(raw);
+  if (parsed.kind === 'match' && parsed.a && parsed.b) {
+    state.custom.codeInput = '';
+    await openMatchParam(`${parsed.a}:${parsed.b}`);
+    return;
+  }
   const code = codeFromInput(raw);
   state.custom.msg = '불러오는 중…';
   render();
@@ -1128,11 +1150,11 @@ function copyText(text, okMsg = '복사했습니다.') {
   else fallback();
 }
 
-/* ?team=CODE · ?match=A:B — 공유 링크로 바로 열기 */
+/* ?t=CODE · ?m=A:B (예전 ?team= · ?match= 도 그대로) — 공유 링크로 바로 열기 */
 async function openFromUrl() {
   const q = new URLSearchParams(location.search);
-  const team = q.get('team');
-  const match = q.get('match');
+  const team = q.get('t') || q.get('team');
+  const match = q.get('m') || q.get('match');
   if (match) { await openMatchParam(match); return; }
   if (team) await openSharedParam(team);
 }

@@ -514,8 +514,34 @@ export const appBase = () => {
   const path = String(globalThis.location?.pathname || '/fm/');
   return `${globalThis.location?.origin || 'https://bmrgoodway.github.io'}${path.replace(/index\.html$/, '')}`;
 };
-export const teamLink = (code) => `${appBase()}?team=${encodeURIComponent(code)}`;
-export const matchLink = (a, b) => `${appBase()}?match=${encodeURIComponent(a)}:${encodeURIComponent(b)}`;
+/* 짧은 공유 링크 — ?t=CODE (한 팀), ?m=CODE:CODE (두 팀).
+   예전에 나눈 ?team= · ?match= 링크도 계속 열립니다(읽는 쪽이 둘 다 알아봅니다). */
+export const teamLink = (code) => `${appBase()}?t=${encodeURIComponent(code)}`;
+export const matchLink = (a, b) => `${appBase()}?m=${encodeURIComponent(a)}:${encodeURIComponent(b)}`;
+
+/* 붙여 넣은 코드·링크 해석 — 짧은 형(?t=·?m=)과 예전 형(?team=·?match=), 그리고 'A:B' 만 적은 경우.
+   { kind:'team', code } 또는 { kind:'match', a, b } 를 돌려줍니다. */
+export function parseShareInput(raw) {
+  const s = String(raw || '').trim();
+  const grab = (...names) => {
+    for (const n of names) {
+      const m = s.match(new RegExp(`[?&#]${n}=([^&\\s]+)`));
+      if (!m) continue;
+      try { return decodeURIComponent(m[1]); } catch { return m[1]; }
+    }
+    return null;
+  };
+  const match = grab('m', 'match');
+  if (match) {
+    const [a = '', b = ''] = match.split(':').map((x) => x.trim());
+    return { kind: 'match', a, b };
+  }
+  const team = grab('t', 'team');
+  if (team) return { kind: 'team', code: team };
+  const bare = s.match(/^([A-Za-z0-9_-]{4,12}):([A-Za-z0-9_-]{4,12})$/);
+  if (bare) return { kind: 'match', a: bare[1], b: bare[2] };
+  return { kind: 'team', code: s };
+}
 
 /* 팀을 공유 표에 올리고 코드를 받습니다. 실패하면 { ok:false, why } — 화면은 긴 링크로 안내합니다. */
 export async function publishTeam(team) {
