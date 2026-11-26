@@ -39,6 +39,57 @@ export function newTeamId() {
 
 const slotsOf = (formation) => FORMATIONS[formation]?.slots || FORMATIONS['4-3-3'].slots;
 export const slotLabelsOf = (formation) => slotsOf(formation).map((s) => s.label);
+
+/* ─────────────────────────── 자유 대형 좌표 ───────────────────────────
+   전술 보드에서 선수 칩을 끌어 옮긴 자리입니다. 포메이션 기본 좌표 위에 덮어쓰고,
+   team.customCoords = [{ x, y }, …] (선수 수만큼) 에 남깁니다. null 이면 기본 대형.
+   필드 플레이어는 우리 진영~상대 진영, 골키퍼는 골문 앞으로만 옮길 수 있습니다. */
+export const FIELD_BOX = { xMin: 0.12, xMax: 0.88, yMin: 0.06, yMax: 0.94 };
+export const GK_BOX = { xMin: 0.03, xMax: 0.14, yMin: 0.22, yMax: 0.78 };
+export function clampCoord(coord, pos = 'MF') {
+  const box = String(pos).toUpperCase() === 'GK' ? GK_BOX : FIELD_BOX;
+  const round = (v, lo, hi) => Math.round(clamp(v, lo, hi) * 10000) / 10000;
+  const x = Number(coord?.x);
+  const y = Number(coord?.y);
+  return {
+    x: round(Number.isFinite(x) ? x : (box.xMin + box.xMax) / 2, box.xMin, box.xMax),
+    y: round(Number.isFinite(y) ? y : (box.yMin + box.yMax) / 2, box.yMin, box.yMax),
+  };
+}
+/* 저장·공유에서 온 좌표를 검사합니다 — 선수 수가 맞지 않거나 값이 깨졌으면 기본 대형(null) */
+function normalizeCoords(raw, slots) {
+  if (!Array.isArray(raw) || raw.length !== slots.length) return null;
+  const out = [];
+  for (let i = 0; i < slots.length; i += 1) {
+    const c = raw[i];
+    if (!c || typeof c !== 'object') return null;
+    const x = Number(c.x);
+    const y = Number(c.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) return null;
+    out.push(clampCoord({ x, y }, slots[i].pos));
+  }
+  return out;
+}
+export const isCustomShape = (team) => Array.isArray(team?.customCoords) && team.customCoords.length === (team?.players?.length || 0);
+/* 지금 대형 — 자유 대형이면 그 좌표, 아니면 포메이션 기본 좌표 */
+export function coordsOf(team) {
+  const slots = slotsOf(team?.formation);
+  if (!isCustomShape(team)) return slots.map((s) => ({ x: s.x, y: s.y }));
+  return team.customCoords.map((c, i) => clampCoord(c, slots[i]?.pos));
+}
+/* 선수 한 명 옮기기 — 처음 옮기는 순간 나머지 선수의 기본 좌표까지 함께 담습니다 */
+export function movePlayerCoord(team, i, coord) {
+  const slots = slotsOf(team.formation);
+  if (!slots[i]) return null;
+  const list = coordsOf(team);
+  list[i] = clampCoord(coord, slots[i].pos);
+  team.customCoords = list;
+  return list[i];
+}
+export function resetCoords(team) {
+  team.customCoords = null;
+  return team;
+}
 /* 자리 이름 → 포지션 분류 (포메이션에 없는 자리 이름으로도 입력할 수 있게) */
 export const LABEL_CAT = {
   GK: 'GK', CB: 'DF', LB: 'DF', RB: 'DF', FIXO: 'DF', SW: 'DF',
@@ -64,6 +115,7 @@ export function newTeam(opts = {}) {
     size, formation,
     colors: { primary: pick, secondary: '#ffffff' },
     players: slotsOf(formation).map((s) => emptyPlayer(s.label)),
+    customCoords: null,
     tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0 },
     roles: [],
     setpiece: {},
@@ -90,6 +142,9 @@ export function normalizeTeam(raw) {
       stats,
     };
   });
+  // DB(tactic jsonb)로 오간 좌표가 전술 값에 섞여 들어오지 않게 떼어 냅니다
+  const tactic = { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(raw.tactic || {}) };
+  delete tactic.coords;
   return {
     v: TEAM_VERSION,
     id: String(raw.id || newTeamId()),
@@ -98,7 +153,8 @@ export function normalizeTeam(raw) {
     size, formation,
     colors: { primary: String(raw.colors?.primary || '#02c245'), secondary: String(raw.colors?.secondary || '#ffffff') },
     players,
-    tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...(raw.tactic || {}) },
+    customCoords: normalizeCoords(raw.customCoords, slots),
+    tactic,
     roles: Array.isArray(raw.roles) && raw.roles.length ? resolveRoles(raw.roles, slots) : defaultRoles(slots),
     setpiece: resolveSetPiece(raw.setpiece),
     updatedAt: Number(raw.updatedAt) || Date.now(),
@@ -122,6 +178,7 @@ export function setFormation(team, fid) {
   team.formation = fid;
   team.size = sizeOfFormation(fid);
   team.roles = defaultRoles(slots);
+  team.customCoords = null;   // 포메이션을 바꾸면 자유 대형은 그 포메이션 기본 좌표로 돌아갑니다
   return team;
 }
 
@@ -331,6 +388,8 @@ export function packTeam(team) {
     tactic: t.tactic,
     roles: t.roles,
     setpiece: t.setpiece,
+    // 자유 대형 — [x, y] 쌍으로 담아 DB(tactic jsonb)·링크 어디로 가도 그대로 살아나게
+    coords: isCustomShape(t) ? t.customCoords.map((c) => [c.x, c.y]) : null,
     players: t.players.map((p) => [p.name, p.slot, p.age, ...STAT_KEYS.map((k) => p.stats?.[k] ?? 60)]),
   };
 }
@@ -340,10 +399,14 @@ export function unpackTeam(packed, extra = {}) {
     name: row[0], slot: row[1], age: row[2],
     stats: Object.fromEntries(STAT_KEYS.map((k, i) => [k, row[3 + i]])),
   }));
+  const coords = Array.isArray(packed.coords)
+    ? packed.coords.map((c) => (Array.isArray(c) ? { x: Number(c[0]), y: Number(c[1]) } : c))
+    : null;
   return normalizeTeam({
     id: extra.id || newTeamId(),
     name: packed.name, short: packed.short, size: packed.size, formation: packed.formation,
     colors: packed.colors, tactic: packed.tactic, roles: packed.roles, setpiece: packed.setpiece,
+    customCoords: coords,
     players, code: extra.code || null, from: extra.from || null,
   });
 }
@@ -410,7 +473,9 @@ export async function publishTeam(team) {
     try {
       const { error } = await sb.from(REMOTE_TABLE).insert({
         code, name: packed.name.slice(0, 24), short, size: packed.size, formation: packed.formation,
-        colors: packed.colors, players: packed.players, tactic: packed.tactic,
+        colors: packed.colors, players: packed.players,
+        // 자유 대형은 표 구조를 바꾸지 않고 tactic jsonb 안에 함께 실어 보냅니다
+        tactic: { ...packed.tactic, coords: packed.coords },
       });
       if (!error) return { ok: true, code, packed };
       lastErr = error.message || String(error);
@@ -438,9 +503,12 @@ export async function fetchTeam(code) {
     const { data, error } = await sb.from(REMOTE_TABLE).select('code,name,short,size,formation,colors,players,tactic,created_at').eq('code', key).maybeSingle();
     if (error) return { ok: false, why: `불러오지 못했습니다 (${(error.message || '').slice(0, 80)})` };
     if (!data) return { ok: false, why: '그 코드의 팀을 찾지 못했습니다. 코드를 확인해 주세요.' };
+    const tactic = { ...(data.tactic || {}) };
+    const coords = tactic.coords ?? null;
+    delete tactic.coords;
     const team = unpackTeam({
       name: data.name, short: data.short, size: data.size, formation: data.formation,
-      colors: data.colors, players: data.players, tactic: data.tactic,
+      colors: data.colors, players: data.players, tactic, coords,
     }, { code: key, from: `${data.created_at?.slice(0, 10) || ''} 공유` });
     if (!team) return { ok: false, why: '팀 정보가 손상되어 읽지 못했습니다.' };
     return { ok: true, team };
@@ -497,8 +565,12 @@ function addCustomTeam(world, team, id) {
     formation: t.formation, tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...t.tactic },
     squad, recent: [], div: null, custom: true,
   };
+  // 자유 대형 — 기본 포메이션 자리의 pos·label 은 그대로 두고 x·y 만 옮긴 좌표로 바꿉니다.
+  // Match 는 이 자리를 선수의 기준 위치(slot)로 씁니다.
+  const coords = coordsOf(t);
+  const slots = slotsOf(t.formation).map((s, i) => ({ ...s, x: coords[i].x, y: coords[i].y }));
   return {
-    formation: t.formation, starters: squad.slice(), bench: [],
+    formation: t.formation, starters: squad.slice(), bench: [], slots,
     tactic: { line: 0, pass: 0, press: 0, route: 0, mentality: 0, ...t.tactic },
     roles: resolveRoles(t.roles, slotsOf(t.formation)),
     setpiece: resolveSetPiece(t.setpiece),

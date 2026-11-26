@@ -1320,3 +1320,62 @@ textarea.inp { resize: vertical; line-height: 1.5; }
   padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px;
 }
 .cm-confirm .actions { margin: 0; }
+
+/* 커스텀 매치업 — 대형 보드(자유 배치). 칩을 끌어 자리를 옮기고, 누르면 역할이 바뀝니다. */
+.cpb { border: var(--bw) solid var(--line); background: var(--paper2); padding: 8px; margin: 6px 0 12px; }
+.cpb-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.cpb-head b { font-size: 12.5px; }
+.cpb-custom { background: var(--yellow); color: #101014; }
+.cpb-tip { font-size: 11px; font-weight: 800; color: var(--soft); margin-left: auto; }
+.cpb-formations { margin-bottom: 8px; }
+.cpb-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.cpb-foot .hint { flex: 1 1 160px; margin: 0; }
+.cpb-foot .btn:disabled { opacity: 0.45; cursor: default; }
+
+.custom-pitchboard {
+  position: relative; width: 100%; aspect-ratio: 3 / 2; min-height: 190px;
+  background: #2f9e4f; border: 2px solid #101014; overflow: hidden;
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+.custom-pitchboard span { pointer-events: none; }
+.pb-half { position: absolute; left: 50%; top: 0; bottom: 0; width: 1.5px; background: rgba(255, 255, 255, 0.55); transform: translateX(-50%); }
+.pb-circle { position: absolute; left: 50%; top: 50%; width: 22%; aspect-ratio: 1; border: 1.5px solid rgba(255, 255, 255, 0.55); border-radius: 50%; transform: translate(-50%, -50%); }
+.pb-box { position: absolute; top: 22%; bottom: 22%; width: 13%; border: 1.5px solid rgba(255, 255, 255, 0.55); }
+.pb-box.pb-left { left: 0; border-left: 0; }
+.pb-box.pb-right { right: 0; border-right: 0; }
+.pb-goal { position: absolute; top: 40%; bottom: 40%; width: 2.2%; background: rgba(255, 255, 255, 0.5); }
+.pb-goal.pb-left { left: 0; }
+.pb-goal.pb-right { right: 0; }
+
+.cp-chip {
+  position: absolute; left: var(--cx, 50%); top: var(--cy, 50%); transform: translate(-50%, -50%);
+  width: 34px; height: 34px; padding: 0; border: 2px solid #101014; border-radius: 50%;
+  background: var(--c1, #02c245); color: var(--chip-ink, #101014);
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-weight: 900; font-size: 12px; line-height: 1; cursor: grab;
+  z-index: 2; touch-action: none; user-select: none; -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25);
+}
+.cp-chip .pc-num, .cp-chip .pc-name { pointer-events: none; }
+.cp-chip .pc-name {
+  position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 1px;
+  font-size: 9px; font-weight: 900; white-space: nowrap; color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 3px rgba(0, 0, 0, 0.6);
+  max-width: 56px; overflow: hidden; text-overflow: ellipsis;
+}
+.cp-chip.is-gk { box-shadow: 0 0 0 2px var(--yellow), 0 2px 0 rgba(0, 0, 0, 0.25); }
+.cp-chip:hover { z-index: 3; }
+.cp-chip.dragging {
+  cursor: grabbing; z-index: 9; box-shadow: 0 0 0 3px var(--yellow), 0 4px 10px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%) scale(1.12);
+}
+.cp-chip:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+@media (max-width: 520px) {
+  .cpb-tip { display: none; }
+  .custom-pitchboard { min-height: 168px; }
+  .cp-chip { width: 30px; height: 30px; font-size: 11px; }
+  .cp-chip .pc-name { font-size: 8.5px; max-width: 44px; }
+}

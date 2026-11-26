@@ -379,7 +379,10 @@ export class Match {
     const team = this.world.teams[teamId];
     const form = FORMATIONS[lineup.formation] || FORMATIONS['4-3-3'];
     const roles = Array.isArray(lineup.roles) ? lineup.roles : [];
-    const starters = lineup.starters.map((pid, i) => makeEntity(this.world, pid, form.slots[i] || form.slots[0], dir, side, roles[i])).filter(Boolean);
+    // 커스텀 매치업의 자유 대형은 라인업이 자리 좌표(slots)를 직접 들고 옵니다 — 그 자리를 기준 위치로 씁니다.
+    // (커리어 라인업에는 slots 가 없어 예전과 똑같이 포메이션 좌표를 씁니다)
+    const customSlots = Array.isArray(lineup.slots) && lineup.slots.length ? lineup.slots : null;
+    const starters = lineup.starters.map((pid, i) => makeEntity(this.world, pid, customSlots?.[i] || form.slots[i] || form.slots[0], dir, side, roles[i])).filter(Boolean);
     for (const e of starters) {
       e.x = dir > 0 ? e.slot.x * W : W - e.slot.x * W;
       e.y = e.slot.y * H;

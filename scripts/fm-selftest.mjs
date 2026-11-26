@@ -20,6 +20,8 @@
 //   24) 가격 협상·FA·시즌 임대(임대 종료 반환)
 //   25) 4단계 필드가 없는 구버전 세이브 호환
 //   29) K리그 장기 밸런스 — 12시즌 시뮬레이션 · 디비전별 유스 아카데미 · 이적 위계 · AI 세대교체
+//   30) 커스텀 매치업 — 팀 빌더·공유 코드·풋살(5·6인제) 경기
+//   31) 커스텀 매치업 자유 대형 — 좌표 클램프·저장·공유(tactic jsonb)·경기 엔진 반영·커리어 무영향
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel, simMatchQuick, buildCupStage, teamPower, academyOf, KL_ACADEMY, aiTransferRound } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
@@ -28,6 +30,7 @@ import {
   newTeam, normalizeTeam, setPlayerOvr, setPlayerName, setPlayerStat, autoFill, ovrOf, teamPowerOf,
   setFormation as setTeamFormation, setSize, setTeamSetPiece, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
+  coordsOf, isCustomShape, movePlayerCoord, resetCoords, clampCoord, FIELD_BOX, GK_BOX,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2355,6 +2358,110 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
 
   /* 커리어 세이브는 그대로 */
   ok(JSON.stringify(career) === careerBefore, '커스텀 매치업이 커리어 세이브(세계)를 건드리지 않습니다');
+}
+
+/* ── 31) 자유 대형(드래그 배치) — 좌표 저장·공유·경기 엔진 반영 ───────────── */
+{
+  console.log('\n[31] 커스텀 매치업 — 자유 대형(드래그 배치)');
+
+  const ft = newTeam({ size: 5, name: '자유 대형' });
+  autoFill(ft, { level: 70 });
+  const baseSlots = FORMATIONS[ft.formation].slots;
+  ok(!isCustomShape(ft) && coordsOf(ft).length === 5 && Math.abs(coordsOf(ft)[1].x - baseSlots[1].x) < 1e-9,
+    '새 팀은 자유 대형이 아니고 기본 포메이션 좌표를 씁니다');
+
+  /* 한 명 옮기기 — 옮긴 선수만 좌표가 바뀝니다 */
+  const movedC = movePlayerCoord(ft, 1, { x: 0.62, y: 0.2 });
+  const now = coordsOf(ft);
+  ok(isCustomShape(ft) && movedC.x === 0.62 && movedC.y === 0.2, '선수를 끌어 옮기면 그 좌표가 팀에 저장됩니다', `x ${movedC.x} · y ${movedC.y}`);
+  ok(Math.abs(now[2].x - baseSlots[2].x) < 1e-9 && Math.abs(now[2].y - baseSlots[2].y) < 1e-9,
+    '옮기지 않은 선수는 기본 좌표 그대로입니다', `x ${now[2].x} · y ${now[2].y}`);
+
+  /* 클램프 — 필드 플레이어는 피치 안, 골키퍼는 골문 앞 */
+  const far = movePlayerCoord(ft, 1, { x: 3, y: -2 });
+  ok(far.x === FIELD_BOX.xMax && far.y === FIELD_BOX.yMin, '필드 플레이어는 피치 밖으로 나가지 않습니다', `x ${far.x} · y ${far.y}`);
+  const gkC = movePlayerCoord(ft, 0, { x: 0.7, y: 0.5 });
+  ok(gkC.x === GK_BOX.xMax && gkC.y >= GK_BOX.yMin && gkC.y <= GK_BOX.yMax, '골키퍼는 골문 앞(x 0.03~0.14)으로 제한됩니다', `x ${gkC.x} · y ${gkC.y}`);
+  const c1 = clampCoord({ x: -1, y: 9 }, 'GK');
+  ok(c1.x === GK_BOX.xMin && c1.y === GK_BOX.yMax, '클램프는 좌표계 밖 값을 경계로 당깁니다', `${c1.x},${c1.y}`);
+
+  /* 저장·불러오기 — localStorage 왕복(JSON)과 깨진 값 방어 */
+  const norm = normalizeTeam(JSON.parse(JSON.stringify(ft)));
+  ok(isCustomShape(norm) && Math.abs(norm.customCoords[1].x - FIELD_BOX.xMax) < 1e-9,
+    '저장·불러오기(normalizeTeam) 뒤에도 자유 대형이 남습니다', `${norm.customCoords?.[1]?.x}`);
+  ok(normalizeTeam({ ...ft, customCoords: [{ x: 0.5, y: 0.5 }] }).customCoords === null, '선수 수가 맞지 않는 좌표는 버리고 기본 대형으로 갑니다');
+  ok(normalizeTeam({ ...ft, customCoords: [{ x: 'a', y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.5 }] }).customCoords === null,
+    '깨진 좌표는 버리고 기본 대형으로 갑니다');
+  ok(normalizeTeam({ ...ft, customCoords: null }) && !isCustomShape(normalizeTeam({ ...ft, customCoords: null })), '자유 대형을 지우면 기본 대형으로 돌아갑니다');
+
+  /* 공유 — 링크(긴 코드)와 DB(tactic jsonb) 왕복 */
+  const pk = packTeam(ft);
+  ok(Array.isArray(pk.coords) && Math.abs(pk.coords[1][0] - FIELD_BOX.xMax) < 1e-9, '공유 페이로드에 [x, y] 쌍으로 좌표가 담깁니다', JSON.stringify(pk.coords[1]));
+  const back = unpackTeam(decodePayload(encodePayload(pk)));
+  ok(back && isCustomShape(back) && Math.abs(back.customCoords[1].x - FIELD_BOX.xMax) < 1e-9, '링크용 긴 코드로도 자유 대형이 그대로 복원됩니다');
+  const dbTactic = { ...pk.tactic, coords: pk.coords };          // publishTeam 이 넣는 모양
+  const dbCoords = dbTactic.coords;
+  const cleanTactic = { ...dbTactic };
+  delete cleanTactic.coords;                                       // fetchTeam 이 빼내는 방식
+  const fromDb = unpackTeam({ ...pk, tactic: cleanTactic, coords: dbCoords });
+  ok(fromDb && isCustomShape(fromDb) && fromDb.tactic.coords === undefined,
+    'DB(tactic jsonb)를 거쳐도 자유 대형이 유지되고 전술 값에는 좌표가 섞이지 않습니다');
+  ok(unpackTeam({ ...pk, coords: null }) && !isCustomShape(unpackTeam({ ...pk, coords: null })), '좌표가 없는 예전 공유 팀도 그대로 읽습니다');
+
+  /* 포메이션·규모를 바꾸면 자유 대형 초기화 */
+  const ft2 = normalizeTeam(JSON.parse(JSON.stringify(ft)));
+  setTeamFormation(ft2, '2-2');
+  ok(!isCustomShape(ft2), '포메이션을 바꾸면 자유 대형이 초기화됩니다', ft2.formation);
+  movePlayerCoord(ft2, 2, { x: 0.4, y: 0.3 });
+  resetCoords(ft2);
+  ok(!isCustomShape(ft2), '「기본 대형으로 되돌리기」는 좌표를 지웁니다');
+
+  /* 경기 엔진 — 자유 대형 좌표가 2D 경기의 기준 위치로 들어갑니다 */
+  const fA = newTeam({ size: 5, name: '자유 A' }); autoFill(fA, { level: 70 });
+  const fB = newTeam({ size: 5, name: '자유 B' }); autoFill(fB, { level: 70 });
+  const a3 = movePlayerCoord(fA, 3, { x: 0.72, y: 0.24 });
+  const a4 = movePlayerCoord(fA, 4, { x: 0.3, y: 0.82 });
+  const b3 = movePlayerCoord(fB, 3, { x: 0.2, y: 0.6 });
+  const bf = buildMatchupWorld({ home: { kind: 'custom', team: fA }, away: { kind: 'custom', team: fB }, seed: 'cm-free', mySide: 'home' });
+  ok(Array.isArray(bf.homeLineup.slots) && bf.homeLineup.slots.length === 5
+    && Math.abs(bf.homeLineup.slots[3].x - a3.x) < 1e-9 && Math.abs(bf.homeLineup.slots[4].y - a4.y) < 1e-9,
+    '경기 라인업이 자유 대형 좌표(slots)를 들고 갑니다', `3번 x ${bf.homeLineup.slots[3].x} · 4번 y ${bf.homeLineup.slots[4].y}`);
+  ok(Math.abs(bf.awayLineup.slots[3].x - b3.x) < 1e-9, '상대(원정) 팀의 자유 대형도 함께 넘어갑니다', `x ${bf.awayLineup.slots[3].x}`);
+
+  const mf = new Match({ world: bf.world, homeId: bf.homeId, awayId: bf.awayId, homeLineup: bf.homeLineup, awayLineup: bf.awayLineup, seed: 'cm-free', userSide: 'home' });
+  const h4 = mf.sides.home.players[4];   // 3번(미드필더)은 킥오프 때 공을 잡느라 센터로 갑니다
+  const a3Ent = mf.sides.away.players[3];
+  ok(Math.abs(h4.x - a4.x * W) < 0.01 && Math.abs(h4.y - a4.y * H) < 0.01,
+    '경기 시작 때 홈 선수가 자유 대형 자리에 섭니다', `x ${h4.x.toFixed(2)} (기대 ${(a4.x * W).toFixed(2)}) · y ${h4.y.toFixed(2)}`);
+  ok(Math.abs(a3Ent.x - (W - b3.x * W)) < 0.01 && Math.abs(a3Ent.y - b3.y * H) < 0.01,
+    '원정 선수는 자유 대형을 좌우 반전해 섭니다', `x ${a3Ent.x.toFixed(2)} (기대 ${(W - b3.x * W).toFixed(2)})`);
+  ok(mf.sides.home.players.every((e, i) => Math.abs(e.slot.x - bf.homeLineup.slots[i].x) < 1e-9),
+    '모든 홈 선수의 기준 위치(slot)가 자유 대형 좌표와 같습니다');
+
+  mf.holdHalf = false;
+  let gf = 0;
+  while (!mf.done && gf < 8000) { mf.tick(); gf += 1; }
+  ok(mf.done, '자유 대형 팀의 5인제 경기가 90분을 끝까지 진행합니다', `${mf.score.home}-${mf.score.away} · ${gf}틱`);
+  ok(['home', 'away'].every((s) => mf.sides[s].players.every((e) => Number.isFinite(e.x) && e.x >= -1 && e.x <= W + 1 && Number.isFinite(e.y) && e.y >= -1 && e.y <= H + 1)),
+    '자유 대형 경기 내내 모든 선수 좌표가 유효합니다');
+  ok(mf.sides.home.players.every((e) => Math.abs(e.slot.x - bf.homeLineup.slots[bf.homeLineup.starters.indexOf(e.id)]?.x) < 1e-9 || !e.onPitch),
+    '경기 중에도 자유 대형 좌표가 기준 위치로 유지됩니다');
+
+  /* 커리어(K리그) 라인업은 예전 그대로 — slots 없이 포메이션 좌표 */
+  const careerW = createWorld('gs', 20261126);
+  const cLine = lineupFor(careerW, 'gs');
+  ok(cLine.slots === undefined, 'K리그 커리어 라인업에는 자유 대형 slots 가 없습니다');
+  const mc = new Match({ world: careerW, homeId: 'gs', awayId: 'dj', homeLineup: cLine, awayLineup: lineupFor(careerW, 'dj'), seed: 'free-career', userSide: 'home' });
+  const f5 = FORMATIONS[cLine.formation].slots[5];
+  ok(Math.abs(mc.sides.home.players[5].x - f5.x * W) < 0.01 && Math.abs(mc.sides.home.players[5].y - f5.y * H) < 0.01,
+    '커리어 경기는 포메이션 기본 좌표로 시작합니다(영향 없음)', `x ${mc.sides.home.players[5].x.toFixed(2)} · y ${mc.sides.home.players[5].y.toFixed(2)}`);
+
+  /* 11인제 자유 대형도 같은 규칙 */
+  const e11 = newTeam({ size: 11, name: '자유 11' }); autoFill(e11);
+  const w0 = movePlayerCoord(e11, 8, { x: 0.85, y: 0.5 });
+  const b11f = buildMatchupWorld({ home: { kind: 'custom', team: e11 }, away: { kind: 'kl', id: 'seoul' }, seed: 'cm-free-11', mySide: 'home' });
+  ok(b11f.homeLineup.slots.length === 11 && b11f.homeLineup.slots[8].x === w0.x, '11인제 자유 대형도 라인업에 그대로 들어갑니다', `8번 x ${b11f.homeLineup.slots[8].x}`);
+  ok(b11f.awayLineup.slots === undefined, 'K리그 구단은 자유 대형 없이 기본 포메이션으로 나옵니다');
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

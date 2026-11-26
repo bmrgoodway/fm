@@ -25,7 +25,7 @@ const state = {
   pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
   posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
   // 커스텀 매치업 — 팀 빌더·공유·가상 경기 (커리어와 분리)
-  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null },
+  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0 },
   matchup: { oppKind: 'kl', oppId: 'geumsan', oppTeam: null, side: 'home' },
   customResult: null, customMatch: null, headerOverride: null,
 };
@@ -59,6 +59,11 @@ export function init() {
     state.pickDiv = W.divOf(state.savedGame, state.savedGame.myTeamId) || 1;
   }
   document.addEventListener('click', onClick);
+  // 자유 대형 보드 — 마우스·터치 모두 pointer 이벤트 하나로 끌어 옮깁니다
+  document.addEventListener('pointerdown', onBoardPointerDown);
+  document.addEventListener('pointermove', onBoardPointerMove);
+  document.addEventListener('pointerup', onBoardPointerEnd);
+  document.addEventListener('pointercancel', onBoardPointerEnd);
   document.addEventListener('input', onFilterInput);
   document.addEventListener('input', onCustomInput);
   document.addEventListener('change', onCustomChange);
@@ -166,6 +171,14 @@ function onFilterInput(e) {
 }
 
 function onClick(e) {
+  // 보드에서 칩을 끌고 난 뒤 따라오는 click 은 무시합니다 (역할이 바뀌지 않게)
+  // — 끌던 그 칩에 한해, 손을 뗀 직후(0.8초)의 click 만 무시하고 다음 누름은 그대로 받습니다
+  if (state.custom.clickSuppress) {
+    const sup = state.custom.clickSuppress;
+    state.custom.clickSuppress = 0;
+    const chip = e.target?.closest?.('[data-chip]');
+    if (chip && chip.dataset.chip === sup.chip && Date.now() - sup.at < 800) return;
+  }
   const el = e.target.closest('[data-act]');
   if (!el) return;
   const act = el.dataset.act;
@@ -534,20 +547,32 @@ function onClick(e) {
     case 'cm-size': {
       const t = state.custom.team;
       if (!t) break;
+      const hadCustom = C.isCustomShape(t);
       C.setSize(t, Number(el.dataset.size));
       const r = C.saveTeam(t);
       state.custom.team = r.ok ? r.team : t;
-      state.custom.msg = `${C.formatName(t.size)} · ${t.formation} — 자리 이름이 같은 선수는 그대로 따라갑니다.`;
+      state.custom.msg = `${C.formatName(t.size)} · ${t.formation} — 자리 이름이 같은 선수는 그대로 따라갑니다.${hadCustom ? ' 자유 대형은 기본 대형으로 돌아갑니다.' : ''}`;
       render(); break;
     }
     case 'cm-formation': {
       const t = state.custom.team;
       if (!t) break;
+      const hadCustom = C.isCustomShape(t);
       C.setFormation(t, el.dataset.formation);
       const r = C.saveTeam(t);
       state.custom.team = r.ok ? r.team : t;
-      state.custom.msg = '';
+      state.custom.msg = hadCustom ? `${t.formation} 기본 대형으로 돌아왔습니다 (자유 대형 초기화).` : '';
       render(); break;
+    }
+    case 'cm-board-reset': {
+      const t = state.custom.team;
+      if (!t) break;
+      C.resetCoords(t);
+      const r = C.saveTeam(t);
+      state.custom.team = r.ok ? r.team : t;
+      state.custom.msg = '';
+      render();
+      toast(`${t.formation} 기본 대형으로 되돌렸습니다.`, 'ok'); break;
     }
     case 'cm-save': {
       const t = state.custom.team;
@@ -645,6 +670,78 @@ function onClick(e) {
     case 'mu-rematch': startCustomMatch(false); break;
     default: break;
   }
+}
+
+/* ─────────────────────────── 커스텀 매치업 — 자유 대형 보드 ───────────────────────────
+   전술 보드의 선수 칩을 마우스로도, 손가락으로도 끌어 자리를 옮깁니다.
+   · pointerdown: 집은 칩·보드 크기·그 선수의 포지션(GK 인지)을 기억
+   · pointermove: 손가락이 보드 안 어디인지 좌표(0~1)로 바꾸고 칩을 따라 움직임 (보드 밖은 클램프)
+   · pointerup: 실제로 움직였으면 팀(customCoords)에 저장하고 다시 그립니다. 그냥 누른 것은 역할 변경(click) */
+const boardDrag = { i: -1, pointerId: null, moved: false, rect: null, chip: null, coord: null, pos: 'MF', startX: 0, startY: 0 };
+
+const boardTeam = () => (state.view === 'custom' && !state.customResult ? state.custom.team : null);
+
+function onBoardPointerDown(e) {
+  if (boardDrag.i >= 0) return;   // 이미 한 손가락으로 끌고 있으면 두 번째 손가락은 무시
+  const chip = e.target?.closest?.('[data-chip]');
+  if (!chip) return;
+  const team = boardTeam();
+  const board = chip.closest('[data-board]');
+  if (!team || !board) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;   // 오른쪽·가운데 버튼은 그대로 둡니다
+  const i = Number(chip.dataset.chip);
+  if (!team.players?.[i]) return;
+  boardDrag.i = i;
+  boardDrag.pointerId = e.pointerId;
+  boardDrag.moved = false;
+  boardDrag.rect = board.getBoundingClientRect();
+  boardDrag.chip = chip;
+  boardDrag.coord = null;
+  boardDrag.pos = C.teamSlotPos(team, team.players[i].slot);
+  boardDrag.startX = e.clientX;
+  boardDrag.startY = e.clientY;
+  chip.classList.add('dragging');
+  try { chip.setPointerCapture(e.pointerId); } catch { /* 캡처를 못 해도 문서 이벤트로 이어집니다 */ }
+}
+
+function boardCoordAt(e) {
+  const r = boardDrag.rect;
+  if (!r || !r.width || !r.height) return null;
+  return C.clampCoord({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }, boardDrag.pos);
+}
+
+function onBoardPointerMove(e) {
+  if (boardDrag.i < 0 || e.pointerId !== boardDrag.pointerId) return;
+  if (!boardDrag.moved) {
+    if (Math.hypot(e.clientX - boardDrag.startX, e.clientY - boardDrag.startY) < 4) return;
+    boardDrag.moved = true;   // 4px 넘게 움직여야 '끌기' (살짝 누른 것은 역할 변경)
+  }
+  const c = boardCoordAt(e);
+  if (!c) return;
+  boardDrag.coord = c;
+  const chip = boardDrag.chip;
+  if (chip) {
+    // inline style 속성은 CSP(style-src 'self')가 막으므로 CSS 변수를 CSSOM 으로 바꿉니다
+    chip.style.setProperty('--cx', `${(c.x * 100).toFixed(2)}%`);
+    chip.style.setProperty('--cy', `${(c.y * 100).toFixed(2)}%`);
+  }
+}
+
+function onBoardPointerEnd(e) {
+  if (boardDrag.i < 0 || e.pointerId !== boardDrag.pointerId) return;
+  const { i, moved, coord, chip } = boardDrag;
+  boardDrag.i = -1; boardDrag.pointerId = null; boardDrag.chip = null; boardDrag.coord = null; boardDrag.moved = false;
+  if (chip) chip.classList.remove('dragging');
+  if (!moved || !coord) return;
+  const team = boardTeam();
+  if (!team) return;
+  const wasCustom = C.isCustomShape(team);
+  C.movePlayerCoord(team, i, coord);
+  const r = C.saveTeam(team);
+  state.custom.team = r.ok ? r.team : team;
+  state.custom.clickSuppress = { at: Date.now(), chip: String(i) };
+  if (!wasCustom) state.custom.msg = '자유 대형 — 끌어 옮긴 자리 그대로 경기에 섭니다. 「기본 대형으로 되돌리기」로 초기화할 수 있습니다.';
+  render();
 }
 
 /* ─────────────────────────── 커리어 ─────────────────────────── */

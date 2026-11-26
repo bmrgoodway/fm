@@ -1,12 +1,12 @@
 // 커스텀 매치업 화면 — 팀 빌더 · 공유 · 경기 준비 · 결과 요약
 // 상태는 app.state.custom / app.state.matchup 에 있습니다 (app.js 가 관리).
 import { FORMATIONS, formationsFor, STAT_KEYS, STAT_LABEL, sizeOfFormation } from './data.js';
-import { MENTALITY, mentalityOf, mentalityEffect, AXES, STEPS, stepLabel, roleLabel, roleShort, nextRole, rolesForLabel } from './tactics.js';
+import { MENTALITY, mentalityOf, mentalityEffect, AXES, STEPS, stepLabel, roleLabel, roleShort, nextRole, rolesForLabel, defaultRole } from './tactics.js';
 import { KL_TEAMS, KL_DIVISIONS } from './kleague2026.js';
 import { esc, setPieceRows } from './views.js';
 import {
   FORMATS, formatName, formatOf, readTeams, getTeam, teamShort, teamPowerOf, ovrOf, teamSlotPos,
-  slotLabelsOf, teamLink, matchLink, matchSummary,
+  slotLabelsOf, teamLink, matchLink, matchSummary, coordsOf, isCustomShape,
 } from './custom.js';
 
 const TABS = [
@@ -225,9 +225,11 @@ function sharePanel(app, team) {
 /* ─────────────────────────── 경기 준비 ─────────────────────────── */
 function miniPitchSvg(team, flip = false) {
   const slots = FORMATIONS[team.formation]?.slots || [];
-  const dots = slots.map((s) => {
-    const x = (flip ? 1 - s.x : s.x) * 100;
-    const y = s.y * 64;
+  const coords = coordsOf(team);   // 자유 대형이면 옮긴 자리로 그립니다
+  const dots = slots.map((s, i) => {
+    const c = coords[i] || s;
+    const x = (flip ? 1 - c.x : c.x) * 100;
+    const y = c.y * 64;
     return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${s.pos === 'GK' ? 3.4 : 3}" fill="${esc(team.colors?.primary || '#02c245')}" stroke="#101014" stroke-width="1.2"/>`;
   }).join('');
   return `<svg class="mini-pitch" viewBox="0 0 100 64" role="img" aria-label="${esc(team.name)} ${esc(team.formation)} 배치">
@@ -245,6 +247,62 @@ const oppName = (mu) => {
   if (mu.oppKind === 'kl') return klTeamOf(mu.oppId)?.name || 'K리그 구단';
   return (mu.oppTeam && mu.oppTeam.name) || '상대 팀';
 };
+
+/* 팀 색 위에 읽히는 글자색 — 칩 안의 등번호용 */
+function inkOn(hex) {
+  const h = String(hex || '').replace('#', '');
+  if (!/^[0-9a-f]{6}$/i.test(h)) return '#101014';
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b > 150 ? '#101014' : '#ffffff';
+}
+
+/* ─────────────────────────── 대형 보드(자유 배치) ───────────────────────────
+   끌어서 옮기기(포인터)는 app.js 가 document 포인터 이벤트로 처리합니다.
+   칩은 button 이라 누르면 역할이 바뀌고(cp-role), 끌고 나서 손을 떼면 위치만 옮깁니다. */
+function pitchBoard(team) {
+  if (!team) return '';
+  const coords = coordsOf(team);
+  const custom = isCustomShape(team);
+  const ink = inkOn(team.colors?.primary);
+  const chips = team.players.map((p, i) => {
+    const c = coords[i];
+    const pos = teamSlotPos(team, p.slot);
+    const role = pos === 'GK' ? 'goalkeeper' : ((team.roles || [])[i] || defaultRole(p.slot));
+    const name = (p.name || `선수 ${i + 1}`).slice(0, 6);
+    // 위치·색은 inline style 대신 data 속성으로 두고 applyTeamColors 가 CSS 변수로 칠합니다 (CSP style-src 'self')
+    return `<button type="button" class="cp-chip${pos === 'GK' ? ' is-gk' : ''}" data-act="cm-role" data-i="${i}" data-chip="${i}"
+      data-team="${team.id}" data-cx="${(c.x * 100).toFixed(2)}" data-cy="${(c.y * 100).toFixed(2)}" data-ink="${ink}"
+      title="${esc(p.name || `선수 ${i + 1}`)} · ${esc(p.slot)} · ${esc(roleLabel(role))} — 끌어서 옮기고, 눌러서 역할 바꾸기"
+      aria-label="${i + 1}번 ${esc(name)}, ${esc(p.slot)}. 끌어서 위치를 옮기고, 누르면 역할이 바뀝니다.">
+      <span class="pc-num">${i + 1}</span>
+      <span class="pc-name">${esc(name)}</span>
+    </button>`;
+  }).join('');
+  return `<div class="cpb">
+    <div class="cpb-head">
+      <b>대형 보드</b>
+      <span class="pill">${esc(team.formation)}</span>
+      ${custom ? '<span class="pill cpb-custom">커스텀 대형</span>' : ''}
+      <span class="cpb-tip">칩을 끌어 옮기고, 눌러서 역할을 바꿉니다</span>
+    </div>
+    <div class="seg-wrap cpb-formations" role="group" aria-label="기본 포메이션">
+      ${formationsFor(team.size).map((f) => `<button type="button" class="btn small ${team.formation === f ? 'on' : ''}" data-act="cm-formation" data-formation="${f}" aria-pressed="${team.formation === f}" title="${esc(FORMATIONS[f]?.shape || '')}">${f}</button>`).join('')}
+    </div>
+    <div class="custom-pitchboard" data-board role="application" aria-label="${esc(team.name)} 대형 보드 — 선수 칩을 끌어 자리를 옮깁니다">
+      <span class="pb-half" aria-hidden="true"></span>
+      <span class="pb-circle" aria-hidden="true"></span>
+      <span class="pb-box pb-left" aria-hidden="true"></span>
+      <span class="pb-box pb-right" aria-hidden="true"></span>
+      <span class="pb-goal pb-left" aria-hidden="true"></span>
+      <span class="pb-goal pb-right" aria-hidden="true"></span>
+      ${chips}
+    </div>
+    <div class="cpb-foot">
+      <button class="btn small" data-act="cm-board-reset" type="button" ${custom ? '' : 'disabled'}>↺ 기본 대형으로 되돌리기</button>
+      <span class="hint">${custom ? '자유 대형 — 끌어 옮긴 그대로 경기장에 섭니다.' : '칩을 끌어 우리 진영~상대 진영 어디든 세울 수 있습니다. 골키퍼는 골문 앞에 머뭅니다.'}</span>
+    </div>
+  </div>`;
+}
 
 function matchupPanel(app, team) {
   const db = readTeams();
@@ -294,6 +352,7 @@ function matchupPanel(app, team) {
 
     <section class="card">
       <h3>전술 — ${esc(team?.name || '내 팀')}</h3>
+      ${pitchBoard(team)}
       <div class="cm-field"><span>팀 성향</span>
         <div class="ment-row" role="group" aria-label="팀 성향">
           ${MENTALITY.map((m) => `<button type="button" class="ment-btn ${Math.abs((team?.tactic.mentality || 0) - m.v) < 0.01 ? 'on' : ''}" data-act="cm-mentality" data-val="${m.v}" aria-pressed="${Math.abs((team?.tactic.mentality || 0) - m.v) < 0.01}" title="${esc(m.effect)}">${esc(m.name)}</button>`).join('')}

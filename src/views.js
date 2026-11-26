@@ -24,6 +24,12 @@ export function applyTeamColors(root, world) {
     el.style.setProperty('--left', Number(el.dataset.py) * 100 + '%');
     el.style.setProperty('--top', (1 - Number(el.dataset.px)) * 100 + '%');
   });
+  // 자유 대형 보드의 칩 — 좌표(data-cx,data-cy)와 글자색(data-ink)도 CSP 때문에 CSS 변수로 칠합니다
+  root.querySelectorAll('[data-cx]').forEach((el) => {
+    el.style.setProperty('--cx', Number(el.dataset.cx) + '%');
+    el.style.setProperty('--cy', Number(el.dataset.cy) + '%');
+  });
+  root.querySelectorAll('[data-ink]').forEach((el) => el.style.setProperty('--chip-ink', el.dataset.ink));
 }
 export const badge = (t, cls = '') => `<span class="badge ${cls}" data-team="${t.id}" aria-hidden="true">${esc(t.short.slice(0, 2))}</span>`;
 const formChips = (rec) => (rec && rec.length ? `<span class="form">${rec.map((r) => `<i class="f-${r}" title="${{ W: '승', D: '무', L: '패' }[r]}">${r === 'W' ? '승' : r === 'D' ? '무' : '패'}</i>`).join('')}</span>` : '<span class="muted sm">경기 없음</span>');
