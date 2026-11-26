@@ -169,6 +169,27 @@ ok(vsVis === 2, '모바일에서도 팀 A·팀 B 선택이 두 칸 다 보입니
 const mLinks = (await m.page.locator('.cm-vs-out code').first().textContent().catch(() => '')).trim();
 ok(/^\?m=[A-Z0-9]{6}:[A-Z0-9]{6}$/.test(mLinks), '모바일에서도 ?m 짧은 링크가 만들어집니다', mLinks);
 
+/* ── 6) 긴 링크(?t=Z…) — 서버 없이 팀 전체를 링크에 ── */
+console.log('\n[6] 긴 링크 — ?t=Z… 로 팀 전체 담기');
+{
+  const a = await open('?m=NUCAD9:4GT4F5');
+  await sleep(2500);
+  await a.page.locator('[data-act="cm-tab"][data-tab="share"]').click();
+  await sleep(400);
+  await a.page.locator('[data-act="cm-longlink"]').click();
+  await sleep(600);
+  const long = (await a.page.locator('[data-cm="longlink"] code').textContent().catch(() => '')).trim();
+  ok(/^https:\/\/bmrgoodway\.github\.io\/fm\/\?t=Z.{40,}$/.test(long), '긴 링크도 ?t=Z… 형식입니다', `${long.length}자`);
+  await a.ctx.close();
+  const b = await open(long.slice(long.indexOf('?')));
+  await sleep(2000);
+  const firstName = await b.page.locator('.cp-name').first().inputValue().catch(() => '');
+  const loadedMsg = await b.page.evaluate(() => (document.querySelector('.cm-msg')?.textContent || '').trim());
+  ok(/공유받은|불러왔|업데이트/.test(loadedMsg) && !!firstName, '긴 링크를 열면 그 팀이 서버 없이 열립니다', `${firstName} · ${loadedMsg.slice(0, 40)}`);
+  await b.ctx.close();
+}
+
+
 /* ── 6) 스크린샷 ──────────────────────────────────────────── */
 await m.page.screenshot({ path: '/workspace/downloads/fm-share-short-links-mobile.png', fullPage: true });
 console.log('\n스크린샷: downloads/fm-share-short-links.png (데스크톱·[4]) · downloads/fm-share-short-links-mobile.png');
