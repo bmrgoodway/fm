@@ -279,7 +279,7 @@ function sharePanel(app, team) {
       ${vsLink ? `<div class="cm-vs-out">
         <div class="cm-vs-main">
           <code class="cm-vs-code">${esc(vsLink.slice(vsLink.indexOf('?')))}</code>
-          <p class="cm-vs-full sm muted">${esc(vsLink)}</p>
+          <p class="cm-vs-full sm muted"><span>${esc(vsLink.slice(0, vsLink.indexOf('?')))}</span><span class="cm-vs-query">${esc(vsLink.slice(vsLink.indexOf('?')))}</span></p>
         </div>
         <button class="btn small" data-act="cm-copy" data-copy="${esc(vsLink)}" type="button">복사</button>
       </div>` : db.list.length > 1 ? `<div class="cm-vs-out off">

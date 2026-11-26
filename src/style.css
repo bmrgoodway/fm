@@ -1295,6 +1295,7 @@ textarea.inp { resize: vertical; line-height: 1.5; }
 .cm-vs-main { flex: 1 1 150px; min-width: 0; }
 .cm-vs-code { display: inline-block; font-size: 14px; font-weight: 900; letter-spacing: 0.02em; word-break: break-all; }
 .cm-vs-full { margin: 3px 0 0; font-size: 11px; word-break: break-all; }
+.cm-vs-query { white-space: nowrap; }
 .cm-vs-out.off { border-style: dashed; background: var(--paper); }
 .cm-vs-out .actions { margin: 0; }
 
