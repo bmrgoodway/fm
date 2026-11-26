@@ -77,6 +77,14 @@ const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('fm:cust
 ok(Array.isArray(saved.list) && saved.list.length === 1 && saved.list[0].size === 5 && saved.list[0].players.length === 5,
   '팀이 브라우저(localStorage)에 저장됩니다', `${saved.list?.[0]?.name} · ${saved.list?.[0]?.size}인제`);
 
+// 삭제는 한 번 더 확인 (실수 방지)
+await page.locator('.cm-picker [data-act="cm-delete"]').click();
+await sleep(250);
+ok(await page.locator('.cm-confirm').count() === 1, '팀 삭제는 한 번 더 확인합니다');
+await page.locator('[data-act="cm-delete-cancel"]').click();
+await sleep(250);
+ok(await page.locator('.cm-confirm').count() === 0 && await page.locator('.cp-row').count() === 5, '삭제를 취소하면 팀이 그대로 남습니다');
+
 /* ── 2) 공유 코드 ───────────────────────────────────────────── */
 console.log('\n[2] 공유 — 6자리 코드 발급 · 코드로 불러오기');
 await page.locator('[data-act="cm-tab"][data-tab="share"]').click();

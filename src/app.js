@@ -546,6 +546,7 @@ function onClick(e) {
       C.setFormation(t, el.dataset.formation);
       const r = C.saveTeam(t);
       state.custom.team = r.ok ? r.team : t;
+      state.custom.msg = '';
       render(); break;
     }
     case 'cm-save': {

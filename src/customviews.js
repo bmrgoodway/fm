@@ -35,7 +35,12 @@ export function renderCustom(app) {
   <nav class="cm-tabs" role="tablist" aria-label="커스텀 매치업 메뉴">
     ${TABS.map((t) => `<button type="button" role="tab" aria-selected="${tab === t.id}" class="cm-tab ${tab === t.id ? 'on' : ''}" data-act="cm-tab" data-tab="${t.id}">${t.label}</button>`).join('')}
   </nav>
-  ${st.msg ? `<p class="cm-msg" role="status">${esc(st.msg)}</p>` : ''}`;
+  ${st.msg ? `<p class="cm-msg" role="status">${esc(st.msg)}</p>` : ''}
+  ${st.confirmDelete ? `<div class="cm-confirm" role="alert">
+    <b>이 팀을 삭제할까요?</b> <span class="sm">브라우저에서 지우면 되돌릴 수 없습니다 (이미 공유한 코드는 그대로 남습니다).</span>
+    <span class="actions"><button class="btn small danger" data-act="cm-delete" data-id="${esc(st.confirmDelete)}" type="button">삭제 확정</button>
+    <button class="btn small ghost" data-act="cm-delete-cancel" type="button">취소</button></span>
+  </div>` : ''}`;
   if (!db.list.length && tab !== 'share') {
     return `${head}<section class="card cm-empty">
       <h3>아직 만든 팀이 없습니다</h3>
