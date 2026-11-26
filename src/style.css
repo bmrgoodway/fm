@@ -1273,6 +1273,7 @@ textarea.inp { resize: vertical; line-height: 1.5; }
 .cm-team-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .cm-team-list li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; border: 1.5px solid color-mix(in srgb, var(--line) 25%, transparent); padding: 6px 8px; }
 .cm-tl-name { flex: 1 1 120px; min-width: 0; }
+.cm-dedupe { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 0; padding: 6px 8px; border: 2px dashed var(--line); background: var(--paper2); font-size: 12px; font-weight: 800; }
 .cm-tl-name b, .cm-tl-name small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cm-longlink { word-break: break-all; }
 .cm-link-info code { word-break: break-all; }

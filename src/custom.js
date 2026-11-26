@@ -390,6 +390,33 @@ export function deleteTeam(id) {
 }
 export const getTeam = (id) => readTeams().list.find((t) => t.id === id) || null;
 
+/* 같은 내용으로 여러 번 저장된 팀(공유를 반복해 생긴 사본) 묶음 — 최신 것만 남기고 정리할 때 씁니다.
+   이름·선수·대형·전술·역할·세트피스가 모두 같은 팀만 한 묶음으로 봅니다. */
+export function duplicateTeams(list = readTeams().list) {
+  const groups = new Map();
+  for (const t of list) {
+    const k = teamFingerprint(t);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(t);
+  }
+  const out = [];
+  for (const arr of groups.values()) {
+    if (arr.length < 2) continue;
+    const sorted = arr.slice().sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    out.push({ keep: sorted[0], drop: sorted.slice(1) });
+  }
+  return out;
+}
+export function removeDuplicates() {
+  const groups = duplicateTeams();
+  const dropIds = new Set(groups.flatMap((g) => g.drop.map((t) => t.id)));
+  if (!dropIds.size) return { ok: true, removed: 0 };
+  const db = readTeams();
+  db.list = db.list.filter((t) => !dropIds.has(t.id));
+  const r = writeTeams(db);
+  return r.ok ? { ok: true, removed: dropIds.size, count: db.list.length } : r;
+}
+
 /* ─────────────────────────── 공유 ─────────────────────────── */
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';   // 헷갈리는 O·I·0·1 제외
 export function makeCode(len = 6) {

@@ -32,7 +32,7 @@ import {
   setFormation as setTeamFormation, setSize, setTeamSetPiece, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
   coordsOf, isCustomShape, movePlayerCoord, resetCoords, clampCoord, FIELD_BOX, GK_BOX,
-  teamFingerprint, readTeams, saveTeam, newTeamId,
+  teamFingerprint, readTeams, saveTeam, newTeamId, duplicateTeams, removeDuplicates,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2498,6 +2498,22 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
   // 같은 id 가 두 번 들어간 저장소도 하나로 정리
   mem.set('fm:customTeams', JSON.stringify({ v: 1, list: [first.team, first.team, second.team] }));
   ok(readTeams().list.length === 2, '같은 id 가 중복된 저장소는 하나로 정리해 읽습니다', `${readTeams().list.length}개`);
+
+  // 같은 내용으로 여러 번 저장된 사본(공유를 반복해 생긴 것) — 「중복 정리」로 최신 하나만 남깁니다
+  mem.clear();
+  const dupA = saveTeam({ ...newTeam({ size: 5, name: '중복 점검 FC' }), id: newTeamId() }).team;
+  mem.set('fm:customTeams', JSON.stringify({ v: 1, list: [
+    { ...dupA, id: 'ctdup-old', updatedAt: 1000 },
+    { ...dupA, id: 'ctdup-new', updatedAt: 3000 },
+    { ...dupA, id: 'ctdup-mid', updatedAt: 2000 },
+    { ...dupA, id: 'ctother', name: '다른 팀', updatedAt: 1500 },
+  ] }));
+  const groups = duplicateTeams();
+  ok(groups.length === 1 && groups[0].drop.length === 2 && groups[0].keep.id === 'ctdup-new',
+    '같은 내용의 사본은 한 묶음으로 묶고 가장 최근 것을 남깁니다', `묶음 ${groups.length} · 삭제 ${groups[0]?.drop.length}개 · 남김 ${groups[0]?.keep.id}`);
+  const dedup = removeDuplicates();
+  ok(dedup.ok && dedup.removed === 2 && readTeams().list.length === 2, '「중복 정리」는 사본만 지우고 다른 팀은 남깁니다', `삭제 ${dedup.removed}개 · 남은 ${dedup.count}개`);
+  ok(duplicateTeams().length === 0, '정리 뒤에는 중복 묶음이 없습니다');
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

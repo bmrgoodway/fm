@@ -25,7 +25,7 @@ const state = {
   pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
   posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
   // 커스텀 매치업 — 팀 빌더·공유·가상 경기 (커리어와 분리)
-  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0, tacticsOpen: true },
+  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0, tacticsOpen: true, confirmDedupe: null },
   matchup: { oppKind: 'kl', oppId: 'geumsan', oppTeam: null, side: 'home' },
   customResult: null, customMatch: null, headerOverride: null,
 };
@@ -538,6 +538,20 @@ function onClick(e) {
     }
     case 'cm-delete-cancel':
       state.custom.confirmDelete = null; render(); break;
+    case 'cm-dedupe-cancel':
+      state.custom.confirmDedupe = null; render(); break;
+    case 'cm-dedupe': {
+      const extra = C.duplicateTeams().reduce((n, g) => n + g.drop.length, 0);
+      if (!extra) { toast('중복된 팀이 없습니다.', 'info'); break; }
+      if (state.custom.confirmDedupe !== extra) { state.custom.confirmDedupe = extra; render(); break; }
+      state.custom.confirmDedupe = null;
+      const r = C.removeDuplicates();
+      if (!r.ok) { toast(r.why || '정리하지 못했습니다.', 'warn'); break; }
+      // 정리된 팀을 보고 있으면 다른 팀으로 넘어갑니다
+      if (!C.getTeam(state.custom.teamId)) { state.custom.team = null; state.custom.teamId = null; ensureCustomTeam(); }
+      render();
+      toast(`같은 내용의 팀 ${r.removed}개를 정리했습니다 · 내 팀 ${r.count}개`, 'ok'); break;
+    }
     case 'cm-open': {
       const t = C.getTeam(el.dataset.id);
       if (!t) { toast('팀을 찾을 수 없습니다.', 'warn'); break; }

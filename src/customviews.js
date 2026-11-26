@@ -6,7 +6,7 @@ import { KL_TEAMS, KL_DIVISIONS } from './kleague2026.js';
 import { esc, setPieceRows } from './views.js';
 import {
   FORMATS, formatName, formatOf, readTeams, getTeam, teamShort, teamPowerOf, ovrOf, teamSlotPos,
-  slotLabelsOf, teamLink, matchLink, matchSummary, coordsOf, isCustomShape,
+  slotLabelsOf, teamLink, matchLink, matchSummary, coordsOf, isCustomShape, duplicateTeams,
 } from './custom.js';
 
 const TABS = [
@@ -214,6 +214,16 @@ function sharePanel(app, team) {
         <button class="btn" data-act="cm-load" type="button">불러오기</button>
       </div>
       <h4 class="sub">내 팀 ${db.list.length}개</h4>
+      ${(() => {
+        const extra = duplicateTeams(db.list).reduce((n, g) => n + g.drop.length, 0);
+        if (!extra) return '';
+        const armed = app.state.custom.confirmDedupe === extra;
+        return `<p class="cm-dedupe">같은 내용으로 여러 번 저장된 팀이 ${extra}개 있습니다.
+          ${armed
+            ? `<button class="btn small danger" data-act="cm-dedupe" type="button">정리 확정 (${extra}개 삭제)</button>
+               <button class="btn small ghost" data-act="cm-dedupe-cancel" type="button">취소</button>`
+            : `<button class="btn small" data-act="cm-dedupe" type="button">중복 팀 ${extra}개 정리</button>`}</p>`;
+      })()}
       <ul class="cm-team-list">
         ${db.list.map((t) => `<li>
           <span class="badge" data-team="${t.id}">${esc(teamShort(t))}</span>

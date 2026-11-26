@@ -249,6 +249,31 @@ for (let i = 1; i <= 3; i += 1) {
 }
 if ((await teams(page3)).length === 1) ok(!page3.url().includes('?team='), '불러온 뒤 주소창의 공유 값은 지워집니다', page3.url().slice(0, 60));
 
+/* ── 5b) 이미 쌓인 중복 팀 정리 버튼 ─────────────────────── */
+console.log('\n[5b] 이미 쌓인 중복 팀 정리');
+await page.evaluate(() => {
+  const db = JSON.parse(localStorage.getItem('fm:customTeams'));
+  const t = db.list[0];
+  db.list = [t, { ...t, id: 'ctdupa1111', updatedAt: (t.updatedAt || 0) - 1 }, { ...t, id: 'ctdupb2222', updatedAt: (t.updatedAt || 0) - 2 }];
+  localStorage.setItem('fm:customTeams', JSON.stringify(db));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.locator('.mode-tab[data-mode="matchup"]').click();
+await sleep(400);
+await page.locator('[data-act="cm-tab"][data-tab="share"]').click();
+await sleep(300);
+ok(await page.locator('.cm-dedupe').count() === 1 && /2개/.test(await page.locator('.cm-dedupe').innerText()), '사본이 있으면 「중복 팀 2개 정리」 안내가 뜹니다', (await page.locator('.cm-dedupe').innerText()).replace(/\n/g, ' ').slice(0, 50));
+await page.locator('[data-act="cm-dedupe"]').click();
+await sleep(300);
+ok((await teams(page)).length === 3 && /정리 확정/.test(await page.locator('[data-act="cm-dedupe"]').innerText()), '한 번 누르면 확인 단계(아직 삭제 전)입니다', `${(await teams(page)).length}개`);
+await page.locator('.cm-dedupe').scrollIntoViewIfNeeded();
+await sleep(150);
+await page.screenshot({ path: `${SHOT}/fm-builder-dedupe.png` });
+await page.locator('[data-act="cm-dedupe"]').click();
+await sleep(400);
+ok((await teams(page)).length === 1, '확인을 누르면 사본만 정리되고 팀은 1개가 됩니다', `${(await teams(page)).length}개`);
+ok(await page.locator('.cm-dedupe').count() === 0, '정리 뒤에는 안내가 사라집니다');
+
 /* ── 6) 모바일 390px ────────────────────────────────────────── */
 console.log('\n[6] 모바일 390px — 전술 카드 · 가로 넘침');
 const mctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: 'ko-KR' });
