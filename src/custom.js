@@ -161,7 +161,23 @@ export function normalizeTeam(raw) {
     code: raw.code ? String(raw.code) : null,
     sharedAt: Number(raw.sharedAt) || 0,
     from: raw.from ? String(raw.from).slice(0, 40) : null,
+    // 공유에서 들여온 내용 지문 — 같은 팀을 다시 불러올 때 새 팀을 만들지 않고 덮어쓰는 기준
+    sharedKey: raw.sharedKey ? String(raw.sharedKey).slice(0, 40) : null,
   };
+}
+
+/* 팀 내용 지문 — 이름·규모·포메이션·선수·대형·전술·역할·세트피스가 모두 같으면 같은 팀으로 봅니다.
+   공유 코드(6자리)가 없는 긴 링크(Z…)로 같은 팀을 여러 번 열어도 사본이 쌓이지 않게 하는 장치입니다. */
+export function teamFingerprint(team) {
+  const t = normalizeTeam(team);
+  const body = JSON.stringify([
+    t.name, t.size, t.formation,
+    t.players.map((p) => [p.name, p.slot, p.age, p.stats]),
+    t.customCoords, t.tactic, t.roles, t.setpiece,
+  ]);
+  let h = 5381;
+  for (let i = 0; i < body.length; i += 1) h = ((h * 33) ^ body.charCodeAt(i)) >>> 0;
+  return `fp${h.toString(36)}${body.length.toString(36)}`;
 }
 
 export const teamShort = (team) => (team.short || team.name || '팀').slice(0, 2);
@@ -340,19 +356,30 @@ export function applyBulk(team, rows) {
 export function readTeams() {
   const raw = local.get(TEAM_KEY, null);
   const list = Array.isArray(raw?.list) ? raw.list : Array.isArray(raw) ? raw : [];
-  return { v: TEAM_VERSION, list: list.map((t) => normalizeTeam(t)).filter((t) => t.id) };
+  const seen = new Map();
+  for (const row of list) {
+    const t = normalizeTeam(row);
+    if (!t.id) continue;
+    // 같은 id 가 두 번 들어간 저장소(예전 사고·직접 편집)는 최신 것 하나만 남깁니다
+    const prev = seen.get(t.id);
+    if (!prev || (t.updatedAt || 0) >= (prev.updatedAt || 0)) seen.set(t.id, t);
+  }
+  return { v: TEAM_VERSION, list: [...seen.values()] };
 }
 export function writeTeams(db) {
   try { local.set(TEAM_KEY, { v: TEAM_VERSION, list: db.list.slice(0, TEAM_MAX) }); return { ok: true }; }
   catch { return { ok: false, why: '브라우저 저장 공간이 부족해 팀을 저장하지 못했습니다.' }; }
 }
+/* 저장 — 같은 id 가 있으면 그 팀을 덮어쓰고, 없을 때만 새로 넣습니다.
+   (새 팀은 「+ 새 팀」·「복제」·공유 불러오기에서만 만들어집니다) */
 export function saveTeam(team) {
   const db = readTeams();
   const t = { ...normalizeTeam(team), updatedAt: Date.now() };
   const i = db.list.findIndex((x) => x.id === t.id);
-  if (i >= 0) db.list[i] = t; else db.list = [t, ...db.list];
+  const created = i < 0;
+  if (!created) db.list[i] = t; else db.list = [t, ...db.list];
   const r = writeTeams(db);
-  return r.ok ? { ok: true, team: t } : r;
+  return r.ok ? { ok: true, team: t, created, count: Math.min(db.list.length, TEAM_MAX) } : r;
 }
 export function deleteTeam(id) {
   const db = readTeams();

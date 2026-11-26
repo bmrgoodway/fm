@@ -130,6 +130,7 @@ function buildPanel(app, team) {
         <div><small>선수</small><b>${filled} / ${team.size}</b></div>
         <div><small>팀 전력</small><b>${power || '—'}</b></div>
         <div><small>포메이션</small><b>${esc(team.formation)}</b></div>
+        <div><small>대형</small><b>${isCustomShape(team) ? '자유 대형' : '기본 대형'}</b></div>
       </div>
       <div class="actions">
         <button class="btn primary" data-act="cm-save" type="button">💾 저장</button>
@@ -146,6 +147,21 @@ function buildPanel(app, team) {
       ${app.state.custom.bulk ? bulkBox(app, team) : ''}
       <ul class="cp-list">${team.players.map((p, i) => playerRow(team, p, i)).join('')}</ul>
       <p class="hint">OVR을 바꾸면 포지션에 맞춰 세부 능력치가 자동으로 배분됩니다. 세부 능력치를 직접 고치면 OVR이 다시 계산됩니다.</p>
+    </section>
+
+    <section class="card cm-tactics">
+      <div class="card-head">
+        <h3>전술 <span class="pill">대형 · 성향 · 역할 · 세트피스</span></h3>
+        <button class="btn small ghost" data-act="cm-tactics-toggle" type="button" aria-expanded="${app.state.custom.tacticsOpen !== false}">${app.state.custom.tacticsOpen !== false ? '접기' : '전술 펼치기'}</button>
+      </div>
+      <p class="hint">팀 이름·선수와 함께 전술까지 정하고 「💾 저장」을 누르면 그대로 팀에 담기고 공유 코드에도 실립니다. 「⚔ 매치업」에서 경기 직전 미세 조정도 계속 됩니다.</p>
+      ${app.state.custom.tacticsOpen !== false ? `<div class="cm-tactics-grid">
+        <div class="cm-tactics-board">
+          ${pitchBoard(team, { formations: false })}
+          <p class="hint">포메이션은 위 「팀 정보」에서 바꿉니다 (바꾸면 자유 대형은 기본 대형으로 돌아갑니다).</p>
+        </div>
+        <div class="cm-tactics-fields">${tacticsFields(team)}</div>
+      </div>` : ''}
     </section>
   </div>`;
 }
@@ -259,8 +275,9 @@ function inkOn(hex) {
 /* ─────────────────────────── 대형 보드(자유 배치) ───────────────────────────
    끌어서 옮기기(포인터)는 app.js 가 document 포인터 이벤트로 처리합니다.
    칩은 button 이라 누르면 역할이 바뀌고(cp-role), 끌고 나서 손을 떼면 위치만 옮깁니다. */
-function pitchBoard(team) {
+function pitchBoard(team, opts = {}) {
   if (!team) return '';
+  const showFormations = opts.formations !== false;
   const coords = coordsOf(team);
   const custom = isCustomShape(team);
   const ink = inkOn(team.colors?.primary);
@@ -285,9 +302,9 @@ function pitchBoard(team) {
       ${custom ? '<span class="pill cpb-custom">커스텀 대형</span>' : ''}
       <span class="cpb-tip">칩을 끌어 옮기고, 눌러서 역할을 바꿉니다</span>
     </div>
-    <div class="seg-wrap cpb-formations" role="group" aria-label="기본 포메이션">
+    ${showFormations ? `<div class="seg-wrap cpb-formations" role="group" aria-label="기본 포메이션">
       ${formationsFor(team.size).map((f) => `<button type="button" class="btn small ${team.formation === f ? 'on' : ''}" data-act="cm-formation" data-formation="${f}" aria-pressed="${team.formation === f}" title="${esc(FORMATIONS[f]?.shape || '')}">${f}</button>`).join('')}
-    </div>
+    </div>` : ''}
     <div class="custom-pitchboard" data-board role="application" aria-label="${esc(team.name)} 대형 보드 — 선수 칩을 끌어 자리를 옮깁니다">
       <span class="pb-half" aria-hidden="true"></span>
       <span class="pb-circle" aria-hidden="true"></span>
@@ -302,6 +319,58 @@ function pitchBoard(team) {
       <span class="hint">${custom ? '자유 대형 — 끌어 옮긴 그대로 경기장에 섭니다.' : '칩을 끌어 우리 진영~상대 진영 어디든 세울 수 있습니다. 골키퍼는 골문 앞에 머뭅니다.'}</span>
     </div>
   </div>`;
+}
+
+/* ─────────────────────────── 전술 블록 (팀 만들기·매치업 공용) ───────────────────────────
+   「🛠 팀 만들기」와 「⚔ 매치업」이 같은 조각을 씁니다 — 어느 쪽에서 바꿔도 같은 팀에 저장됩니다. */
+function mentalityBlock(team) {
+  const v = team?.tactic?.mentality || 0;
+  return `<div class="cm-field"><span>팀 성향</span>
+    <div class="ment-row" role="group" aria-label="팀 성향">
+      ${MENTALITY.map((m) => `<button type="button" class="ment-btn ${Math.abs(v - m.v) < 0.01 ? 'on' : ''}" data-act="cm-mentality" data-val="${m.v}" aria-pressed="${Math.abs(v - m.v) < 0.01}" title="${esc(m.effect)}">${esc(m.name)}</button>`).join('')}
+    </div>
+    <p class="axis-eff">${esc(mentalityEffect(v, true))}</p>
+  </div>`;
+}
+
+function axesBlock(team) {
+  return `<div class="cm-field"><span>전술 4축</span>
+    <ul class="axes compact cm-axes">
+      ${AXES.map((a) => {
+        const v = team?.tactic?.[a.key] || 0;
+        return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
+        <div class="axis-ctl"><span class="axis-end">${a.left}</span><span class="seg">${STEPS.map((s) => `<button type="button" class="${Math.abs(s - v) < 0.01 ? 'on' : ''}" data-act="cm-tactic" data-axis="${a.key}" data-val="${s}" aria-label="${a.name} ${stepLabel(s)}" aria-pressed="${Math.abs(s - v) < 0.01}">${s > 0 ? '▲' : s < 0 ? '▼' : '●'}</button>`).join('')}</span><span class="axis-end">${a.right}</span></div></li>`;
+      }).join('')}
+    </ul>
+  </div>`;
+}
+
+function rolesBlock(team) {
+  return `<div class="cm-field"><span>포지션별 역할 <small class="muted">— 누르면 바뀝니다</small></span>
+    <div class="role-grid">
+      ${team.players.map((p, i) => {
+        if (teamSlotPos(team, p.slot) === 'GK') return '';
+        const role = (team.roles || [])[i] || 'b2b';
+        const next = nextRole(p.slot, role);
+        const more = rolesForLabel(p.slot).length > 1;
+        return `<button type="button" class="role-row" data-act="cm-role" data-i="${i}" title="${esc(roleLabel(role))} → ${esc(roleLabel(next))}">
+          <span class="rr-pos">${esc(p.slot)}</span><span class="rr-name">${esc(p.name || `선수 ${i + 1}`)}</span>
+          <span class="rr-role">${esc(roleShort(role))}${more ? ' ↻' : ''}</span></button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+
+function setpieceBlock(team) {
+  return `<div class="cm-field"><span>세트피스 지시</span>
+    <ul class="axes compact sp-axes">${setPieceRows(team.setpiece, (t, k) => `data-act="cm-setpiece" data-type="${t}" data-key="${k}"`, { compact: true })}</ul>
+  </div>`;
+}
+
+/* 팀 성향·4축·역할·세트피스 — 두 탭이 함께 쓰는 본문 */
+function tacticsFields(team) {
+  if (!team) return '';
+  return mentalityBlock(team) + axesBlock(team) + rolesBlock(team) + setpieceBlock(team);
 }
 
 function matchupPanel(app, team) {
@@ -353,38 +422,8 @@ function matchupPanel(app, team) {
     <section class="card">
       <h3>전술 — ${esc(team?.name || '내 팀')}</h3>
       ${pitchBoard(team)}
-      <div class="cm-field"><span>팀 성향</span>
-        <div class="ment-row" role="group" aria-label="팀 성향">
-          ${MENTALITY.map((m) => `<button type="button" class="ment-btn ${Math.abs((team?.tactic.mentality || 0) - m.v) < 0.01 ? 'on' : ''}" data-act="cm-mentality" data-val="${m.v}" aria-pressed="${Math.abs((team?.tactic.mentality || 0) - m.v) < 0.01}" title="${esc(m.effect)}">${esc(m.name)}</button>`).join('')}
-        </div>
-        <p class="axis-eff">${esc(mentalityEffect(team?.tactic.mentality || 0, true))}</p>
-      </div>
-      <div class="cm-field"><span>전술 4축</span>
-        <ul class="axes compact cm-axes">
-          ${AXES.map((a) => {
-            const v = team?.tactic?.[a.key] || 0;
-            return `<li class="axis"><div class="axis-head"><b>${a.name}</b><span class="axis-val">${stepLabel(v)}</span></div>
-            <div class="axis-ctl"><span class="axis-end">${a.left}</span><span class="seg">${STEPS.map((s) => `<button type="button" class="${Math.abs(s - v) < 0.01 ? 'on' : ''}" data-act="cm-tactic" data-axis="${a.key}" data-val="${s}" aria-label="${a.name} ${stepLabel(s)}" aria-pressed="${Math.abs(s - v) < 0.01}">${s > 0 ? '▲' : s < 0 ? '▼' : '●'}</button>`).join('')}</span><span class="axis-end">${a.right}</span></div></li>`;
-          }).join('')}
-        </ul>
-      </div>
-      ${team ? `<div class="cm-field"><span>포지션별 역할 <small class="muted">— 누르면 바뀝니다</small></span>
-        <div class="role-grid">
-          ${team.players.map((p, i) => {
-            if (teamSlotPos(team, p.slot) === 'GK') return '';
-            const role = (team.roles || [])[i] || 'b2b';
-            const next = nextRole(p.slot, role);
-            const more = rolesForLabel(p.slot).length > 1;
-            return `<button type="button" class="role-row" data-act="cm-role" data-i="${i}" title="${esc(roleLabel(role))} → ${esc(roleLabel(next))}">
-              <span class="rr-pos">${esc(p.slot)}</span><span class="rr-name">${esc(p.name || `선수 ${i + 1}`)}</span>
-              <span class="rr-role">${esc(roleShort(role))}${more ? ' ↻' : ''}</span></button>`;
-          }).join('')}
-        </div>
-      </div>
-      <div class="cm-field"><span>세트피스 지시</span>
-        <ul class="axes compact sp-axes">${setPieceRows(team.setpiece, (t, k) => `data-act="cm-setpiece" data-type="${t}" data-key="${k}"`, { compact: true })}</ul>
-      </div>` : ''}
-      <p class="hint">K리그 구단과 붙을 때도 내 팀 전술은 그대로 적용됩니다. 경기 중에도 바꿀 수 있습니다.</p>
+      ${tacticsFields(team)}
+      <p class="hint">K리그 구단과 붙을 때도 내 팀 전술은 그대로 적용됩니다. 경기 중에도 바꿀 수 있습니다. 팀 이름·선수 명단과 함께 전술을 짜려면 「🛠 팀 만들기」 탭을 쓰세요.</p>
     </section>
   </div>`;
 }

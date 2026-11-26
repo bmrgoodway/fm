@@ -1284,6 +1284,24 @@ textarea.inp { resize: vertical; line-height: 1.5; }
 .cm-match-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
 .cm-axes .axis { margin-bottom: 6px; }
 
+/* 팀 만들기 탭의 전술 카드 — 대형 보드 + 성향·4축·역할·세트피스 (두 칸 폭) */
+.cm-tactics { grid-column: 1 / -1; }
+.cm-tactics .card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.cm-tactics .card-head h3 { margin: 0; }
+.cm-tactics .card-head .btn { margin-left: auto; }
+.cm-tactics-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 14px; align-items: start; }
+.cm-tactics-board { min-width: 0; }
+.cm-tactics-board .cpb { margin-top: 4px; }
+.cm-tactics-fields { min-width: 0; }
+.cm-tactics-fields > .cm-field:first-child { margin-top: 4px; }
+@media (max-width: 900px) {
+  .cm-tactics-grid { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  /* 모바일은 한 줄짜리라, 긴 선수 명단보다 전술 카드를 먼저 보여 줍니다 */
+  .cm-form { order: 1; }
+  .cm-tactics { order: 2; }
+  .cm-roster { order: 3; }
+}
+
 .cm-result-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: start; }
 .cm-score { display: flex; align-items: center; justify-content: space-between; gap: 8px; border: var(--bw) solid var(--line); background: var(--paper2); padding: 12px; margin-bottom: 12px; }
 .cm-score-team { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; min-width: 0; flex: 1 1 0; }

@@ -22,6 +22,7 @@
 //   29) K리그 장기 밸런스 — 12시즌 시뮬레이션 · 디비전별 유스 아카데미 · 이적 위계 · AI 세대교체
 //   30) 커스텀 매치업 — 팀 빌더·공유 코드·풋살(5·6인제) 경기
 //   31) 커스텀 매치업 자유 대형 — 좌표 클램프·저장·공유(tactic jsonb)·경기 엔진 반영·커리어 무영향
+//   32) 커스텀 팀 저장 — 같은 id 덮어쓰기·새 id 만 생성·공유 지문(sharedKey)·중복 저장소 정리
 // 사용: node scripts/fm-selftest.mjs [경기수]
 import { createWorld, loadWorld, saveWorld, autoLineup, setFormation, setRole, setSetPiece, lineupInfo, fillLineup, mySetup, squadOf, userNextMatch, ensureProgress, finishRound, playOtherFixtures, settleRound, generateOffers, acceptOffer, rejectOffer, counterOffer, negotiate, loanPlayer, returnLoans, signPlayer, sellToClub, advanceSeason, growthPlan, applyGrowth, growTeamFromMatch, setTraining, trainingOf, growthStatus, recentDelta, TRAINING, TRAINING_IDS, myTeam, divisionsOf, divOf, standingsFor, standings, cupStageCount, completeSeason, promotionPlan, applyPromotion, seasonSummary, seasonLabel, simMatchQuick, buildCupStage, teamPower, academyOf, KL_ACADEMY, aiTransferRound } from '../src/world.js';
 import { Match, lineupFor, applyResult, growthPreview, simulateInstant, CY, W, H, aiMentalityPlan } from '../src/match.js';
@@ -31,6 +32,7 @@ import {
   setFormation as setTeamFormation, setSize, setTeamSetPiece, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
   coordsOf, isCustomShape, movePlayerCoord, resetCoords, clampCoord, FIELD_BOX, GK_BOX,
+  teamFingerprint, readTeams, saveTeam, newTeamId,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2462,6 +2464,40 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
   const b11f = buildMatchupWorld({ home: { kind: 'custom', team: e11 }, away: { kind: 'kl', id: 'seoul' }, seed: 'cm-free-11', mySide: 'home' });
   ok(b11f.homeLineup.slots.length === 11 && b11f.homeLineup.slots[8].x === w0.x, '11인제 자유 대형도 라인업에 그대로 들어갑니다', `8번 x ${b11f.homeLineup.slots[8].x}`);
   ok(b11f.awayLineup.slots === undefined, 'K리그 구단은 자유 대형 없이 기본 포메이션으로 나옵니다');
+
+  /* ─────────── [32] 저장 중복 방지 — 같은 팀은 덮어쓰기, 공유 재불러오기는 사본을 만들지 않음 ─────────── */
+  console.log('\n[32] 커스텀 팀 저장 — 같은 id 는 덮어쓰기 · 공유 지문으로 중복 방지');
+
+  // localStorage 대신 쓸 수 있는 간단한 저장소 (store.js 는 호출할 때 globalThis.localStorage 를 봅니다)
+  const mem = new Map();
+  globalThis.localStorage = {
+    getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+    setItem: (k, v) => mem.set(k, String(v)),
+    removeItem: (k) => mem.delete(k),
+    key: (i) => [...mem.keys()][i] ?? null,
+    get length() { return mem.size; },
+  };
+
+  const s1 = newTeam({ size: 11, name: '저장 점검 FC' });
+  autoFill(s1, { level: 72 });
+  const first = saveTeam(s1);
+  ok(first.ok && first.created && first.count === 1, '처음 저장하면 새 팀 1개(created)가 됩니다', `count ${first.count}`);
+  for (let i = 0; i < 3; i += 1) saveTeam({ ...first.team, name: `저장 점검 FC ${i}` });
+  const after = readTeams();
+  ok(after.list.length === 1 && after.list[0].id === s1.id, '같은 팀을 세 번 더 저장해도 팀 개수는 그대로입니다', `${after.list.length}개 · ${after.list[0]?.name}`);
+  const second = saveTeam({ ...first.team, name: '저장 점검 FC 복사본' , id: newTeamId() });
+  ok(second.created && second.count === 2, '새 id 로 저장할 때만 팀이 하나 늘어납니다', `count ${second.count}`);
+
+  const fp1 = teamFingerprint(first.team);
+  ok(fp1 === teamFingerprint(normalizeTeam(first.team)), '같은 내용의 팀은 같은 지문을 가집니다', fp1);
+  ok(fp1 !== teamFingerprint({ ...first.team, name: '다른 이름' }), '이름이 달라지면 지문도 달라집니다');
+  const movedFp = { ...first.team, customCoords: coordsOf(first.team).map((c) => ({ x: c.x, y: c.y })) };
+  ok(fp1 !== teamFingerprint(movedFp), '자유 대형 좌표가 달라지면 지문도 달라집니다');
+  ok(normalizeTeam({ ...first.team, sharedKey: fp1 }).sharedKey === fp1, '팀에 공유 지문(sharedKey)이 저장되고 다시 읽힙니다');
+
+  // 같은 id 가 두 번 들어간 저장소도 하나로 정리
+  mem.set('fm:customTeams', JSON.stringify({ v: 1, list: [first.team, first.team, second.team] }));
+  ok(readTeams().list.length === 2, '같은 id 가 중복된 저장소는 하나로 정리해 읽습니다', `${readTeams().list.length}개`);
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);

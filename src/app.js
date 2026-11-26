@@ -25,7 +25,7 @@ const state = {
   pickMode: 'kleague', pickDiv: 4, divTab: null, marketDiv: 0,
   posFilter: 'ALL', sortKey: 'ovr', sortDir: -1,
   // 커스텀 매치업 — 팀 빌더·공유·가상 경기 (커리어와 분리)
-  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0 },
+  custom: { tab: 'build', teamId: null, team: null, bulk: false, bulkText: '', codeInput: '', share: { busy: false }, msg: '', longLink: '', confirmDelete: null, clickSuppress: 0, tacticsOpen: true },
   matchup: { oppKind: 'kl', oppId: 'geumsan', oppTeam: null, side: 'home' },
   customResult: null, customMatch: null, headerOverride: null,
 };
@@ -522,7 +522,7 @@ function onClick(e) {
     case 'cm-duplicate': {
       const src = state.custom.team;
       if (!src) break;
-      const made = C.saveTeam(C.normalizeTeam({ ...JSON.parse(JSON.stringify(src)), id: C.newTeamId(), name: `${src.name} 복사`, code: null }));
+      const made = C.saveTeam(C.normalizeTeam({ ...JSON.parse(JSON.stringify(src)), id: C.newTeamId(), name: `${src.name} 복사`, code: null, sharedKey: null }));
       if (!made.ok) { toast(made.why, 'warn'); break; }
       state.custom.team = made.team; state.custom.teamId = made.team.id;
       render(); toast('팀을 복제했습니다.', 'ok'); break;
@@ -580,9 +580,13 @@ function onClick(e) {
       C.autoFill(t);
       const r = C.saveTeam(t);
       state.custom.team = r.ok ? r.team : t;
+      if (r.ok) state.custom.msg = `'${t.name}' — 같은 팀을 최신 내용으로 저장했습니다 (내 팀 ${r.count}개).`;
       render();
-      toast(r.ok ? `'${t.name}' 저장했습니다.` : r.why, r.ok ? 'ok' : 'warn'); break;
+      toast(r.ok ? (r.created ? `'${t.name}' 팀을 저장했습니다.` : `'${t.name}' 저장 완료 — 같은 팀을 업데이트했습니다 (내 팀 ${r.count}개)`) : r.why, r.ok ? 'ok' : 'warn'); break;
     }
+    case 'cm-tactics-toggle':
+      state.custom.tacticsOpen = !state.custom.tacticsOpen;
+      keepScroll(); render(); break;
     case 'cm-autofill': {
       const t = state.custom.team;
       if (!t) break;
@@ -933,6 +937,10 @@ function ensureCustomTeam() {
 function onCustomInput(e) {
   const el = e.target;
   if (state.view !== 'custom' || !el?.dataset) return;
+  const cm = el.dataset.cm;
+  // 공유 코드는 팀이 하나도 없을 때도 입력할 수 있어야 합니다 (처음 온 친구가 코드부터 넣는 경우)
+  if (cm === 'code') { state.custom.codeInput = el.value; return; }
+  if (cm === 'bulk') { state.custom.bulkText = el.value; return; }
   const t = state.custom.team;
   if (!t) return;
   const cp = el.dataset.cp;
@@ -945,13 +953,10 @@ function onCustomInput(e) {
     if (cp === 'stat') { if (el.value !== '') C.setPlayerStat(t, i, el.dataset.key, el.value); return; }
     if (cp === 'age') { if (el.value !== '') C.setPlayerAge(t, i, el.value); return; }
   }
-  const cm = el.dataset.cm;
   if (cm === 'name') t.name = String(el.value).slice(0, 24);
   else if (cm === 'short') t.short = String(el.value).slice(0, 5);
   else if (cm === 'primary') t.colors.primary = el.value;
   else if (cm === 'secondary') t.colors.secondary = el.value;
-  else if (cm === 'bulk') state.custom.bulkText = el.value;
-  else if (cm === 'code') state.custom.codeInput = el.value;
 }
 
 /* 값이 확정되는 순간(블러·선택) — 모델을 저장하고 바뀐 부분만 그 자리에서 갱신합니다.
@@ -960,8 +965,6 @@ function onCustomInput(e) {
 function onCustomChange(e) {
   const el = e.target;
   if (state.view !== 'custom' || !el?.dataset) return;
-  const t = state.custom.team;
-  if (!t) return;
   const cm = el.dataset.cm;
   const cp = el.dataset.cp;
   if (cm === 'pick') {
@@ -969,6 +972,8 @@ function onCustomChange(e) {
     if (nt) { state.custom.team = nt; state.custom.teamId = nt.id; state.custom.confirmDelete = null; render(); }
     return;
   }
+  const t = state.custom.team;
+  if (!t) return;
   if (cm === 'primary' || cm === 'secondary') {
     C.saveTeam(t);
     applyTeamColors(document.getElementById('app'), colorWorld());
@@ -1046,6 +1051,29 @@ const codeFromInput = (raw) => {
   return s;
 };
 
+/* 공유 코드·링크로 들여온 팀을 내 팀으로 저장합니다.
+   같은 팀(같은 공유 코드 또는 같은 내용 지문)이 이미 있으면 **새 팀을 만들지 않고 그 팀을 덮어씁니다.**
+   → 같은 링크를 여러 번 열거나 '불러오기'를 다시 눌러도 내 팀 목록이 늘어나지 않습니다. */
+function importSharedTeam(team, { code = null, source = '공유 링크' } = {}) {
+  const key = /^[A-Za-z0-9]{4,12}$/.test(String(code || '')) ? String(code).toUpperCase() : null;
+  const sharedKey = C.teamFingerprint(team);
+  const same = C.readTeams().list.find((t) => (key && t.code === key) || (sharedKey && t.sharedKey === sharedKey)) || null;
+  const saved = C.saveTeam({
+    ...team,
+    id: same?.id || C.newTeamId(),
+    code: key || same?.code || null,
+    sharedKey,
+    from: same?.from || source,
+  });
+  return { saved, updated: !!same, count: saved.count };
+}
+
+/* 공유 링크(?team=·?match=)로 들어왔을 때 주소창에서 그 값을 지웁니다 —
+   새로고침·뒤로가기로 같은 링크를 다시 열어도 팀 사본이 쌓이지 않게. */
+function clearShareParams() {
+  try { history.replaceState(null, '', C.appBase()); } catch { /* 주소를 못 바꾸는 환경이면 그냥 둡니다 */ }
+}
+
 async function loadSharedCode() {
   const raw = (state.custom.codeInput || '').trim();
   if (!raw) { toast('공유 코드나 링크를 입력해 주세요.', 'warn'); return; }
@@ -1054,14 +1082,16 @@ async function loadSharedCode() {
   render();
   const r = await C.fetchTeam(code);
   if (!r.ok) { state.custom.msg = r.why; render(); toast(r.why, 'warn'); return; }
-  const saved = C.saveTeam({ ...r.team, id: C.newTeamId(), code: /^[A-Za-z0-9]{4,12}$/.test(code) ? code.toUpperCase() : null, from: r.team.from || '공유 코드' });
+  const { saved, updated, count } = importSharedTeam(r.team, { code, source: '공유 코드' });
   if (!saved.ok) { state.custom.msg = saved.why; render(); toast(saved.why, 'warn'); return; }
   state.custom.team = saved.team;
   state.custom.teamId = saved.team.id;
   state.custom.codeInput = '';
-  state.custom.msg = `'${saved.team.name}' 팀을 불러와 내 팀으로 저장했습니다.`;
+  state.custom.msg = updated
+    ? `이미 저장한 '${saved.team.name}' 팀을 새 내용으로 업데이트했습니다 (내 팀 ${count}개). 따로 보관하려면 '복제'를 누르세요.`
+    : `'${saved.team.name}' 팀을 불러와 내 팀으로 저장했습니다 (내 팀 ${count}개).`;
   render();
-  toast(`${saved.team.name} 팀을 불러왔습니다.`, 'ok');
+  toast(updated ? `${saved.team.name} 팀을 업데이트했습니다.` : `${saved.team.name} 팀을 불러왔습니다.`, 'ok');
 }
 
 function copyText(text, okMsg = '복사했습니다.') {
@@ -1100,12 +1130,15 @@ async function openSharedParam(code) {
   state.custom.msg = '공유된 팀을 불러오는 중…';
   render();
   const r = await C.fetchTeam(code);
-  if (!r.ok) { state.custom.msg = r.why; render(); toast(r.why, 'warn'); return; }
-  const saved = C.saveTeam({ ...r.team, id: C.newTeamId(), code: /^[A-Za-z0-9]{4,12}$/.test(code) ? code.toUpperCase() : null, from: r.team.from || '공유 링크' });
-  if (!saved.ok) { state.custom.msg = saved.why; render(); return; }
+  if (!r.ok) { clearShareParams(); state.custom.msg = r.why; render(); toast(r.why, 'warn'); return; }
+  const { saved, updated, count } = importSharedTeam(r.team, { code, source: '공유 링크' });
+  if (!saved.ok) { clearShareParams(); state.custom.msg = saved.why; render(); return; }
+  clearShareParams();
   state.custom.team = saved.team;
   state.custom.teamId = saved.team.id;
-  state.custom.msg = `공유받은 '${saved.team.name}' 팀입니다 — 바로 경기하거나 고쳐서 내 팀으로 쓸 수 있어요.`;
+  state.custom.msg = updated
+    ? `공유받은 '${saved.team.name}' 팀이 이미 있어 새 내용으로 업데이트했습니다 (내 팀 ${count}개). 바로 경기하거나 고쳐서 쓸 수 있어요.`
+    : `공유받은 '${saved.team.name}' 팀입니다 — 바로 경기하거나 고쳐서 내 팀으로 쓸 수 있어요.`;
   render();
   toast(`${saved.team.name} 팀을 불러왔습니다.`, 'ok');
 }
@@ -1119,20 +1152,22 @@ async function openMatchParam(value) {
   render();
   const [ra, rb] = await Promise.all([C.fetchTeam(a || ''), C.fetchTeam(b || '')]);
   if (!ra.ok || !rb.ok) {
+    clearShareParams();
     state.custom.msg = ra.ok ? rb.why : ra.why;
     render();
     toast(state.custom.msg, 'warn');
     return;
   }
-  const sa = C.saveTeam({ ...ra.team, id: C.newTeamId(), from: '공유 링크' });
-  const sb = C.saveTeam({ ...rb.team, id: C.newTeamId(), from: '공유 링크' });
-  if (!sa.ok || !sb.ok) { state.custom.msg = '팀을 저장하지 못했습니다.'; render(); return; }
-  state.custom.team = sa.team;
-  state.custom.teamId = sa.team.id;
+  const sa = importSharedTeam(ra.team, { code: a, source: '공유 링크' });
+  const sb = importSharedTeam(rb.team, { code: b, source: '공유 링크' });
+  if (!sa.saved.ok || !sb.saved.ok) { state.custom.msg = '팀을 저장하지 못했습니다.'; render(); return; }
+  clearShareParams();
+  state.custom.team = sa.saved.team;
+  state.custom.teamId = sa.saved.team.id;
   state.matchup.oppKind = 'custom';
-  state.matchup.oppId = sb.team.id;
-  state.matchup.oppTeam = sb.team;
-  state.custom.msg = `${sa.team.name} vs ${sb.team.name} — 홈/원정을 고르고 시작하세요.`;
+  state.matchup.oppId = sb.saved.team.id;
+  state.matchup.oppTeam = sb.saved.team;
+  state.custom.msg = `${sa.saved.team.name} vs ${sb.saved.team.name} — 홈/원정을 고르고 시작하세요.`;
   render();
   toast('두 팀을 불러왔습니다.', 'ok');
 }
