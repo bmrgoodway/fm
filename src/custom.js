@@ -377,6 +377,8 @@ export function saveTeam(team) {
   const t = { ...normalizeTeam(team), updatedAt: Date.now() };
   const i = db.list.findIndex((x) => x.id === t.id);
   const created = i < 0;
+  // 새 팀을 넣을 자리가 없으면 조용히 밀어내지 않고 알려 줍니다
+  if (created && db.list.length >= TEAM_MAX) return { ok: false, why: `팀은 최대 ${TEAM_MAX}개까지 저장할 수 있습니다. 쓰지 않는 팀을 지우고 다시 해 주세요.` };
   if (!created) db.list[i] = t; else db.list = [t, ...db.list];
   const r = writeTeams(db);
   return r.ok ? { ok: true, team: t, created, count: Math.min(db.list.length, TEAM_MAX) } : r;

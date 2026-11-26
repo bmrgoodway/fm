@@ -32,7 +32,7 @@ import {
   setFormation as setTeamFormation, setSize, setTeamSetPiece, parseBulk, applyBulk, packTeam, unpackTeam, encodePayload, decodePayload,
   buildMatchupWorld, resultText, matchSummary, FORMATS, formatName,
   coordsOf, isCustomShape, movePlayerCoord, resetCoords, clampCoord, FIELD_BOX, GK_BOX,
-  teamFingerprint, readTeams, saveTeam, newTeamId, duplicateTeams, removeDuplicates,
+  teamFingerprint, readTeams, saveTeam, newTeamId, duplicateTeams, removeDuplicates, TEAM_MAX,
 } from '../src/custom.js';
 import { FORMATIONS, FORMATION_IDS, FUTSAL_FORMATIONS, formationsFor, sizeOfFormation, overall, valueOf, TEAM_DEFS } from '../src/data.js';
 import { KL_ROSTERS, KL_TEAMS } from '../src/kleague2026.js';
@@ -2514,6 +2514,13 @@ console.log('\n[29] K리그 장기 밸런스 — 12시즌 시뮬레이션 · 유
   const dedup = removeDuplicates();
   ok(dedup.ok && dedup.removed === 2 && readTeams().list.length === 2, '「중복 정리」는 사본만 지우고 다른 팀은 남깁니다', `삭제 ${dedup.removed}개 · 남은 ${dedup.count}개`);
   ok(duplicateTeams().length === 0, '정리 뒤에는 중복 묶음이 없습니다');
+
+  // 저장 한도(24팀) — 새 팀을 넣을 자리가 없으면 조용히 밀어내지 않고 알립니다
+  mem.clear();
+  for (let i = 0; i < TEAM_MAX; i += 1) saveTeam({ ...newTeam({ size: 5, name: `한도 ${i}` }), id: `ctlimit${i}` });
+  const full = saveTeam(newTeam({ size: 5, name: '한도 초과' }));
+  ok(!full.ok && /최대 24개/.test(full.why || '') && readTeams().list.length === TEAM_MAX, '팀이 24개일 때 새 팀 저장은 거절하고 이유를 알려 줍니다', full.why);
+  mem.clear();
 }
 
 console.log(`\n${fails ? `❌ ${fails}개 점검 실패` : '✅ 모든 점검 통과'}\n`);
